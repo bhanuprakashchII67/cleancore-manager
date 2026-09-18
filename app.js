@@ -11,7 +11,7 @@ const STAFF_AUTH_DOMAIN="@staff.cleancore.local";
 const ALL_MODULES=["dashboard","products","billing","sales","customers","enquiries","website_orders","expenses"];
 const MODULE_LABELS={dashboard:"Dashboard",products:"Products & Stock",billing:"Billing",sales:"Sales",customers:"Customers",enquiries:"Leads / Enquiries",website_orders:"Website Orders",expenses:"Expenses"};
 const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing",sales:"sales",customers:"customers",enquiries:"enquiries",expenses:"expenses",settings:"settings"};
-let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[];
+let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
@@ -105,16 +105,126 @@ async function loadAll(){
  for(const q of qs)if(q?.error)return toast(q.error.message,false);
  products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
  if(isAdmin){
-   const [er,cr,ar,nr]=await Promise.all([
+   const [er,ep,cr,ar,nr]=await Promise.all([
      db.from("employees").select("*").order("created_at",{ascending:false}),
+     db.from("employee_permissions").select("*"),
      db.from("change_requests").select("*").order("requested_at",{ascending:false}),
      db.from("access_requests").select("*").order("created_at",{ascending:false}),
      db.from("manager_notifications").select("*").order("created_at",{ascending:false})
    ]);
-   for(const q of [er,cr,ar,nr])if(q?.error)return toast(q.error.message,false);
-   employees=er.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];
+   for(const q of [er,ep,cr,ar,nr])if(q?.error)return toast(q.error.message,false);
+   employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];
  }
  renderAll();
+}
+
+function formatAccessDate(v){return v?new Date(v).toLocaleString("en-IN"):"—"}
+function employeePermissionsFor(id){
+ return employeePermissionRows.filter(x=>x.employee_id===id&&x.enabled).map(x=>MODULE_LABELS[x.module]||x.module);
+}
+function employeeById(id){return employees.find(x=>x.id===id)}
+function renderEmployeeData(){
+ if(!isAdmin)return;
+ if($("employeesTable")){
+   $("employeesTable").innerHTML=table(["Employee","Username","Team","Access","Start","End","Permissions","Action"],employees.map(e=>{
+     const expired=e.ends_at&&new Date(e.ends_at)<new Date();
+     const state=e.active&&!expired?"Active":"Disabled / expired";
+     const perms=employeePermissionsFor(e.id).join(", ")||"None";
+     return [esc(e.full_name),esc(e.username),esc(e.team),state,formatAccessDate(e.starts_at),formatAccessDate(e.ends_at),esc(perms),
+       "<button class='link' onclick=\"toggleEmployeeActive('"+e.id+"',"+(!e.active)+")\">"+(e.active?"Disable":"Enable")+"</button> <button class='link' onclick=\"resetEmployeePassword('"+e.id+"')\">Reset password</button>"];
+   }));
+ }
+ const pending=changeRequests.filter(x=>x.status==="Pending");
+ if($("approvalCount"))$("approvalCount").textContent=String(pending.length);
+ if($("accessAlertCount"))$("accessAlertCount").textContent=String(accessRequests.length);
+ if($("changeRequestsTable")){
+   $("changeRequestsTable").innerHTML=table(["Employee","Module","Action","Target","Requested","Status","Review"],changeRequests.map(r=>{
+     const e=employeeById(r.employee_id);
+     const action=esc(r.action);
+     const status=esc(r.status);
+     const buttons=r.status==="Pending"
+       ? "<button class='link' onclick=\"reviewChange('"+r.id+"',true)\">Approve</button> <button class='link danger' onclick=\"reviewChange('"+r.id+"',false)\">Reject</button>"
+       : "Reviewed";
+     return [esc(e?.username||"—"),esc(MODULE_LABELS[r.module]||r.module),action,esc(r.target_table||"—"),formatAccessDate(r.requested_at),status,buttons];
+   }));
+ }
+ if($("accessRequestsTable")){
+   $("accessRequestsTable").innerHTML=table(["Employee","Module","Action","Reason","Date"],accessRequests.slice(0,100).map(r=>{
+     const e=employeeById(r.employee_id);
+     return [esc(e?.username||"—"),esc(MODULE_LABELS[r.module]||r.module),esc(r.action),esc(r.reason||"—"),formatAccessDate(r.created_at)];
+   }));
+ }
+ if($("notificationTable")){
+   $("notificationTable").innerHTML=table(["Type","Subject","Email","Status","Date"],managerNotifications.slice(0,100).map(n=>[esc(n.notification_type),esc(n.subject),esc(n.email_to),esc(n.email_status),formatAccessDate(n.created_at)]));
+ }
+}
+window.toggleEmployeeActive=async function(id,active){
+ if(!isAdmin)return;
+ const {error}=await db.from("employees").update({active,updated_at:new Date().toISOString()}).eq("id",id);
+ if(error)return toast(error.message,false);
+ await loadAll();toast(active?"Employee enabled":"Employee disabled");
+};
+window.resetEmployeePassword=async function(id){
+ if(!isAdmin)return;
+ const e=employeeById(id);if(!e)return;
+ const password=prompt("New password for "+e.username+" (minimum 8 characters):","");
+ if(password===null)return;
+ if(password.length<8)return toast("Password must be at least 8 characters.",false);
+ const {data,error}=await db.functions.invoke("employee-admin",{body:{action:"reset_password",employee_id:id,password}});
+ if(error)return toast(error.message||"Password reset failed.",false);
+ if(data?.error)return toast(data.error,false);
+ toast("Password reset for "+e.username);
+};
+window.reviewChange=async function(id,approve){
+ if(!isAdmin)return;
+ const note=approve?"":(prompt("Reason for rejection (optional):","")||"");
+ const {data,error}=await db.rpc("review_change_request",{p_request_id:id,p_approve:approve,p_note:note});
+ if(error)return toast(error.message,false);
+ toast(approve?"Change approved and applied.":"Change request rejected.");
+ await loadAll();
+};
+function defaultEmployeeModules(team){
+ if(team==="account")return ["dashboard","products","billing","sales","expenses"];
+ if(team==="crm")return ["dashboard","customers","enquiries","website_orders"];
+ return ["dashboard"];
+}
+function employeeModuleChecks(selected){
+ return ALL_MODULES.map(m=>"<label class='permission-check'><input type='checkbox' name='employeeModule' value='"+m+"' "+(selected.has(m)?"checked":"")+"><span>"+esc(MODULE_LABELS[m])+"</span></label>").join("");
+}
+function renderEmployeeModuleChecks(team){
+ const wrap=$("employeePermissions");
+ if(!wrap)return;
+ const selected=new Set(defaultEmployeeModules(team||$("employeeTeam")?.value||"custom"));
+ wrap.innerHTML=employeeModuleChecks(selected);
+}
+function collectEmployeeModules(){
+ return [...document.querySelectorAll('input[name="employeeModule"]:checked')].map(x=>x.value);
+}
+function resetEmployeeForm(){
+ $("employeeUsername").value="";$("employeeFullName").value="";$("employeeAlertEmail").value="";
+ $("employeeTeam").value="account";$("employeePassword").value="";
+ $("employeeStarts").value="";$("employeeEnds").value="";
+ renderEmployeeModuleChecks("account");$("employeeStatus").textContent="";
+}
+async function createEmployee(e){
+ e.preventDefault();
+ const status=$("employeeStatus");
+ const username=$("employeeUsername").value.trim().toLowerCase();
+ const full_name=$("employeeFullName").value.trim();
+ const alert_email=$("employeeAlertEmail").value.trim();
+ const password=$("employeePassword").value;
+ const team=$("employeeTeam").value;
+ const starts_at=$("employeeStarts").value?new Date($("employeeStarts").value).toISOString():null;
+ const ends_at=$("employeeEnds").value?new Date($("employeeEnds").value).toISOString():null;
+ const modules=collectEmployeeModules();
+ if(!/^[a-z0-9._-]{3,40}$/.test(username))return status.textContent="Username must be 3-40 characters using letters, numbers, dot, underscore or hyphen.";
+ if(password.length<8)return status.textContent="Password must be at least 8 characters.";
+ if(starts_at&&ends_at&&new Date(starts_at)>=new Date(ends_at))return status.textContent="End date/time must be after start date/time.";
+ if(!modules.length)return status.textContent="Select at least one Manager section.";
+ const {data,error}=await db.functions.invoke("employee-admin",{body:{action:"create",username,full_name,team,alert_email,password,starts_at,ends_at,modules}});
+ if(error)return status.textContent=error.message||"Could not create employee.";
+ if(data?.error)return status.textContent=data.error;
+ $("employeeDialog").close();toast("Employee "+username+" created.");await loadAll();
 }
 function renderAll(){
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
