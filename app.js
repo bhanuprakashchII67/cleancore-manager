@@ -210,24 +210,48 @@ window.viewInvoice=async id=>{
  const r=await db.from("invoice_items").select("*").eq("invoice_id",id).order("created_at");
  if(r.error)return toast(r.error.message,false);
  const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
- const tax=intra
-  ? "<div>CGST "+Number(inv.cgst_percent||0)+"%: <b>"+money(inv.cgst_amount)+"</b></div><div>SGST "+Number(inv.sgst_percent||0)+"%: <b>"+money(inv.sgst_amount)+"</b></div>"
-  : (Number(inv.igst_amount||0)>0 ? "<div>IGST "+Number(inv.igst_percent||0)+"%: <b>"+money(inv.igst_amount)+"</b></div>" : "");
+ const cgst=Number(inv.cgst_amount||0),sgst=Number(inv.sgst_amount||0),igst=Number(inv.igst_amount||0);
+ const taxRows=intra
+  ? "<tr><td colspan='5' class='tax-label'>CGST ("+Number(inv.cgst_percent||0)+"%)</td><td>"+money(cgst)+"</td></tr><tr><td colspan='5' class='tax-label'>SGST ("+Number(inv.sgst_percent||0)+"%)</td><td>"+money(sgst)+"</td></tr>"
+  : (igst>0 ? "<tr><td colspan='5' class='tax-label'>IGST ("+Number(inv.igst_percent||0)+"%)</td><td>"+money(igst)+"</td></tr>" : "");
+ const rows=(r.data||[]).map((it,n)=>"<tr><td>"+(n+1)+"</td><td>"+esc(it.product_name)+"</td><td>—</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("");
+ const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
+ const date=new Date(inv.created_at);
  $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
- "<h2>CleanCore Chemical & Cleaning</h2><p>Hyderabad • +91 91827 25773</p>"+
- "<p><b>Invoice:</b> "+esc(inv.invoice_no)+"<br><b>Date:</b> "+new Date(inv.created_at).toLocaleString("en-IN")+"</p><hr>"+
- "<p><b>Customer:</b> "+esc(inv.customer_name)+"<br><b>Business:</b> "+esc(inv.customer_business||"—")+"<br><b>Phone:</b> "+esc(inv.customer_phone||"—")+"<br><b>GSTIN:</b> "+esc(inv.gstin||"—")+"<br><b>Billing:</b> "+esc(inv.billing_address||"—")+"<br><b>Delivery:</b> "+esc(inv.delivery_address||"—")+"</p>"+
- "<table class='invoice-items'><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>"+
- (r.data||[]).map(it=>"<tr><td>"+esc(it.product_name)+"</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("")+
- "</tbody></table><div class='invoice-totals'>Subtotal: <b>"+money(inv.subtotal)+"</b><br>Discount: <b>"+money(inv.discount)+"</b><br>"+tax+"<br><strong>Total: "+money(inv.total)+"</strong></div></div>";
+ "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div></div><div class='inv-title'><b>TAX INVOICE</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
+ "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> Telangana<br><b>Payment:</b> —</div></div>"+
+ "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
+ "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
+ "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(taxable)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+taxRows+
+ "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
+ "<div class='amount-words'><b>Total in words:</b> "+esc(numberToWordsIndian(Number(inv.total||0)))+" ONLY</div>"+
+ "<div class='inv-bottom'><div><b>Terms & Conditions</b><p>Goods once sold will not be taken back unless agreed in writing.<br>Payment as per agreed business terms.<br>Subject to Hyderabad, Telangana jurisdiction.</p></div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
+ "</div>";
  $("invoiceDialog").showModal();
 };
+function numberToWordsIndian(n){
+ n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
+ const ones=["","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE","TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN"];
+ const tens=["","","TWENTY","THIRTY","FORTY","FIFTY","SIXTY","SEVENTY","EIGHTY","NINETY"];
+ const two=x=>x<20?ones[x]:tens[Math.floor(x/10)]+(x%10?" "+ones[x%10]:"");
+ const part=(x,unit)=>x?two(x)+" "+unit+" ":"";
+ let s="";
+ if(n>=10000000){s+=part(Math.floor(n/10000000),"CRORE");n%=10000000}
+ if(n>=100000){s+=part(Math.floor(n/100000),"LAKH");n%=100000}
+ if(n>=1000){s+=part(Math.floor(n/1000),"THOUSAND");n%=1000}
+ if(n>=100){s+=part(Math.floor(n/100),"HUNDRED");n%=100}
+ if(n)s+=two(n);
+ return s.trim()+" RUPEES";
+}
 $("closeInvoice").onclick=()=>$("invoiceDialog").close();
 $("printInvoice").onclick=()=>{
- const w=window.open("","_blank","width=900,height=900");
+ const w=window.open("","_blank","width=900,height=1100");
  if(!w)return toast("Allow pop-ups to print the bill.",false);
- w.document.write("<html><head><title>CleanCore Invoice</title><style>body{font-family:Arial;padding:30px}.invoice-items{width:100%;border-collapse:collapse}.invoice-items th,.invoice-items td{border:1px solid #ccc;padding:8px}.invoice-totals{text-align:right;margin-top:20px}</style></head><body>"+$("invoicePreview").innerHTML+"</body></html>");
- w.document.close(); w.focus(); w.print();
+ const body=$("invoicePreview").innerHTML;
+ w.document.write("<html><head><title>CleanCore Tax Invoice</title><style>"+
+ "@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;font-size:11px;margin:0}.invoice-preview{width:100%;padding:0}.inv-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}.inv-brand{font-size:22px;font-weight:800}.inv-sub{font-weight:700;margin:3px 0 6px}.inv-title{text-align:right;font-size:20px}.inv-title span{display:block;font-size:9px;margin-top:4px}.inv-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111;padding:8px 0}.inv-parties{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111}.inv-parties>div{padding:8px;border-right:1px solid #111}.inv-parties>div:last-child{border-right:0}.inv-parties p{line-height:1.45;margin:5px 0}.invoice-items{width:100%;border-collapse:collapse;margin-top:10px}.invoice-items th,.invoice-items td{border:1px solid #777;padding:6px;vertical-align:top}.invoice-items th{background:#f1f1f1;text-transform:uppercase;font-size:9px}.invoice-items td:nth-child(1){width:7%}.invoice-items td:nth-child(3){width:14%}.invoice-items td:nth-child(4){width:9%}.invoice-items td:nth-child(5){width:14%}.invoice-items td:nth-child(6){width:18%;text-align:right}.tax-label{text-align:right}.subtotal-row td,.grand-total td{font-weight:700}.grand-total{font-size:13px}.amount-words{border:1px solid #777;padding:8px;margin-top:8px}.inv-bottom{display:grid;grid-template-columns:1fr 1fr;border:1px solid #777;margin-top:8px;min-height:110px}.inv-bottom>div{padding:8px;border-right:1px solid #777}.inv-bottom>div:last-child{border-right:0}.inv-bottom p{line-height:1.45}.signature{text-align:center;padding-top:55px!important}.signature span{font-weight:700}.invoice-preview b{font-weight:700}"+
+ "</style></head><body>"+body+"</body></html>");
+ w.document.close(); w.focus(); setTimeout(()=>w.print(),250);
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
