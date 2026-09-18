@@ -149,8 +149,14 @@ function calc(){
  let subtotal=0;
  document.querySelectorAll(".line").forEach(r=>{const p=products.find(x=>x.id===r.querySelector(".lp").value),q=+r.querySelector(".lq").value||0,v=(p?.selling_price||0)*q;subtotal+=v;r.querySelector(".lv").textContent=money(v)});
  const discount=Math.max(0,+$("discount").value||0),taxable=Math.max(0,subtotal-discount),gstin=$("custGstin").value.trim().toUpperCase(),gp=gstin?(+$("gstPercent").value||0):0,gst=taxable*gp/100,total=taxable+gst;
+ const intraState=gstin ? gstin.slice(0,2)==="36" : false;
+ const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
+ const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
+ const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
  $("subtotal").textContent=money(subtotal);$("discountShow").textContent=money(discount);$("gstShow").textContent=`${gp}% • ${money(gst)}`;$("total").textContent=money(total);
  $("gstWrap").classList.toggle("hidden",!gstin);
+ $("taxBreakdown").classList.toggle("hidden",!gstin);
+ $("taxBreakdown").innerHTML=gstin?(intraState?`<div>CGST ${cgstPercent}%: <strong>${money(cgstAmount)}</strong></div><div>SGST ${sgstPercent}%: <strong>${money(sgstAmount)}</strong></div>`:`<div>IGST ${igstPercent}%: <strong>${money(igstAmount)}</strong></div>`):"";
 }
 $("custGstin").oninput=()=>{const v=$("custGstin").value.trim().toUpperCase();$("custGstin").value=v;calc()};
 $("custPhone").oninput=e=>{e.target.value=e.target.value.replace(/\D/g,"").slice(0,10)};
@@ -172,14 +178,14 @@ $("billForm").addEventListener("submit",async e=>{
  const customerData={name, business_name:business, phone,email,gstin,billing_address:billing,delivery_address:delivery};
  if(!c){const q=await db.from("customers").insert(customerData).select().single();if(q.error)return toast(q.error.message,false);c=q.data}
  else{const q=await db.from("customers").update(customerData).eq("id",c.id);if(q.error)return toast(q.error.message,false)}
- const inv=await db.from("invoices").insert({invoice_no:no,customer_id:c.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,total,profit}).select().single();
+ const inv=await db.from("invoices").insert({invoice_no:no,customer_id:c.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit}).select().single();
  if(inv.error)return toast(inv.error.message,false);
  for(const x of items){
   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q});
   if(a.error)return toast(a.error.message,false);
   const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);if(b.error)return toast(b.error.message,false);
  }
- toast("Invoice "+no+" saved");const waName=name,waPhone=phone,msg=encodeURIComponent(`CleanCore Chemical & Cleaning\nInvoice: ${no}\nCustomer: ${waName}\nSubtotal: ${money(subtotal)}\nDiscount: ${money(discount)}\nGST: ${gp}% (${money(gst)})\nTotal: ${money(total)}\nThank you.`);if(waPhone)window.open(`https://wa.me/91${waPhone}?text=${msg}`,"_blank");
+ toast("Invoice "+no+" saved successfully");
  $("billForm").reset();$("lines").innerHTML="";await loadAll();rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
