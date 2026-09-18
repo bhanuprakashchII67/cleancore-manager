@@ -15,6 +15,7 @@ function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,
 function validPhone(v){return phoneRE.test(normalizePhone(v))}
 function validGstin(v){return !v || gstRE.test(String(v).trim().toUpperCase())}
 function isoDate(d){return new Date(d).toLocaleDateString("en-IN")}
+function dateKey(d=new Date()){const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")}
 function mediaUrls(p,key){const v=p?.[key];return Array.isArray(v)?v:[]}
 
 async function adminCheck(){const {data,error}=await db.from("profiles").select("role").eq("id",user.id).single();if(error||data?.role!=="admin")throw new Error("This account is not authorized as a CleanCore admin.")}
@@ -45,7 +46,7 @@ async function loadAll(){
 }
 function renderAll(){
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
- const todayKey=now.toISOString().slice(0,10),monthKey=todayKey.slice(0,7);
+ const todayKey=dateKey(now),monthKey=todayKey.slice(0,7);
  const td=invoices.filter(x=>new Date(x.created_at)>=day),mo=invoices.filter(x=>new Date(x.created_at)>=mon);
  const grossMonth=mo.reduce((a,x)=>a+Number(x.profit||0),0);
  const monthExpenses=expenses.filter(x=>String(x.expense_date||"").startsWith(monthKey)).reduce((a,x)=>a+Number(x.amount||0),0);
@@ -78,14 +79,14 @@ function expenseList(){
 }
 function renderExpenses(){
  const list=expenseList();
- const gross=list.length ? invoices.filter(inv=>{
+ const gross=invoices.filter(inv=>{
    const d=new Date(inv.created_at);
    const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
    return (!from||d>=new Date(from+"T00:00:00"))&&(!to||d<=new Date(to+"T23:59:59"));
- }).reduce((a,x)=>a+Number(x.profit||0),0) : 0;
+ }).reduce((a,x)=>a+Number(x.profit||0),0);
  const totalExp=list.reduce((a,x)=>a+Number(x.amount||0),0);
  $("expenseSummary").textContent=list.length+" expense"+(list.length===1?"":"s")+" • "+money(totalExp);
- $("expenseToday").textContent=money(expenses.filter(x=>String(x.expense_date)===new Date().toISOString().slice(0,10)).reduce((a,x)=>a+Number(x.amount||0),0));
+ $("expenseToday").textContent=money(expenses.filter(x=>String(x.expense_date)===dateKey()).reduce((a,x)=>a+Number(x.amount||0),0));
  $("expensePeriod").textContent=money(totalExp);
  $("expenseGross").textContent=money(gross);
  $("expenseNet").textContent=money(gross-totalExp);
