@@ -726,7 +726,7 @@ $("billingCustomer").onchange=()=>{
    $("billCustomerPhone").textContent="—";
    $("billCustomerEmail").textContent="—";
    $("billCustomerGstin").textContent="—";
-   $("billCustomerAddress").textContent="—";
+   $("selectedCustomerCard").classList.add("hidden");
    calc();
    return;
  }
@@ -735,8 +735,7 @@ $("billingCustomer").onchange=()=>{
  $("billCustomerPhone").textContent=c.phone||"—";
  $("billCustomerEmail").textContent=c.email||"—";
  $("billCustomerGstin").textContent=c.gstin||"No GSTIN";
- const address=[c.delivery_address||c.billing_address||"—"].filter(Boolean).join(" ");
- $("billCustomerAddress").textContent=address||"—";
+ $("selectedCustomerCard").classList.remove("hidden");
  calc();
 };
 
@@ -802,7 +801,8 @@ $("clearBill").onclick=()=>{
  $("billType").value="NON_GST";
  $("paymentType").value="CASH";
  $("gstPercent").value="18";
- ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin","billCustomerAddress"].forEach(id=>$(id).textContent="—");
+ ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin"].forEach(id=>$(id).textContent="—");
+ $("selectedCustomerCard").classList.add("hidden");
  $("lines").innerHTML="";
  billTotal=0;
  calc();
