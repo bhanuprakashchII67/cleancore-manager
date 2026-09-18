@@ -900,3 +900,10 @@ alter table public.website_orders
   add column if not exists customer_gstin text;
 create index if not exists website_orders_invoice_idx on public.website_orders(invoice_id);
 -- Keep the live Supabase function definitions in sync with the deployed migration.
+
+
+-- add_product_hsn_invoice_fields
+alter table public.products add column if not exists hsn_code text;
+alter table public.invoice_items add column if not exists hsn_code text;
+alter table public.website_order_items add column if not exists hsn_code text;
+alter table public.invoices add column if not exists place_of_supply text;
