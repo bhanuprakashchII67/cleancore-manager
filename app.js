@@ -364,12 +364,20 @@ function renderAll(){
  renderExpenses();
  renderCustomers();
  renderWebsiteOrders();
- $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date"],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at)]));
+ $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
  if($("websiteOrdersPanel"))$("websiteOrdersPanel").style.display=(isAdmin||canAccess("website_orders"))?"":"none";
  if($("enquiriesPanel"))$("enquiriesPanel").style.display=(isAdmin||canAccess("enquiries"))?"":"none";
  if($("addEnquiry"))$("addEnquiry").disabled=(!isAdmin&&!canAccess("enquiries"));
  rebuildLines();
 }
+window.deleteEnquiry=async id=>{
+ if(!isAdmin){toast("Only the Manager can delete enquiries.",false);return;}
+ if(!confirm("Delete this enquiry?"))return;
+ const {error}=await db.from("enquiries").delete().eq("id",id);
+ if(error)return toast(error.message,false);
+ toast("Enquiry deleted");
+ await loadAll();
+};
 function expenseList(){
  const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
  return expenses.filter(x=>(!from||String(x.expense_date)>=from)&&(!to||String(x.expense_date)<=to));
