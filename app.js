@@ -18,7 +18,7 @@ function isoDate(d){return new Date(d).toLocaleDateString("en-IN")}
 function mediaUrls(p,key){const v=p?.[key];return Array.isArray(v)?v:[]}
 
 async function adminCheck(){const {data,error}=await db.from("profiles").select("role").eq("id",user.id).single();if(error||data?.role!=="admin")throw new Error("This account is not authorized as a CleanCore admin.")}
-async function enter(){try{await adminCheck();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("profileEmail").textContent=user.email;await loadAll()}catch(e){await db.auth.signOut();toast(e.message,false)}}
+async function enter(){try{await adminCheck();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("profileEmail").textContent=user.email;await loadAll()}catch(e){await db.auth.signOut({scope:"local"});toast(e.message,false)}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();const password=$("loginPassword").value;if(!password)return toast("Enter your admin password.",false);try{await bootSignout; const {data,error}=await db.auth.signInWithPassword({email:"bhanuprakashchadalawada10@gmail.com",password});if(error)return toast("Login failed: "+error.message,false);if(!data?.session)return toast("Login failed: No session returned.",false);user=data.user;await enter()}catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}});
 $("logout").onclick=async()=>{await db.auth.signOut({scope:"local"});location.reload()};
 document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.dataset.section));
@@ -247,7 +247,7 @@ function armInactivity(){
 }
 ["click","keydown","pointerdown","mousemove","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{if(user)armInactivity()},{passive:true}));
 window.addEventListener("pagehide",()=>{try{db.auth.signOut({scope:"local"})}catch(e){}});
-document.addEventListener("visibilitychange",()=>{if(user){if(document.visibilityState==="hidden"){try{db.auth.signOut()}catch(e){}}else{forceLogout()}}});
+document.addEventListener("visibilitychange",()=>{if(user){if(document.visibilityState==="hidden"){try{db.auth.signOut({scope:"local"})}catch(e){}}else{forceLogout()}}});
 sessionStorage.removeItem("cleancore_session");
 user=null;
 
