@@ -32,7 +32,10 @@ async function loadAccess(){
   const {data:emp,error}=await db.from("employees").select("*").eq("auth_user_id",user.id).maybeSingle();
   if(error||!emp)throw new Error("Employee account not found.");
   const now=Date.now(),start=emp.starts_at?new Date(emp.starts_at).getTime():-Infinity,end=emp.ends_at?new Date(emp.ends_at).getTime():Infinity;
-  if(!emp.active||now<start||now>end)throw new Error("Your employee access is inactive or outside the allowed date/time.");
+  if(!emp.active||now<start||now>end){
+    await db.rpc("log_employee_access_attempt",{p_module:"login",p_action:"LOGIN_OUTSIDE_ALLOWED_TIME",p_reason:"Employee attempted login outside the configured active window."}).catch(()=>null);
+    throw new Error("Your employee access is inactive or outside the allowed date/time.");
+  }
   const {data:perms,error:perr}=await db.from("employee_permissions").select("module").eq("employee_id",emp.id).eq("enabled",true);
   if(perr)throw new Error(perr.message);
   employee=emp;employeePermissions=new Set((perms||[]).map(x=>x.module));
@@ -154,7 +157,8 @@ function renderEmployeeData(){
      const buttons=r.status==="Pending"
        ? "<button class='link' onclick=\"reviewChange('"+r.id+"',true)\">Approve</button> <button class='link danger' onclick=\"reviewChange('"+r.id+"',false)\">Reject</button>"
        : "Reviewed";
-     return [esc(e?.username||"—"),esc(MODULE_LABELS[r.module]||r.module),action,esc(r.target_table||"—"),formatAccessDate(r.requested_at),status,buttons];
+     const details="<button class='link' onclick=\"viewChangeRequest('"+r.id+"')\">View</button> ";
+     return [esc(e?.username||"—"),esc(MODULE_LABELS[r.module]||r.module),action,esc(r.target_table||"—"),formatAccessDate(r.requested_at),status,details+buttons];
    }));
  }
  if($("accessRequestsTable")){
@@ -184,6 +188,15 @@ window.resetEmployeePassword=async function(id){
  if(data?.error)return toast(data.error,false);
  toast("Password reset for "+e.username);
 };
+window.viewChangeRequest=function(id){
+ if(!isAdmin)return;
+ const r=changeRequests.find(x=>x.id===id);if(!r)return;
+ const e=employeeById(r.employee_id);
+ $("changeRequestTitle").textContent=(e?.username||"Employee")+" — "+(MODULE_LABELS[r.module]||r.module)+" / "+r.action;
+ $("changeRequestDetails").textContent=JSON.stringify({action:r.action,target_table:r.target_table,target_id:r.target_id,payload:r.payload,requested_at:r.requested_at,status:r.status},null,2);
+ $("changeRequestDialog").showModal();
+};
+$("closeChangeRequest").onclick=function(){$("changeRequestDialog").close()};
 window.reviewChange=async function(id,approve){
  if(!isAdmin)return;
  const note=approve?"":(prompt("Reason for rejection (optional):","")||"");
