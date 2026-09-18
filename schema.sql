@@ -87,6 +87,22 @@ create table if not exists public.raw_materials(
  updated_at timestamptz not null default now()
 );
 
+create table if not exists public.expenses(
+ id uuid primary key default gen_random_uuid(),
+ expense_date date not null default current_date,
+ category text not null,
+ amount numeric(12,2) not null check(amount>0),
+ vendor text not null default '',
+ payment_method text not null default 'Cash',
+ notes text not null default '',
+ raw_material_id uuid references public.raw_materials(id) on delete set null,
+ quantity numeric(14,3),
+ unit_cost numeric(12,2),
+ created_at timestamptz not null default now(),
+ updated_at timestamptz not null default now()
+);
+create index if not exists expenses_date_idx on public.expenses(expense_date desc);
+
 insert into public.products(name,unit,selling_price,cost_price,stock)
 select x.name,'5 Litre Can',349,0,0 from (values
 ('Dishwash Liquid'),('Floor Cleaner'),('Toilet Cleaner'),('Glass Cleaner'),('Hand Wash'),('Hard Surface Cleaner'),('All-in-One Cleaner')
@@ -105,6 +121,7 @@ alter table public.invoices enable row level security;
 alter table public.invoice_items enable row level security;
 alter table public.enquiries enable row level security;
 alter table public.raw_materials enable row level security;
+alter table public.expenses enable row level security;
 
 drop policy if exists profiles_self on public.profiles;
 create policy profiles_self on public.profiles for select to authenticated using(id=auth.uid() and role='admin');
@@ -121,10 +138,12 @@ drop policy if exists enquiries_admin on public.enquiries;
 create policy enquiries_admin on public.enquiries for all to authenticated using(public.is_admin()) with check(public.is_admin());
 drop policy if exists raw_materials_admin on public.raw_materials;
 create policy raw_materials_admin on public.raw_materials for all to authenticated using(public.is_admin()) with check(public.is_admin());
+drop policy if exists expenses_admin on public.expenses;
+create policy expenses_admin on public.expenses for all to authenticated using(public.is_admin()) with check(public.is_admin());
 
 grant usage on schema public to authenticated;
 grant select on public.profiles to authenticated;
-grant select,insert,update,delete on public.products,public.customers,public.invoices,public.invoice_items,public.enquiries,public.raw_materials to authenticated;
+grant select,insert,update,delete on public.products,public.customers,public.invoices,public.invoice_items,public.enquiries,public.raw_materials,public.expenses to authenticated;
 
 -- Product photos/videos: public read for the future public website, admin-only upload/change/delete.
 insert into storage.buckets(id,name,public)
