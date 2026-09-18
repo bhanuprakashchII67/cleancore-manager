@@ -453,7 +453,7 @@ function renderSales(){
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
  $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Paid","Credit","Status","Date","Action"],list.map(x=>[
   esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),String(Number(x.gst_percent||0))+"%",money(x.total),money(x.profit),money(x.paid_amount),money(x.due_amount),esc(x.payment_status||"Credit"),new Date(x.created_at).toLocaleString("en-IN"),
-  '<button class="link" onclick="viewInvoice(\\\''+x.id+'\\\')">View Bill</button>'
+  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View Bill</button>'
  ]));
 }
 function customerStats(id){
@@ -760,6 +760,10 @@ $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
 $("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
 $("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
 
+document.addEventListener("click",e=>{
+ const btn=e.target.closest?.(".view-bill");
+ if(btn){e.preventDefault();window.viewInvoice(btn.dataset.invoiceId);}
+});
 window.viewInvoice=async id=>{
  const inv=invoices.find(x=>x.id===id); if(!inv)return;
  const r=await db.from("invoice_items").select("*").eq("invoice_id",id).order("created_at");
@@ -775,7 +779,7 @@ window.viewInvoice=async id=>{
  $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
  "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+(hasGst?"TAX INVOICE":"INVOICE")+"</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
  "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> Telangana<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"")+"</div></div>"+
- "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</<p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
+ "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
  "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
  "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
  "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
