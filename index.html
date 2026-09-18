@@ -229,6 +229,10 @@
   </div>
 
   <div class="panel">
+    <div class="panel-head"><div><h3>Access Requests</h3><p class="muted">Employees can raise a ticket from their private portal when they need an additional section.</p></div><span id="accessTicketCount" class="badge warn">0</span></div>
+    <div id="accessTicketsTable"></div>
+  </div>
+  <div class="panel">
     <div class="panel-head"><div><h3>Restricted Access Alerts</h3><p id="accessSummary" class="muted">Attempts by employees to open sections outside their permissions are recorded here.</p></div><span id="accessAlertCount" class="badge warn">0</span></div>
     <div id="accessRequestsTable"></div>
   </div>
@@ -351,8 +355,19 @@
     <label>Access ends<input id="employeeEnds" type="datetime-local"></label>
   </div>
   <div><b>Manager sections they may open</b><div id="employeePermissions" class="permission-grid"></div></div>
+  <div id="employeePortalBox" class="employee-portal-box hidden">
+    <label>Private employee portal link
+      <input id="employeePortalLink" type="text" readonly>
+    </label>
+    <button type="button" id="copyEmployeePortalButton" class="btn secondary">Copy portal link</button>
+    <p class="muted tiny">Give this link only to this employee. They will still need their username and password.</p>
+  </div>
   <p id="employeeStatus" class="cc-status" aria-live="polite"></p>
-  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" type="submit">Create Employee</button></div>
+  <div class="actions">
+    <button id="employeeCloseButton" class="btn hidden" type="button">Done</button>
+    <button class="btn" value="cancel" type="button" id="employeeCancelButton">Cancel</button>
+    <button id="employeeCreateButton" class="btn primary" type="submit">Create Employee</button>
+  </div>
 </form>
 </dialog>
 
@@ -368,6 +383,6 @@
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.5.1"></script>
+<script src="app.js?v=2.5.2"></script>
 </body>
 </html>
