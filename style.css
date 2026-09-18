@@ -281,3 +281,5 @@ dialog .dialog{padding-top:52px}
 /* Customer bill delivery notice */
 .send-notice{margin:0 0 18px;padding:14px 16px;border:1px solid #cfe5e2;border-radius:12px;background:#f2fbfa;color:#173946}
 .send-notice strong{color:#087f79}
+
+.install-app-btn{margin-top:12px;width:100%;justify-content:center}
