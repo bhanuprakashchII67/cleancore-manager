@@ -95,9 +95,11 @@ function renderExpenses(){
   "<button class='link' onclick=\"editExpense('"+x.id+"')\">Edit</button> <button class='link danger' onclick=\"deleteExpense('"+x.id+"')\">Delete</button>"
  ]));
 }
+function refreshExpenseRawMaterials(){const el=$("expenseRawMaterial");el.innerHTML="<option value=\"\">Select raw material (optional)</option>"+rawMaterials.map(r=>"<option value=\""+r.id+"\">"+esc(r.name)+" ("+esc(r.unit)+")</option>").join("")}
 function resetExpenseForm(){
  editingExpenseId=null;
- $("expenseDate").value=new Date().toISOString().slice(0,10);
+ refreshExpenseRawMaterials();
+ $("expenseDate").value=dateKey();
  $("expenseCategory").value="Other";
  $("expenseAmount").value="";
  $("expenseVendor").value="";
@@ -120,7 +122,8 @@ $("expenseCategory").onchange=toggleExpenseRawFields;
 window.editExpense=id=>{
  const x=expenses.find(e=>e.id===id);if(!x)return;
  editingExpenseId=id;
- $("expenseDate").value=x.expense_date||new Date().toISOString().slice(0,10);
+ refreshExpenseRawMaterials();
+ $("expenseDate").value=x.expense_date||dateKey();
  $("expenseCategory").value=x.category||"Other";
  $("expenseAmount").value=x.amount??"";
  $("expenseVendor").value=x.vendor||"";
