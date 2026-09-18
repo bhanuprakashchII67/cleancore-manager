@@ -143,3 +143,30 @@ button,input,select,textarea{touch-action:manipulation}
   .cards{gap:6px}
   .metric{padding:11px 8px}
 }
+
+/* Fix compact bottom navigation on phones: icon above label, never side-by-side */
+@media (max-width: 768px){
+  .sidebar nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));width:100%;align-items:stretch}
+  .nav{
+    width:100%;min-width:0;max-width:none;
+    flex-direction:column;
+    gap:2px;
+    white-space:normal;
+    overflow:hidden;
+    padding:6px 1px;
+    font-size:10px;
+    line-height:1.05;
+  }
+  .nav[data-section]::before{
+    display:block;
+    flex:0 0 auto;
+    margin:0 0 2px;
+    font-size:16px;
+    line-height:1;
+  }
+  .nav[data-section="products"]::before{content:"▣"}
+}
+@media (max-width:390px){
+  .nav{font-size:8.5px;padding:5px 0}
+  .nav[data-section]::before{font-size:14px;margin-bottom:2px}
+}
