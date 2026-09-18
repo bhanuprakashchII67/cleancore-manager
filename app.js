@@ -48,6 +48,23 @@ async function refreshManagerData(){
    if(b){b.disabled=false;b.textContent="↻ Refresh";}
  }
 }
+async function refreshPageData(btn){
+ if(!btn)return;
+ const old=btn.innerHTML;
+ btn.disabled=true;btn.innerHTML="↻ Refreshing…";
+ try{
+   await loadAll();
+   toast("Page data refreshed");
+ }catch(err){
+   toast(err?.message||"Refresh failed",false);
+ }finally{
+   btn.disabled=false;btn.innerHTML=old;
+ }
+}
+document.addEventListener("click",e=>{
+ const btn=e.target.closest?.("[data-page-refresh]");
+ if(btn)refreshPageData(btn);
+});
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
 function validPhone(v){return phoneRE.test(normalizePhone(v))}
