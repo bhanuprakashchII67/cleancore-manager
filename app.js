@@ -18,14 +18,36 @@ let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExp
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
 function ensureDialogCloseButtons(){
  document.querySelectorAll("dialog").forEach(d=>{
-   if(d.querySelector("[data-dialog-x]"))return;
-   const b=document.createElement("button");
-   b.type="button";b.dataset.dialogX="1";b.className="dialog-x";b.setAttribute("aria-label","Close");
-   b.textContent="×";b.onclick=()=>d.close();
-   d.appendChild(b);
+   if(!d.querySelector("[data-dialog-x]")){
+     const b=document.createElement("button");
+     b.type="button";b.dataset.dialogX="1";b.className="dialog-x";b.setAttribute("aria-label","Close");
+     b.textContent="×";b.onclick=()=>d.close();
+     d.appendChild(b);
+   }
+   d.querySelectorAll("[data-dialog-cancel]").forEach(b=>{
+     b.type="button";
+     b.addEventListener("click",()=>{
+       const form=b.closest("form");
+       if(form)form.reset();
+       d.close();
+     });
+   });
  });
 }
 document.addEventListener("DOMContentLoaded",ensureDialogCloseButtons);
+
+async function refreshManagerData(){
+ const b=$("refreshManager");
+ if(b){b.disabled=true;b.textContent="↻ Refreshing…";}
+ try{
+   await loadAll();
+   toast("Manager data refreshed");
+ }catch(err){
+   toast(err?.message||"Refresh failed",false);
+ }finally{
+   if(b){b.disabled=false;b.textContent="↻ Refresh";}
+ }
+}
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
 function validPhone(v){return phoneRE.test(normalizePhone(v))}
@@ -94,6 +116,7 @@ $("loginForm").addEventListener("submit",async e=>{
  }catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}
 });
 $("logout").onclick=async()=>{clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
+$("refreshManager").onclick=refreshManagerData;
 document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.dataset.section));
 document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
 async function go(id){
