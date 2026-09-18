@@ -1209,19 +1209,46 @@ function numberToWordsIndian(n){
  return s.trim()+" RUPEES";
 }
 $("closeInvoice").onclick=()=>$("invoiceDialog").close();
-$("printInvoice").onclick=(e)=>{
+function getPrintableInvoiceHtml(){
+ const body=$("invoicePreview")?.innerHTML?.trim();
+ if(!body)throw new Error("Open a bill before printing.");
+ return `<!doctype html><html><head><meta charset="utf-8"><title>CleanCore Invoice</title><style>
+ @page{size:A4;margin:10mm}
+ *{box-sizing:border-box}
+ body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:11px;margin:0;background:#fff}
+ .invoice-preview{width:100%;padding:0}
+ .inv-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}
+ .inv-brand{font-size:22px;font-weight:800}.inv-sub{font-weight:700;margin:3px 0 6px}.inv-title{text-align:right;font-size:20px}.inv-title span{display:block;font-size:9px;margin-top:4px}
+ .inv-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111;padding:8px 0}
+ .inv-parties{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:10px 0;border-bottom:1px solid #111}.inv-parties>div{border:1px solid #ddd;padding:8px;border-radius:4px}.inv-parties b{font-size:9px;letter-spacing:.04em}.inv-parties p{margin:5px 0 0;line-height:1.45}
+ .invoice-items{width:100%;border-collapse:collapse;margin-top:10px}.invoice-items th,.invoice-items td{border:1px solid #ccc;padding:6px 7px;vertical-align:top}.invoice-items th{font-size:9px;text-transform:uppercase;text-align:left}.invoice-items .subtotal-row td,.invoice-items .grand-total td{font-weight:800}.invoice-items .grand-total td{font-size:13px;border-top:2px solid #111}
+ .tax-label{text-align:right;font-weight:700}.amount-words{margin-top:9px;padding:8px;border:1px solid #ddd}.inv-bottom{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:14px}.signature{text-align:right}
+ @media(max-width:700px){.inv-header,.inv-parties,.inv-meta,.inv-bottom{grid-template-columns:1fr;display:grid}.inv-title{text-align:left;margin-top:8px}}
+ </style></head><body><div class="invoice-preview">${body}</div></body></html>`;
+}
+$("printInvoice").onclick=async e=>{
  e.preventDefault();
- if(!$("invoicePreview")?.innerHTML.trim())return toast("Open a bill before printing.",false);
- const title=document.title;
- document.title="CleanCore Invoice";
- document.body.classList.add("printing-invoice");
- const cleanup=()=>{
-   document.body.classList.remove("printing-invoice");
-   document.title=title;
-   window.removeEventListener("afterprint",cleanup);
- };
- window.addEventListener("afterprint",cleanup,{once:true});
- requestAnimationFrame(()=>window.print());
+ try{
+   const html=getPrintableInvoiceHtml();
+   const w=window.open("","_blank","noopener,noreferrer,width=900,height=1100");
+   if(w){
+     w.document.open();w.document.write(html);w.document.close();
+     w.focus();
+     setTimeout(()=>{try{w.print()}catch(err){console.error(err)}},300);
+     return;
+   }
+   const oldTitle=document.title;
+   document.title="CleanCore Invoice";
+   document.body.classList.add("printing-invoice");
+   const cleanup=()=>{
+     document.body.classList.remove("printing-invoice");
+     document.title=oldTitle;
+   };
+   window.addEventListener("afterprint",cleanup,{once:true});
+   setTimeout(()=>window.print(),50);
+ }catch(err){
+   toast(err?.message||"Unable to print invoice.",false);
+ }
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
@@ -1230,32 +1257,39 @@ $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
 
-// Persistent Manager login policy: one successful login stays active for 7 days.
-// The 7-day window survives reloads, tab switches and reopening the installed/browser app.
-// It is absolute from the successful login and is not extended by activity.
-var MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
-var MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
+// Manager login policy:
+// - Installed Manager app (PWA): stay signed in for 7 days.
+// - Normal browser/web link: require login again after every page reload.
+const MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
+const MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
 var managerExpiryTimer=null;
 
+function isStandaloneManagerApp(){
+  return !!(window.matchMedia?.("(display-mode: standalone)")?.matches ||
+             window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches ||
+             window.navigator.standalone===true);
+}
 function clearManagerLoginWindow(){
   clearTimeout(managerExpiryTimer);
   managerExpiryTimer=null;
   localStorage.removeItem(MANAGER_LOGIN_EXPIRY_KEY);
 }
 function startManagerLoginWindow(){
+  if(!isStandaloneManagerApp()){
+    clearManagerLoginWindow();
+    return;
+  }
   const expiresAt=Date.now()+MANAGER_LOGIN_TTL_MS;
   localStorage.setItem(MANAGER_LOGIN_EXPIRY_KEY,String(expiresAt));
   armManagerExpiryTimer();
 }
 function armManagerExpiryTimer(){
   clearTimeout(managerExpiryTimer);
+  if(!isStandaloneManagerApp())return;
   const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
   if(!expiresAt)return;
   const remaining=expiresAt-Date.now();
-  if(remaining<=0){
-    forceManagerExpiry();
-    return;
-  }
+  if(remaining<=0){forceManagerExpiry();return;}
   managerExpiryTimer=setTimeout(forceManagerExpiry,remaining);
 }
 async function forceManagerExpiry(){
@@ -1266,6 +1300,13 @@ async function forceManagerExpiry(){
   }
 }
 async function restoreManagerSession(){
+  if(!isStandaloneManagerApp()){
+    clearManagerLoginWindow();
+    try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Web session cleanup:",err)}
+    $("loginView").classList.remove("hidden");
+    $("appView").classList.add("hidden");
+    return;
+  }
   const {data,error}=await db.auth.getSession();
   if(error||!data?.session)return;
   const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
@@ -1284,7 +1325,12 @@ async function restoreManagerSession(){
     await db.auth.signOut({scope:"local"});
   }
 }
+async function bootstrapManagerSession(){
+  $("loginView").classList.remove("hidden");
+  $("appView").classList.add("hidden");
+  await restoreManagerSession();
+}
 window.addEventListener("storage",e=>{
   if(e.key===MANAGER_LOGIN_EXPIRY_KEY)armManagerExpiryTimer();
 });
-restoreManagerSession();
+bootstrapManagerSession();
