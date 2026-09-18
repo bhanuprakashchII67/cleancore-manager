@@ -310,3 +310,30 @@ dialog .dialog{padding-top:52px}
 .address-fieldset legend{padding:0 8px;font-weight:900;color:#22364b;font-size:13px}
 .address-fieldset .customer-form-grid{gap:2px 14px}
 @media(max-width:650px){.customer-form-grid,.address-fieldset .customer-form-grid{grid-template-columns:1fr}}
+
+/* Modern Create Bill controls */
+.billing .panel{border-radius:18px}
+.modern-line{display:grid;grid-template-columns:minmax(220px,1fr) 90px 125px 110px 42px;gap:10px;align-items:center;padding:10px;border:1px solid #e3ebf1;border-radius:13px;background:#fff;box-shadow:0 3px 12px rgba(14,40,60,.05)}
+.modern-line .lp,.modern-line .lq,.modern-line .lr{min-width:0;min-height:42px}
+.modern-line .lr{background:#fbfdff;font-weight:800}
+.modern-line .lv{text-align:right;font-weight:900;font-size:14px}
+.modern-line .remove{width:42px;height:42px;border:0;border-radius:11px;background:#fff1f1;color:#b42318;font-size:21px;font-weight:900;cursor:pointer}
+.modern-line .remove:hover{background:#ffe3e3}
+.payment-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.payment-summary{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.payment-summary-item{padding:14px 16px;border:1px solid #dce7ed;border-radius:13px;background:#fff}
+.payment-summary-item span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#6f8091;font-weight:900}
+.payment-summary-item strong{display:block;margin-top:5px;font-size:20px}
+.payment-summary-item.credit{background:#f3faf8;border-color:#cfe7df}
+.payment-amount-input{margin-top:10px;background:#f8fbfd;font-weight:800}
+.payment-box{border-radius:16px!important;background:#f7fafc!important;padding:17px!important}
+.tax-breakdown{padding:12px 14px;border:1px solid #dce7ed;border-radius:12px;background:#f8fbfd}
+@media(max-width:900px){
+ .modern-line{grid-template-columns:minmax(180px,1fr) 78px 110px 100px 40px}
+ .payment-choice-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+ .modern-line{grid-template-columns:1fr 70px 100px 90px 38px;padding:8px}
+ .modern-line .lv{font-size:13px}
+ .payment-summary{grid-template-columns:1fr}
+}
