@@ -704,92 +704,176 @@ $("rawForm").addEventListener("submit",async e=>{
 function addLine(){
  const r=document.createElement("div");r.className="line";
  r.innerHTML=`<select class="lp">${products.map(p=>`<option value="${p.id}">${esc(p.name)} — ₹${p.selling_price} (${p.stock} in stock)</option>`).join("")}</select><input class="lq" type="number" min="1" value="1"><span class="lv">₹0</span><button type="button" class="remove">×</button>`;
- $("lines").appendChild(r);r.querySelectorAll("select,input").forEach(x=>x.oninput=calc);r.querySelector(".remove").onclick=()=>{r.remove();calc()};calc()
+ $("lines").appendChild(r);
+ r.querySelectorAll("select,input").forEach(x=>x.oninput=calc);
+ r.querySelector(".remove").onclick=()=>{r.remove();calc()};
+ calc();
 }
-function rebuildLines(){if(!$("lines").children.length && products.length)addLine()}
-$("addLine").onclick=addLine;$("discount").oninput=calc;$("gstPercent").oninput=calc;$("paymentStatus").onchange=updatePaymentFields;
+function rebuildLines(){if(!$("lines").children.length&&products.length)addLine()}
+
+$("addLine").onclick=addLine;
+$("discount").oninput=calc;
+$("gstRateWrap")?.classList.add("hidden");
+$("gstPercent").oninput=calc;
+$("billType").onchange=calc;
+$("paymentType").onchange=updatePaymentFields;
+
 $("billingCustomer").onchange=()=>{
- const c=customers.find(x=>x.id===$("billingCustomer").value);if(!c)return;
- $("custName").value=c.name||"";$("custBusiness").value=c.business_name||"";$("custPhone").value=c.phone||"";$("custEmail").value=c.email||"";$("custGstin").value=c.gstin||"";$("custBilling").value=c.billing_address||"";$("custDelivery").value=c.delivery_address||"";$("gstPercent").value=c.gstin?$("gstPercent").value:"";
+ const c=customers.find(x=>x.id===$("billingCustomer").value);
+ if(!c){
+   $("billCustomerName").textContent="—";
+   $("billCustomerBusiness").textContent="—";
+   $("billCustomerPhone").textContent="—";
+   $("billCustomerEmail").textContent="—";
+   $("billCustomerGstin").textContent="—";
+   $("billCustomerAddress").textContent="—";
+   calc();
+   return;
+ }
+ $("billCustomerName").textContent=c.name||"—";
+ $("billCustomerBusiness").textContent=c.business_name||"—";
+ $("billCustomerPhone").textContent=c.phone||"—";
+ $("billCustomerEmail").textContent=c.email||"—";
+ $("billCustomerGstin").textContent=c.gstin||"No GSTIN";
+ const address=[c.delivery_address||c.billing_address||"—"].filter(Boolean).join(" ");
+ $("billCustomerAddress").textContent=address||"—";
  calc();
 };
+
+function currentBillCustomer(){
+ return customers.find(x=>x.id===$("billingCustomer").value)||null;
+}
+function paymentState(total){
+ const type=$("paymentType")?.value||"CASH";
+ if(type==="CASH"||type==="ONLINE")return {type,method:type==="CASH"?"Cash":"Online",status:"Paid",paid:Number(total||0),due:0,dueDate:null};
+ if(type==="HALF")return {type,method:"Half Payment",status:"Part Paid",paid:Math.round(Number(total||0)*50)/100,due:Number(total||0)-Math.round(Number(total||0)*50)/100,dueDate:$("dueDate").value||null};
+ return {type,method:"Credit",status:"Credit",paid:0,due:Number(total||0),dueDate:$("dueDate").value||null};
+}
 function updatePaymentFields(){
- const status=$("paymentStatus")?.value||"Credit",paid=$("paidAmount"),due=$("dueDate"),method=$("billPaymentMethod"),preview=$("paymentPreview");
- if(!paid)return;
- if(status==="Paid"){paid.value=billTotal.toFixed(2);paid.disabled=true;due.value="";due.disabled=true;method.value="Cash";}
- else if(status==="Credit"){paid.value="0";paid.disabled=true;due.disabled=false;method.value="Credit";}
- else {paid.disabled=false;due.disabled=false;if(method.value==="Credit")method.value="Cash";}
- const p=Number(paid.value||0),d=Math.max(billTotal-p,0);
- preview.textContent=billTotal?"Paid "+money(p)+" • Credit due "+money(d):"Enter items to calculate payment";
+ const type=$("paymentType")?.value||"CASH";
+ const dueWrap=$("billDueDateWrap"),due=$("dueDate"),preview=$("paymentPreview");
+ const state=paymentState(billTotal);
+ const needsDue=type==="CREDIT"||type==="HALF";
+ if(dueWrap)dueWrap.classList.toggle("hidden",!needsDue);
+ if(due)!needsDue&&(due.value="");
+ if(preview){
+   preview.textContent=billTotal
+    ?"Paid "+money(state.paid)+" • Credit due "+money(state.due)+(needsDue&&state.dueDate?" • Due "+new Date(state.dueDate).toLocaleDateString("en-IN"):"")
+    :"Select payment type after adding items";
+ }
 }
 function calc(){
  let subtotal=0;
- document.querySelectorAll(".line").forEach(r=>{const p=products.find(x=>x.id===r.querySelector(".lp").value),q=+r.querySelector(".lq").value||0,v=(p?.selling_price||0)*q;subtotal+=v;r.querySelector(".lv").textContent=money(v)});
- const discount=Math.max(0,+$("discount").value||0),taxable=Math.max(0,subtotal-discount),gstin=$("custGstin").value.trim().toUpperCase(),gp=gstin?(+$("gstPercent").value||0):0,gst=taxable*gp/100,total=taxable+gst;
- const intraState=gstin ? gstin.slice(0,2)==="36" : false;
+ document.querySelectorAll(".line").forEach(r=>{
+   const p=products.find(x=>x.id===r.querySelector(".lp").value),q=+r.querySelector(".lq").value||0,v=(p?.selling_price||0)*q;
+   subtotal+=v;
+   r.querySelector(".lv").textContent=money(v);
+ });
+ const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
+ const taxable=Math.max(0,subtotal-discount);
+ const customer=currentBillCustomer();
+ const isGst=$("billType").value==="GST";
+ const gstin=isGst?String(customer?.gstin||"").trim().toUpperCase():"";
+ const gp=isGst?(+$("gstPercent").value||0):0;
+ const gst=taxable*gp/100,total=taxable+gst;
+ const intraState=gstin?gstin.slice(0,2)==="36":false;
  const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
  const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
  const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
- billTotal=total;$("subtotal").textContent=money(subtotal);$("discountShow").textContent=money(discount);$("gstShow").textContent=`${gp}% • ${money(gst)}`;$("total").textContent=money(total);updatePaymentFields();
- $("gstWrap").classList.toggle("hidden",!gstin);
- $("taxBreakdown").classList.toggle("hidden",!gstin);
- $("taxBreakdown").innerHTML=gstin?(intraState?`<div>CGST ${cgstPercent}%: <strong>${money(cgstAmount)}</strong></div><div>SGST ${sgstPercent}%: <strong>${money(sgstAmount)}</strong></div>`:`<div>IGST ${igstPercent}%: <strong>${money(igstAmount)}</strong></div>`):"";
+ billTotal=total;
+ $("subtotal").textContent=money(subtotal);
+ $("discountShow").textContent=money(discount);
+ $("gstShow").textContent=`${gp}% • ${money(gst)}`;
+ $("total").textContent=money(total);
+ $("gstRateWrap").classList.toggle("hidden",!isGst);
+ $("taxBreakdown").classList.toggle("hidden",!isGst);
+ if(isGst&&gstin){
+   $("taxBreakdown").innerHTML=intraState
+    ?`<div>CGST ${cgstPercent}%: <strong>${money(cgstAmount)}</strong></div><div>SGST ${sgstPercent}%: <strong>${money(sgstAmount)}</strong></div>`
+    :`<div>IGST ${igstPercent}%: <strong>${money(igstAmount)}</strong></div>`;
+ }else if(isGst){
+   $("taxBreakdown").innerHTML='<div class="tax-warning">GST Bill selected — customer GSTIN is required.</div>';
+ }else $("taxBreakdown").innerHTML="";
+ updatePaymentFields();
 }
-$("custGstin").oninput=()=>{const v=$("custGstin").value.trim().toUpperCase();$("custGstin").value=v;calc()};
-$("custPhone").oninput=e=>{e.target.value=e.target.value.replace(/\D/g,"").slice(0,10)};
-$("clearBill").onclick=()=>{$("billForm").reset();$("lines").innerHTML="";calc();rebuildLines()};
+$("clearBill").onclick=()=>{
+ $("billForm").reset();
+ $("billingCustomer").value="";
+ $("billType").value="NON_GST";
+ $("paymentType").value="CASH";
+ $("gstPercent").value="18";
+ ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin","billCustomerAddress"].forEach(id=>$(id).textContent="—");
+ $("lines").innerHTML="";
+ billTotal=0;
+ calc();
+ rebuildLines();
+};
+
 $("billForm").addEventListener("submit",async e=>{
  e.preventDefault();
- const name=$("custName").value.trim(),business=$("custBusiness").value.trim(),phone=normalizePhone($("custPhone").value),email=$("custEmail").value.trim(),gstin=$("custGstin").value.trim().toUpperCase(),billing=$("custBilling").value.trim(),delivery=$("custDelivery").value.trim();
- if(!name)return toast("Enter customer name",false);
- if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);
- if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);
- const gp=gstin?+$("gstPercent").value:0;if(gstin && !(gp>0&&gp<=100))return toast("Enter GST percentage for this bill",false);
- const paymentStatus=$("paymentStatus").value,paymentMethod=$("billPaymentMethod").value;
- const enteredPaid=paymentStatus==="Paid"?null:(paymentStatus==="Credit"?0:(+$("paidAmount").value||0));
- const items=[...document.querySelectorAll(".line")].map(r=>{const p=products.find(x=>x.id===r.querySelector(".lp").value);return {p,q:+r.querySelector(".lq").value||0}}).filter(x=>x.p&&x.q>0);
+ const customer=currentBillCustomer();
+ if(!customer)return toast("Select an existing customer first. Add the customer in Customers, then create the bill.",false);
+ const name=customer.name||"",business=customer.business_name||"",phone=normalizePhone(customer.phone||""),email=customer.email||"";
+ const customerGstin=String(customer.gstin||"").trim().toUpperCase();
+ const billType=$("billType").value;
+ if(!validPhone(phone))return toast("The customer phone number must be exactly 10 digits.",false);
+ if(billType==="GST"&&!validGstin(customerGstin))return toast("This customer does not have a valid GSTIN. Add the GSTIN in Customer data first.",false);
+ const gstin=billType==="GST"?customerGstin:"";
+ const gp=billType==="GST"?(+$("gstPercent").value||0):0;
+ if(billType==="GST"&&!(gp>0&&gp<=100))return toast("Enter a valid GST rate for this GST bill.",false);
+
+ const items=[...document.querySelectorAll(".line")].map(r=>{
+   const p=products.find(x=>x.id===r.querySelector(".lp").value);
+   return {p,q:+r.querySelector(".lq").value||0};
+ }).filter(x=>x.p&&x.q>0);
  if(!items.length)return toast("Add an item",false);
  for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
- const subtotal=items.reduce((a,x)=>a+x.p.selling_price*x.q,0),discount=Math.min(subtotal,Math.max(0,+$("discount").value||0)),taxable=subtotal-discount,gst=taxable*gp/100,total=taxable+gst;
- const intraState=gstin ? gstin.slice(0,2)==="36" : false;
+
+ const subtotal=items.reduce((a,x)=>a+x.p.selling_price*x.q,0);
+ const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
+ const taxable=subtotal-discount;
+ const gst=taxable*gp/100,total=taxable+gst;
+ const intraState=gstin?gstin.slice(0,2)==="36":false;
  const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
  const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
  const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
  const profit=items.reduce((a,x)=>a+(x.p.selling_price-x.p.cost_price)*x.q,0)-discount;
- const paidAmount=paymentStatus==="Paid"?total:Math.max(0,enteredPaid),dueAmount=Math.max(total-paidAmount,0);
- if(paymentStatus==="Part Paid" && !(paidAmount>0&&paidAmount<total))return toast("For Part Paid, enter an amount between 0 and the bill total.",false);
- const dueDate=dueAmount>0?($("dueDate").value||null):null;
+ const pay=paymentState(total);
  const no="CC-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
+
  if(!isAdmin){
    const payload={
-     invoice_no:no,
-     customer_id:$("billingCustomer").value||null,
-     customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
-     billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,
-     cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,
-     igst_percent:igstPercent,igst_amount:igstAmount,total,profit,payment_status:paymentStatus,
-     paid_amount:paidAmount,due_amount:dueAmount,due_date:dueDate,payment_method:paymentMethod,
+     invoice_no:no,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+     billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
+     subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit,
+     payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,
      items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q}))
    };
    const ok=await submitChange("billing","invoice_create","invoices",null,payload,"Employee bill submitted for manager approval");
    if(ok){$("billForm").reset();$("lines").innerHTML="";rebuildLines();}
    return;
  }
- let c=customers.find(x=>x.id===$("billingCustomer").value)||customers.find(x=>x.phone===phone);
- const customerData={name, business_name:business, phone,email,gstin,billing_address:billing,delivery_address:delivery};
- if(!c){const q=await db.from("customers").insert(customerData).select().single();if(q.error)return toast(q.error.message,false);c=q.data}
- else{const q=await db.from("customers").update(customerData).eq("id",c.id);if(q.error)return toast(q.error.message,false)}
- const inv=await db.from("invoices").insert({invoice_no:no,customer_id:c.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit,payment_status:paymentStatus,paid_amount:paidAmount,due_amount:dueAmount,due_date:dueDate,payment_method:paymentMethod}).select().single();
+
+ const inv=await db.from("invoices").insert({
+   invoice_no:no,customer_id:customer.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,
+   billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
+   subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,
+   total,profit,payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
+ }).select().single();
  if(inv.error)return toast(inv.error.message,false);
- if(paidAmount>0){const pay=await db.from("payments").insert({invoice_id:inv.data.id,customer_id:c.id,amount:paidAmount,payment_date:dateKey(),payment_method:paymentMethod,notes:"Initial payment"});if(pay.error)return toast(pay.error.message,false)}
+ if(pay.paid>0){
+   const payRow=await db.from("payments").insert({invoice_id:inv.data.id,customer_id:customer.id,amount:pay.paid,payment_date:dateKey(),payment_method:pay.method,notes:"Initial payment"});
+   if(payRow.error)return toast(payRow.error.message,false);
+ }
  for(const x of items){
-  const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q});
-  if(a.error)return toast(a.error.message,false);
-  const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);if(b.error)return toast(b.error.message,false);
+   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q});
+   if(a.error)return toast(a.error.message,false);
+   const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);
+   if(b.error)return toast(b.error.message,false);
  }
  const savedInv=inv.data;
  toast("Invoice "+no+" saved successfully");
- sendBillToCustomer(savedInv,c,items);
+ sendBillToCustomer(savedInv,customer,items);
  $("billForm").reset();$("lines").innerHTML="";await loadAll();rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
