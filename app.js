@@ -401,7 +401,7 @@ function renderAll(){
  $("netProfit").textContent=money(grossMonth-monthExpenses);
  $("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
- $("recent").innerHTML=table(["Invoice","Customer","Total","Date"],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN")]));
+ $("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),"<button type='button' class='icon-delete-btn' title='Delete invoice' aria-label='Delete invoice' onclick="deleteInvoice('"+x.id+"')"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
  $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
   esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
   Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
@@ -422,6 +422,15 @@ function renderAll(){
  if($("addEnquiry"))$("addEnquiry").disabled=(!isAdmin&&!canAccess("enquiries"));
  rebuildLines();
 }
+window.deleteInvoice=async function(id){
+ if(!isAdmin){toast("Only the Manager can delete invoices.",false);return;}
+ const inv=invoices.find(x=>x.id===id);if(!inv)return;
+ if(!confirm("Delete invoice "+(inv.invoice_no||"")+"? Its invoice items and payment records will also be deleted. This cannot be undone."))return;
+ const {error}=await db.from("invoices").delete().eq("id",id);
+ if(error)return toast(error.message||"Unable to delete invoice.",false);
+ toast("Invoice deleted");
+ await loadAll();
+};
 window.deleteEnquiry=async id=>{
  if(!isAdmin){toast("Only the Manager can delete enquiries.",false);return;}
  if(!confirm("Delete this enquiry?"))return;
@@ -537,7 +546,7 @@ function renderSales(){
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
  $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Paid","Credit","Status","Date","Action"],list.map(x=>[
   esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),String(Number(x.gst_percent||0))+"%",money(x.total),money(x.profit),money(x.paid_amount),money(x.due_amount),esc(x.payment_status||"Credit"),new Date(x.created_at).toLocaleString("en-IN"),
-  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View Bill</button>'
+  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View Bill</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
 }
 function customerStats(id){
