@@ -47,7 +47,18 @@
     <p class="eyebrow">CLEANCORЕ CHEMICAL & CLEANING</p>
     <h2 id="title">Dashboard</h2>
   </div>
-  <div id="userChip" class="chip"></div>
+  <div class="profile-wrap">
+<button id="profileBtn" class="chip profile-btn" type="button">👤 Profile</button>
+<div id="profileMenu" class="profile-menu hidden">
+<div class="profile-photo">CC</div>
+<h3>CleanCore Admin</h3>
+<p id="profileEmail" class="muted"></p>
+<p><b>Phone:</b> <span id="profilePhone">+91 91827 25773</span></p>
+<p><b>Business:</b> CleanCore Chemical & Cleaning</p>
+<p><b>Role:</b> Administrator</p>
+<button id="profileChangePassword" class="btn small">Change Password</button>
+<button id="profileLogout" class="btn small">Lock / Sign out</button>
+</div></div>
 </header>
 
 <section id="dashboard" class="section active">
@@ -111,7 +122,7 @@
   <div class="panel">
     <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
     <div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div>
-    <div id="salesTable"></div>
+    <div id="salesTable"></div><dialog id="invoiceDialog"><div id="invoicePreview"></div><div class="actions"><button id="printInvoice" class="btn primary">Print Bill / PDF</button><button id="closeInvoice" class="btn">Close</button></div></dialog>
   </div>
 </section>
 
