@@ -1,26 +1,5 @@
 const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com";
 const {createClient}=supabase; const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-const bootSignout=db.auth.signOut({scope:"local"}).catch(()=>null);
-let deferredInstallPrompt=null;
-window.addEventListener("beforeinstallprompt",e=>{
- e.preventDefault();
- deferredInstallPrompt=e;
- ["installAppLogin","installAppProfile"].forEach(id=>$(id)?.classList.remove("hidden"));
-});
-window.addEventListener("appinstalled",()=>{
- deferredInstallPrompt=null;
- ["installAppLogin","installAppProfile"].forEach(id=>$(id)?.classList.add("hidden"));
-});
-async function installManagerApp(){
- if(!deferredInstallPrompt){
-   toast("Use your browser's Install app / Add to Home Screen option.",false);
-   return;
- }
- deferredInstallPrompt.prompt();
- await deferredInstallPrompt.userChoice;
- deferredInstallPrompt=null;
- ["installAppLogin","installAppProfile"].forEach(id=>$(id)?.classList.add("hidden"));
-}
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(n||0));
@@ -105,15 +84,16 @@ $("loginForm").addEventListener("submit",async e=>{
  const identifier=$("loginIdentifier").value.trim(),password=$("loginPassword").value;
  if(!identifier||!password)return toast("Enter username and password.",false);
  try{
-   await bootSignout;
    const email=identifier.includes("@")?identifier.toLowerCase():syntheticStaffEmail(identifier);
    const {data,error}=await db.auth.signInWithPassword({email,password});
    if(error)return toast("Login failed: "+error.message,false);
    if(!data?.session)return toast("Login failed: No session returned.",false);
-   user=data.user;await enter();
+   user=data.user;
+   startManagerLoginWindow();
+   await enter();
  }catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}
 });
-$("logout").onclick=async()=>{await db.auth.signOut({scope:"local"});location.reload()};
+$("logout").onclick=async()=>{clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
 document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.dataset.section));
 document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
 async function go(id){
@@ -891,34 +871,66 @@ $("printInvoice").onclick=()=>{
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
-$("profileLogout").onclick=async()=>{await db.auth.signOut();location.reload()};$("installAppLogin").onclick=installManagerApp;
-$("installAppProfile").onclick=installManagerApp;
-navigator.serviceWorker?.register("sw.js?v=3.0.0").catch(()=>{});
+$("profileLogout").onclick=async()=>{clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
 $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
 
-// Clean session policy: stay signed in across screen changes / tab switches.
-// Automatic lock happens after 20 minutes with no user activity.
-// A normal browser reload starts at the login screen because the local session is cleared on load.
-const INACTIVITY_MS=20*60*1000;
-let inactivityTimer;
-function clearInactivity(){clearTimeout(inactivityTimer)}
-async function forceLogout(){
-  clearInactivity();
+// Persistent Manager login policy: one successful login stays active for 7 days.
+// The 7-day window survives reloads, tab switches and reopening the installed/browser app.
+// It is absolute from the successful login and is not extended by activity.
+const MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
+const MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
+let managerExpiryTimer=null;
+
+function clearManagerLoginWindow(){
+  clearTimeout(managerExpiryTimer);
+  managerExpiryTimer=null;
+  localStorage.removeItem(MANAGER_LOGIN_EXPIRY_KEY);
+}
+function startManagerLoginWindow(){
+  const expiresAt=Date.now()+MANAGER_LOGIN_TTL_MS;
+  localStorage.setItem(MANAGER_LOGIN_EXPIRY_KEY,String(expiresAt));
+  armManagerExpiryTimer();
+}
+function armManagerExpiryTimer(){
+  clearTimeout(managerExpiryTimer);
+  const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
+  if(!expiresAt)return;
+  const remaining=expiresAt-Date.now();
+  if(remaining<=0){
+    forceManagerExpiry();
+    return;
+  }
+  managerExpiryTimer=setTimeout(forceManagerExpiry,remaining);
+}
+async function forceManagerExpiry(){
+  clearManagerLoginWindow();
   try{await db.auth.signOut({scope:"local"})}finally{
-    sessionStorage.removeItem("cleancore_session");
     user=null;
     location.reload();
   }
 }
-function armInactivity(){
-  clearInactivity();
-  if(!user)return;
-  inactivityTimer=setTimeout(forceLogout,INACTIVITY_MS);
+async function restoreManagerSession(){
+  const {data,error}=await db.auth.getSession();
+  if(error||!data?.session)return;
+  const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
+  if(!expiresAt||Date.now()>=expiresAt){
+    clearManagerLoginWindow();
+    await db.auth.signOut({scope:"local"});
+    return;
+  }
+  user=data.session.user;
+  try{
+    await enter();
+    armManagerExpiryTimer();
+  }catch(err){
+    console.error("Manager session restore failed",err);
+    clearManagerLoginWindow();
+    await db.auth.signOut({scope:"local"});
+  }
 }
-["click","keydown","pointerdown","mousemove","touchstart","scroll"].forEach(ev=>{
-  document.addEventListener(ev,()=>{if(user)armInactivity()},{passive:true});
+window.addEventListener("storage",e=>{
+  if(e.key===MANAGER_LOGIN_EXPIRY_KEY)armManagerExpiryTimer();
 });
-window.addEventListener("beforeunload",()=>{sessionStorage.removeItem("cleancore_session")});
-user=null;
+restoreManagerSession();
