@@ -1,5 +1,7 @@
 const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com";
-const {createClient}=supabase; const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const {createClient}=window.supabase||{};
+if(typeof createClient!=="function")throw new Error("Supabase client library did not load. Please check your internet connection and reload.");
+const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(n||0));
@@ -77,7 +79,14 @@ function syntheticStaffEmail(username){return String(username||"").trim().toLowe
 function canAccess(module){return isAdmin||employeePermissions.has(module)}
 async function loadAccess(){
   isAdmin=false;employee=null;employeePermissions=new Set();
-  const {data:profile}=await db.from("profiles").select("role").eq("id",user.id).maybeSingle();
+  const currentEmail=String(user?.email||"").trim().toLowerCase();
+  if(currentEmail===ADMIN_EMAIL.toLowerCase()){
+    isAdmin=true;
+    employeePermissions=new Set(ALL_MODULES);
+    return;
+  }
+  const {data:profile,error}=await db.from("profiles").select("role").eq("id",user.id).maybeSingle();
+  if(error)throw new Error("Unable to verify Manager access: "+error.message);
   if(profile?.role!=="admin")throw new Error("This Manager workspace is restricted to the main Manager account. Use your employee portal link.");
   isAdmin=true;employeePermissions=new Set(ALL_MODULES);
 }
@@ -105,18 +114,16 @@ async function submitChange(module,action,targetTable,targetId,payload,reason=""
   return true;
 }
 async function enter(){
- try{
-   await loadAccess();
-   $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-   $("profileEmail").textContent=isAdmin?user.email:(employee.alert_email||("Username: "+employee.username));
-   if($("profileName"))$("profileName").textContent=isAdmin?"CleanCore Admin":employee.full_name;
-   if($("profileRole"))$("profileRole").textContent=isAdmin?"Administrator":("Employee • "+employee.team);
-   if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
-   applyAccess();
-   await loadAll();
-   const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
-   await go(first);
- }catch(e){await db.auth.signOut({scope:"local"});location.reload();}
+ await loadAccess();
+ $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
+ $("profileEmail").textContent=isAdmin?user.email:(employee.alert_email||("Username: "+employee.username));
+ if($("profileName"))$("profileName").textContent=isAdmin?"CleanCore Admin":employee.full_name;
+ if($("profileRole"))$("profileRole").textContent=isAdmin?"Administrator":("Employee • "+employee.team);
+ if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
+ applyAccess();
+ await loadAll();
+ const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
+ await go(first);
 }
 $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();
@@ -124,13 +131,35 @@ $("loginForm").addEventListener("submit",async e=>{
  if(!identifier||!password)return toast("Enter username and password.",false);
  try{
    const email=identifier.includes("@")?identifier.toLowerCase():syntheticStaffEmail(identifier);
-   const {data,error}=await db.auth.signInWithPassword({email,password});
+   let data,error;
+   try{
+     ({data,error}=await db.auth.signInWithPassword({email,password}));
+   }catch(networkErr){
+     const response=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password",{
+       method:"POST",
+       headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},
+       body:JSON.stringify({email,password})
+     });
+     const payload=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(payload.error_description||payload.msg||networkErr.message||"Authentication request failed.");
+     const setResult=await db.auth.setSession(payload);
+     if(setResult.error)throw setResult.error;
+     data={session:payload,user:payload.user};error=null;
+   }
    if(error)return toast("Login failed: "+error.message,false);
    if(!data?.session)return toast("Login failed: No session returned.",false);
    user=data.user;
    startManagerLoginWindow();
-   await enter();
- }catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}
+   try{
+     await enter();
+   }catch(err){
+     console.error("CleanCore Manager startup error",err);
+     return toast(err?.message||"Unable to open the Manager.",false);
+   }
+ }catch(err){
+   console.error("CleanCore login error",err);
+   return toast(err?.message||"Unable to connect to CleanCore.",false);
+ }
 });
 $("logout").onclick=async()=>{clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
 $("refreshManager").onclick=refreshManagerData;
