@@ -746,7 +746,9 @@ $("billForm").addEventListener("submit",async e=>{
   if(a.error)return toast(a.error.message,false);
   const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);if(b.error)return toast(b.error.message,false);
  }
+ const savedInv=inv.data;
  toast("Invoice "+no+" saved successfully");
+ sendBillToCustomer(savedInv,c);
  $("billForm").reset();$("lines").innerHTML="";await loadAll();rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
@@ -788,6 +790,46 @@ window.viewInvoice=async id=>{
  "</div>";
  $("invoiceDialog").showModal();
 };
+function buildCustomerBillMessage(inv,customer){
+ const lines=[
+  "CleanCore Chemical & Cleaning",
+  "Invoice: "+inv.invoice_no,
+  "Date: "+new Date(inv.created_at).toLocaleDateString("en-IN"),
+  "Customer: "+(inv.customer_name||""),
+  "Total: "+money(inv.total),
+  "Paid: "+money(inv.paid_amount||0),
+  "Credit Due: "+money(inv.due_amount||0),
+  "Payment Status: "+(inv.payment_status||"Credit"),
+  "Thank you for your business."
+ ];
+ return lines.join("\n");
+}
+function sendBillToCustomer(inv,customer){
+ const phone=normalizePhone(customer?.phone||inv?.customer_phone||"");
+ const email=String(customer?.email||inv?.customer_email||"").trim();
+ const msg=buildCustomerBillMessage(inv,customer);
+ let opened=0;
+ if(phoneRE.test(phone)){
+   const wa="https://wa.me/91"+phone+"?text="+encodeURIComponent(msg);
+   const w=window.open(wa,"_blank","noopener,noreferrer");
+   if(w)opened++;
+ }
+ if(email){
+   const subject="CleanCore Invoice "+inv.invoice_no;
+   const body=msg+"\n\nRegards,\nCleanCore Chemical & Cleaning\n+91 91827 25773\ncleancorehyd@gmail.com";
+   const mail="mailto:"+encodeURIComponent(email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+   const m=window.open(mail,"_blank");
+   if(m)opened++;
+ }
+ const n=$("billSendNotice");
+ if(n){
+   n.classList.remove("hidden");
+   n.innerHTML=(phoneRE.test(phone)||email)
+     ? "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+(phoneRE.test(phone)?"WhatsApp draft opened. ":"")+(email?"Email draft opened. ":"")+"Review and send from the opened app/window."
+     : "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Customer has no WhatsApp number or email, so nothing was opened.";
+ }
+ if(opened===0 && (phoneRE.test(phone)||email))toast("Bill saved. Your browser blocked the WhatsApp/email window; use the Send Bill options in Sales.",false);
+}
 function numberToWordsIndian(n){
  n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
  const ones=["","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE","TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN"];
