@@ -22,7 +22,7 @@
       <button class="btn primary">Open Dashboard</button>
     </form>
     <p class="security-note">Admin access is authenticated securely through Supabase.</p>
-    <p class="version">CleanCore Manager v2.3.0</p>
+    <p class="version">CleanCore Manager v2.4.0</p>
   </div>
 </section>
 
@@ -70,6 +70,7 @@
     <div class="metric"><span>Monthly expenses</span><strong id="monthlyExpenses">₹0</strong></div>
     <div class="metric"><span>Net profit</span><strong id="netProfit">₹0</strong></div>
     <div class="metric"><span>Low stock items</span><strong id="low">0</strong></div>
+    <div class="metric"><span>New website orders</span><strong id="websiteOrdersNew">0</strong></div>
   </div>
   <div class="panel"><div class="panel-head"><h3>Recent invoices</h3><button class="btn small goto" data-goto="billing">New bill</button></div><div id="recent"></div></div>
 </section>
@@ -170,7 +171,14 @@
 </dialog>
 
 <section id="enquiries" class="section">
-  <div class="panel"><div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div><div id="enquiriesTable"></div></div>
+  <div class="panel">
+    <div class="panel-head"><div><h3>Website Orders</h3><p id="websiteOrdersSummary" class="muted"></p></div></div>
+    <div id="websiteOrdersTable"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div>
+    <div id="enquiriesTable"></div>
+  </div>
 </section>
 
 <section id="expenses" class="section">
@@ -284,6 +292,17 @@
   <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Expense</button></div>
 </form></dialog>
 
+<dialog id="websiteOrderDialog">
+  <div class="dialog">
+    <h3 id="websiteOrderTitle">Website Order</h3>
+    <div id="websiteOrderSummary"></div>
+    <div id="websiteOrderCustomer"></div>
+    <div id="websiteOrderItems"></div>
+    <p><b>Order note:</b> <span id="websiteOrderNotes"></span></p>
+    <div class="actions"><button type="button" id="closeWebsiteOrder" class="btn">Close</button></div>
+  </div>
+</dialog>
+
 <dialog id="enquiryDialog">
 <form method="dialog" id="enquiryForm" class="dialog">
   <h3>Enquiry</h3>
@@ -296,6 +315,6 @@
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.3.0"></script>
+<script src="app.js?v=2.4.0"></script>
 </body>
 </html>
