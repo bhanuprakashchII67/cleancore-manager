@@ -880,3 +880,23 @@ end;
 $$;
 revoke all on function public.review_customer_change_request(uuid,boolean,text) from public;
 grant execute on function public.review_customer_change_request(uuid,boolean,text) to authenticated;
+
+
+-- website_order_invoice_gst_v2: website checkout GST + automatic invoice linkage
+create sequence if not exists public.website_invoice_seq;
+alter table public.website_orders
+  add column if not exists invoice_id uuid references public.invoices(id) on delete set null,
+  add column if not exists invoice_no text,
+  add column if not exists gst_enabled boolean not null default false,
+  add column if not exists gst_percent numeric(5,2) not null default 0,
+  add column if not exists gst_amount numeric(12,2) not null default 0,
+  add column if not exists cgst_percent numeric(5,2) not null default 0,
+  add column if not exists cgst_amount numeric(12,2) not null default 0,
+  add column if not exists sgst_percent numeric(5,2) not null default 0,
+  add column if not exists sgst_amount numeric(12,2) not null default 0,
+  add column if not exists igst_percent numeric(5,2) not null default 0,
+  add column if not exists igst_amount numeric(12,2) not null default 0,
+  add column if not exists place_of_supply text,
+  add column if not exists customer_gstin text;
+create index if not exists website_orders_invoice_idx on public.website_orders(invoice_id);
+-- Keep the live Supabase function definitions in sync with the deployed migration.
