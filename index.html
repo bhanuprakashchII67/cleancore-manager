@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=2.1.4">
+<link rel="stylesheet" href="style.css?v=2.2.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -22,7 +22,7 @@
       <button class="btn primary">Open Dashboard</button>
     </form>
     <p class="security-note">Admin access is authenticated securely through Supabase.</p>
-    <p class="version">CleanCore Manager v2.1.4</p>
+    <p class="version">CleanCore Manager v2.2.0</p>
   </div>
 </section>
 
@@ -36,6 +36,7 @@
     <button class="nav" data-section="sales">Sales</button>
     <button class="nav" data-section="customers">Customers</button>
     <button class="nav" data-section="enquiries">Enquiries</button>
+    <button class="nav" data-section="expenses">Expenses</button>
     <button class="nav" data-section="settings">Settings</button>
   </nav>
   <button id="logout" class="nav logout">Sign out</button>
@@ -65,7 +66,9 @@
   <div class="cards">
     <div class="metric"><span>Today sales</span><strong id="today">₹0</strong></div>
     <div class="metric"><span>This month</span><strong id="month">₹0</strong></div>
-    <div class="metric"><span>Monthly profit</span><strong id="profit">₹0</strong></div>
+    <div class="metric"><span>Gross profit</span><strong id="grossProfit">₹0</strong></div>
+    <div class="metric"><span>Monthly expenses</span><strong id="monthlyExpenses">₹0</strong></div>
+    <div class="metric"><span>Net profit</span><strong id="netProfit">₹0</strong></div>
     <div class="metric"><span>Low stock items</span><strong id="low">0</strong></div>
   </div>
   <div class="panel"><div class="panel-head"><h3>Recent invoices</h3><button class="btn small goto" data-goto="billing">New bill</button></div><div id="recent"></div></div>
@@ -137,6 +140,24 @@
   <div class="panel"><div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div><div id="enquiriesTable"></div></div>
 </section>
 
+<section id="expenses" class="section">
+  <div class="panel">
+    <div class="panel-head">
+      <div><h3>Business Expenses</h3><p class="muted">Track daily business spending and subtract it from gross profit to calculate net profit.</p></div>
+      <div class="actions"><button id="exportExpenses" class="btn small">Export CSV</button><button id="addExpense" class="btn primary small">+ Add Expense</button></div>
+    </div>
+    <div class="cards expense-cards">
+      <div class="metric"><span>Today's expenses</span><strong id="expenseToday">₹0</strong></div>
+      <div class="metric"><span>Selected expenses</span><strong id="expensePeriod">₹0</strong></div>
+      <div class="metric"><span>Selected gross profit</span><strong id="expenseGross">₹0</strong></div>
+      <div class="metric"><span>Selected net profit</span><strong id="expenseNet">₹0</strong></div>
+    </div>
+    <div class="filters"><label>From date<input id="expenseFrom" type="date"></label><label>To date<input id="expenseTo" type="date"></label><button id="clearExpenseFilter" class="btn small">Clear dates</button></div>
+    <p id="expenseSummary" class="muted"></p>
+    <div id="expensesTable"></div>
+  </div>
+</section>
+
 <section id="settings" class="section">
   <div class="panel">
     <h3>Security</h3><p class="muted">Password changes require email reauthentication.</p>
@@ -194,6 +215,35 @@
   <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Customer</button></div>
 </form></dialog>
 
+<dialog id="expenseDialog">
+<form method="dialog" id="expenseForm" class="dialog">
+  <h3 id="expenseDialogTitle">Add Business Expense</h3>
+  <label>Expense date<input id="expenseDate" type="date" required></label>
+  <label>Expense category<select id="expenseCategory">
+    <option>Raw Materials</option>
+    <option>Petrol / Fuel</option>
+    <option>Delivery / Transport</option>
+    <option>Electricity / Utilities</option>
+    <option>Rent</option>
+    <option>Salaries / Wages</option>
+    <option>Packaging</option>
+    <option>Repairs / Maintenance</option>
+    <option>Phone / Internet</option>
+    <option>Marketing</option>
+    <option>Bank / Payment Fees</option>
+    <option>Office / Admin</option>
+    <option>Other</option>
+  </select></label>
+  <label>Amount ₹<input id="expenseAmount" type="number" min="0.01" step="0.01" required></label>
+  <label id="expenseRawWrap" class="hidden">Raw material<select id="expenseRawMaterial"><option value="">Select raw material (optional)</option></select></label>
+  <label id="expenseQtyWrap" class="hidden">Quantity purchased<input id="expenseQty" type="number" min="0" step="0.001"></label>
+  <label>Vendor / Payee<input id="expenseVendor" placeholder="Petrol pump, supplier, driver, landlord, etc."></label>
+  <label>Payment method<select id="expensePayment"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Credit</option></select></label>
+  <label>Notes<textarea id="expenseNotes" rows="3" placeholder="What was this expense for?"></textarea></label>
+  <p class="muted tiny">Raw-material purchases entered here reduce net profit. Raw-material stock quantity is maintained separately in Raw Materials Stock.</p>
+  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Expense</button></div>
+</form></dialog>
+
 <dialog id="enquiryDialog">
 <form method="dialog" id="enquiryForm" class="dialog">
   <h3>Enquiry</h3>
@@ -206,6 +256,6 @@
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.1.3"></script>
+<script src="app.js?v=2.2.0"></script>
 </body>
 </html>
