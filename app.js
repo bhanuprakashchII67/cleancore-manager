@@ -748,7 +748,7 @@ $("billForm").addEventListener("submit",async e=>{
  }
  const savedInv=inv.data;
  toast("Invoice "+no+" saved successfully");
- sendBillToCustomer(savedInv,c);
+ sendBillToCustomer(savedInv,c,items);
  $("billForm").reset();$("lines").innerHTML="";await loadAll();rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
@@ -790,45 +790,59 @@ window.viewInvoice=async id=>{
  "</div>";
  $("invoiceDialog").showModal();
 };
-function buildCustomerBillMessage(inv,customer){
- const lines=[
+function buildCustomerBillMessage(inv,customer,items=[]){
+ const itemLines=items.map(x=>"• "+(x.p?.name||x.product_name||"Item")+" × "+(x.q||x.qty||1)+" @ "+money(x.p?.selling_price||x.unit_price||0)+" = "+money(x.p?(x.p.selling_price*x.q):x.line_total));
+ return [
   "CleanCore Chemical & Cleaning",
-  "Invoice: "+inv.invoice_no,
+  "INVOICE: "+inv.invoice_no,
   "Date: "+new Date(inv.created_at).toLocaleDateString("en-IN"),
-  "Customer: "+(inv.customer_name||""),
+  "Customer: "+(inv.customer_name||customer?.name||""),
+  "",
+  ...(itemLines.length?itemLines:["Items: —"]),
+  "",
+  "Subtotal: "+money(inv.subtotal),
+  "Discount: "+money(inv.discount||0),
+  "GST: "+money(inv.gst_amount||0),
   "Total: "+money(inv.total),
   "Paid: "+money(inv.paid_amount||0),
   "Credit Due: "+money(inv.due_amount||0),
-  "Payment Status: "+(inv.payment_status||"Credit"),
-  "Thank you for your business."
- ];
- return lines.join("\n");
+  "Status: "+(inv.payment_status||"Credit"),
+  "",
+  "CleanCore Chemical & Cleaning",
+  "+91 91827 25773",
+  "cleancorehyd@gmail.com"
+ ].join("\n");
 }
-function sendBillToCustomer(inv,customer){
+function sendBillToCustomer(inv,customer,items){
  const phone=normalizePhone(customer?.phone||inv?.customer_phone||"");
  const email=String(customer?.email||inv?.customer_email||"").trim();
- const msg=buildCustomerBillMessage(inv,customer);
+ const msg=buildCustomerBillMessage(inv,customer,items);
+ const hasPhone=phoneRE.test(phone),hasEmail=!!email;
  let opened=0;
- if(phoneRE.test(phone)){
+
+ if(hasPhone){
    const wa="https://wa.me/91"+phone+"?text="+encodeURIComponent(msg);
    const w=window.open(wa,"_blank","noopener,noreferrer");
    if(w)opened++;
  }
- if(email){
+ if(hasEmail){
    const subject="CleanCore Invoice "+inv.invoice_no;
-   const body=msg+"\n\nRegards,\nCleanCore Chemical & Cleaning\n+91 91827 25773\ncleancorehyd@gmail.com";
-   const mail="mailto:"+encodeURIComponent(email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+   const mail="mailto:"+email+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(msg);
    const m=window.open(mail,"_blank");
    if(m)opened++;
  }
+
  const n=$("billSendNotice");
  if(n){
    n.classList.remove("hidden");
-   n.innerHTML=(phoneRE.test(phone)||email)
-     ? "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+(phoneRE.test(phone)?"WhatsApp draft opened. ":"")+(email?"Email draft opened. ":"")+"Review and send from the opened app/window."
-     : "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Customer has no WhatsApp number or email, so nothing was opened.";
+   const destinations=[];
+   if(hasPhone)destinations.push("WhatsApp");
+   if(hasEmail)destinations.push("Email");
+   n.innerHTML=destinations.length
+     ? "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destinations.join(" + ")+" opened with the bill details. Review and press Send in the opened app."
+     : "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> No customer WhatsApp number or email was provided.";
  }
- if(opened===0 && (phoneRE.test(phone)||email))toast("Bill saved. Your browser blocked the WhatsApp/email window; use the Send Bill options in Sales.",false);
+ if(opened===0&&destinations.length)toast("Bill saved, but your browser blocked the WhatsApp/email window.",false);
 }
 function numberToWordsIndian(n){
  n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
