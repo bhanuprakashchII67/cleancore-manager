@@ -235,7 +235,9 @@ window.reviewAccessRequest=async function(id,approve){
 window.reviewChange=async function(id,approve){
  if(!isAdmin)return;
  const note=approve?"":(prompt("Reason for rejection (optional):","")||"");
- const {data,error}=await db.rpc("review_change_request",{p_request_id:id,p_approve:approve,p_note:note});
+ const req=changeRequests.find(x=>x.id===id);
+ const rpcName=req?.action==="raw_material_delete"?"review_raw_material_delete_request":"review_change_request";
+ const {data,error}=await db.rpc(rpcName,{p_request_id:id,p_approve:approve,p_note:note});
  if(error)return toast(error.message,false);
  toast(approve?"Change approved and applied.":"Change request rejected.");
  await loadAll();
