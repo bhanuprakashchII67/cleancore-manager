@@ -15,6 +15,16 @@ let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employee
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
+function ensureDialogCloseButtons(){
+ document.querySelectorAll("dialog").forEach(d=>{
+   if(d.querySelector("[data-dialog-x]"))return;
+   const b=document.createElement("button");
+   b.type="button";b.dataset.dialogX="1";b.className="dialog-x";b.setAttribute("aria-label","Close");
+   b.textContent="×";b.onclick=()=>d.close();
+   d.appendChild(b);
+ });
+}
+document.addEventListener("DOMContentLoaded",ensureDialogCloseButtons);
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
 function validPhone(v){return phoneRE.test(normalizePhone(v))}
@@ -247,8 +257,11 @@ async function createEmployee(e){
  if(password.length<8)return status.textContent="Password must be at least 8 characters.";
  if(starts_at&&ends_at&&new Date(starts_at)>=new Date(ends_at))return status.textContent="End date/time must be after start date/time.";
  if(!modules.length)return status.textContent="Select at least one Manager section.";
- const {data,error}=await db.functions.invoke("employee-admin",{body:{action:"create",username,full_name,team,alert_email,password,starts_at,ends_at,modules}});
- if(error)return status.textContent=error.message||"Could not create employee.";
+ let result;
+ try{result=await db.functions.invoke("employee-admin",{body:{action:"create",username,full_name,team,alert_email,password,starts_at,ends_at,modules}})}
+ catch(err){return status.textContent="Could not reach the employee service. Please refresh and try again."}
+ const {data,error}=result;
+ if(error)return status.textContent=(error.message||"Could not create employee.")+" Please try again.";
  if(data?.error)return status.textContent=data.error;
  $("employeeDialog").close();toast("Employee "+username+" created.");await loadAll();
 }
