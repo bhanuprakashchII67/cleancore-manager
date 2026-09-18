@@ -611,7 +611,28 @@ $("productForm").addEventListener("submit",async e=>{
 function resetRawForm(){editingRawId=null;$("rawName").value="";$("rawUnit").value="Kg";$("rawCost").value=0;$("rawStock").value=0;$("rawLow").value=5;$("rawDialogTitle").textContent="Add Raw Material"}
 $("addRaw").onclick=()=>{resetRawForm();$("rawDialog").showModal()};
 window.editRawMaterial=id=>{const r=rawMaterials.find(x=>x.id===id);if(!r)return;editingRawId=id;$("rawName").value=r.name||"";$("rawUnit").value=r.unit||"Kg";$("rawCost").value=r.cost_per_unit??0;$("rawStock").value=r.stock??0;$("rawLow").value=r.low_stock_threshold??5;$("rawDialogTitle").textContent="Edit Raw Material";$("rawDialog").showModal()};
-$("rawForm").addEventListener("submit",async e=>{e.preventDefault();const x={name:$("rawName").value.trim(),unit:$("rawUnit").value.trim(),cost_per_unit:+$("rawCost").value,stock:+$("rawStock").value,low_stock_threshold:+$("rawLow").value};if(!x.name)return toast("Enter raw material name",false);if(!isAdmin){const ok=await submitChange("products",editingRawId?"raw_material_update":"raw_material_create","raw_materials",editingRawId,x,"Employee raw-material change");if(ok)$("rawDialog").close();return} const q=editingRawId?db.from("raw_materials").update(x).eq("id",editingRawId):db.from("raw_materials").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("rawDialog").close();toast("Raw material saved");loadAll()});
+$("rawForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const x={name:$("rawName").value.trim(),unit:$("rawUnit").value.trim(),cost_per_unit:+$("rawCost").value,stock:+$("rawStock").value,low_stock_threshold:+$("rawLow").value};
+ if(!x.name)return toast("Enter raw material name",false);
+ if(!isAdmin){
+   const ok=await submitChange("products",editingRawId?"raw_material_update":"raw_material_create","raw_materials",editingRawId,x,"Employee raw-material change");
+   if(ok)$("rawDialog").close();
+   return;
+ }
+ const {data,error}=await db.rpc("save_raw_material_admin",{
+   p_id:editingRawId||null,
+   p_name:x.name,
+   p_unit:x.unit,
+   p_cost_per_unit:x.cost_per_unit,
+   p_stock:x.stock,
+   p_low_stock_threshold:x.low_stock_threshold
+ });
+ if(error)return toast(error.message||"Unable to save raw material.",false);
+ $("rawDialog").close();
+ toast(editingRawId?"Raw material updated":"Raw material saved");
+ await loadAll();
+});
 
 function addLine(){
  const r=document.createElement("div");r.className="line";
