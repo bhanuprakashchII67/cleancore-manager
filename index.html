@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.5.2">
+<link rel="stylesheet" href="style.css?v=3.5.3">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -461,8 +461,19 @@
   <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save</button></div>
 </form></dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.4.1").catch(()=>{}));</script>
-<script src="app.js?v=3.5.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+  const K="cleancore_manager_cache_reset_353";
+  if(localStorage.getItem(K)!=="1"){
+    localStorage.setItem(K,"1");
+    Promise.all([
+      "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
+      "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=353"));
+  }
+})();
+</script>
+<script src="app.js?v=3.5.3"></script>
 </body>
 </html>
