@@ -6,8 +6,8 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const phoneRE=/^[6-9]\d{9}$/;
 const gstRE=/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[];
-let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null;
+let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[];
+let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
@@ -27,13 +27,14 @@ document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
 function go(id){document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));$("title").textContent=document.querySelector(`.nav[data-section="${id}"]`)?.textContent||id}
 
 async function loadAll(){
- const [p,i,c,e,r,x]=await Promise.all([
+ const [p,i,c,e,r,x,pm]=await Promise.all([
   db.from("products").select("*").order("name"),
   db.from("invoices").select("*").order("created_at",{ascending:false}),
   db.from("customers").select("*").order("name"),
   db.from("enquiries").select("*").order("created_at",{ascending:false}),
   db.from("raw_materials").select("*").order("name"),
-  db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false})
+  db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}),
+  db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false})
  ]);
  if(p.error)return toast(p.error.message,false);
  if(i.error)return toast(i.error.message,false);
@@ -41,7 +42,8 @@ async function loadAll(){
  if(e.error)return toast(e.error.message,false);
  if(r.error)return toast(r.error.message,false);
  if(x.error)return toast(x.error.message,false);
- products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];expenses=x.data||[];
+ if(pm.error)return toast(pm.error.message,false);
+ products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];expenses=x.data||[];payments=pm.data||[];
  renderAll();
 }
 function renderAll(){
@@ -70,7 +72,7 @@ function renderAll(){
  renderSales();
  renderExpenses();
  renderCustomers();
- $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Message","Status","Date"],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.message),esc(x.status),isoDate(x.created_at)]));
+ $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date"],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at)]));
  rebuildLines();
 }
 function expenseList(){
@@ -181,14 +183,55 @@ function renderSales(){
   '<button class="link" onclick="viewInvoice(\''+x.id+'\')">View Bill</button>'
  ]));
 }
-function renderCustomers(){
- $("customersTable").innerHTML=table(["Customer","Business","Phone","Email","GSTIN","Billing address","Delivery address","Purchases","Action"],customers.map(x=>[
-  esc(x.name),esc(x.business_name),esc(x.phone),esc(x.email),esc(x.gstin),esc(x.billing_address),esc(x.delivery_address),
-  money(x.total_purchases),`<button class="link" onclick="editCustomer('${x.id}')">Edit</button>`
- ]));
- $("billingCustomer").innerHTML=`<option value="">New / enter customer</option>${customers.map(x=>`<option value="${x.id}">${esc(x.name)}${x.business_name?" — "+esc(x.business_name):""} (${esc(x.phone)})</option>`).join("")}`;
+function customerStats(id){
+ const bills=invoices.filter(x=>x.customer_id===id);
+ const totalPurchases=bills.reduce((a,x)=>a+Number(x.total||0),0);
+ const totalPaid=bills.reduce((a,x)=>a+Number(x.paid_amount||0),0);
+ const creditDue=bills.reduce((a,x)=>a+Number(x.due_amount||0),0);
+ const lastPurchase=bills.length?bills.reduce((a,x)=>new Date(x.created_at)>new Date(a)?x.created_at:a,bills[0].created_at):null;
+ return {bills,totalPurchases,totalPaid,creditDue,lastPurchase};
 }
-
+function renderCustomers(){
+ $("customersTable").innerHTML=table(["Customer","Business","Phone","Total purchases","Paid","Credit due","Last purchase","Action"],customers.map(x=>{
+  const s=customerStats(x.id);
+  return [esc(x.name),esc(x.business_name),esc(x.phone),money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
+   "<button class=\"link\" onclick=\"viewCustomerHistory(\'"+x.id+"\')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer(\'"+x.id+"\')\">Edit</button>"];
+ }));
+ $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone)+")</option>").join("");
+}
+window.viewCustomerHistory=function(id){
+ const c=customers.find(x=>x.id===id);if(!c)return;
+ const s=customerStats(id);
+ $("customerHistoryTitle").textContent=(c.business_name||c.name)+" — Purchase History";
+ $("customerHistorySummary").innerHTML="<div class=\"history-cards\"><div><span>Total purchases</span><b>"+money(s.totalPurchases)+"</b></div><div><span>Total paid</span><b>"+money(s.totalPaid)+"</b></div><div><span>Credit due</span><b>"+money(s.creditDue)+"</b></div><div><span>Last purchase</span><b>"+(s.lastPurchase?isoDate(s.lastPurchase):"—")+"</b></div></div>";
+ $("customerHistoryTable").innerHTML=table(["Invoice","Purchase date","Total","Paid","Credit due","Payment status","Due date","Action"],s.bills.map(inv=>[
+   esc(inv.invoice_no),new Date(inv.created_at).toLocaleString("en-IN"),money(inv.total),money(inv.paid_amount),money(inv.due_amount),esc(inv.payment_status||"Credit"),inv.due_date?isoDate(inv.due_date):"—",
+   Number(inv.due_amount||0)>0?"<button class=\"link\" onclick=\"recordPayment(\'"+inv.id+"\')\">Record payment</button>":"Paid"
+ ]));
+ $("customerHistoryDialog").showModal();
+};
+$("closeCustomerHistory").onclick=function(){$("customerHistoryDialog").close()};
+window.recordPayment=function(invoiceId){
+ const inv=invoices.find(x=>x.id===invoiceId);if(!inv||Number(inv.due_amount||0)<=0)return;
+ $("paymentInvoiceId").value=invoiceId;$("paymentInvoiceNo").textContent=inv.invoice_no;$("paymentCustomerName").textContent=inv.customer_name;$("paymentOutstanding").textContent=money(inv.due_amount);
+ $("paymentDate").value=dateKey();$("paymentAmount").value=Number(inv.due_amount).toFixed(2);$("paymentMethod").value="Cash";$("paymentNotes").value="";$("paymentDialog").showModal();
+};
+$("closePayment").onclick=function(){$("paymentDialog").close()};
+$("paymentForm").addEventListener("submit",async function(e){
+ e.preventDefault();
+ const invoiceId=$("paymentInvoiceId").value,inv=invoices.find(x=>x.id===invoiceId);
+ if(!inv)return toast("Invoice not found",false);
+ const amount=+$("paymentAmount").value;
+ if(!(amount>0&&amount<=Number(inv.due_amount||0)))return toast("Payment must be greater than 0 and not exceed the outstanding credit.",false);
+ const payment_date=$("paymentDate").value||dateKey();
+ const ins=await db.from("payments").insert({invoice_id:inv.id,customer_id:inv.customer_id,amount,payment_date,payment_method:$("paymentMethod").value,notes:$("paymentNotes").value.trim()});
+ if(ins.error)return toast(ins.error.message,false);
+ const paid=Number(inv.paid_amount||0)+amount,due=Math.max(Number(inv.total||0)-paid,0);
+ const status=due===0?"Paid":"Part Paid";
+ const upd=await db.from("invoices").update({paid_amount:paid,due_amount:due,payment_status:status,due_date:due>0?inv.due_date:null,payment_method:$("paymentMethod").value}).eq("id",inv.id);
+ if(upd.error)return toast(upd.error.message,false);
+ $("paymentDialog").close();toast("Payment recorded");await loadAll();
+});
 function resetProductForm(){
  editingProductId=null;
  ["pname","punit","pcost","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
@@ -247,12 +290,21 @@ function addLine(){
  $("lines").appendChild(r);r.querySelectorAll("select,input").forEach(x=>x.oninput=calc);r.querySelector(".remove").onclick=()=>{r.remove();calc()};calc()
 }
 function rebuildLines(){if(!$("lines").children.length && products.length)addLine()}
-$("addLine").onclick=addLine;$("discount").oninput=calc;$("gstPercent").oninput=calc;
+$("addLine").onclick=addLine;$("discount").oninput=calc;$("gstPercent").oninput=calc;$("paymentStatus").onchange=updatePaymentFields;
 $("billingCustomer").onchange=()=>{
  const c=customers.find(x=>x.id===$("billingCustomer").value);if(!c)return;
  $("custName").value=c.name||"";$("custBusiness").value=c.business_name||"";$("custPhone").value=c.phone||"";$("custEmail").value=c.email||"";$("custGstin").value=c.gstin||"";$("custBilling").value=c.billing_address||"";$("custDelivery").value=c.delivery_address||"";$("gstPercent").value=c.gstin?$("gstPercent").value:"";
  calc();
 };
+function updatePaymentFields(){
+ const status=$("paymentStatus")?.value||"Credit",paid=$("paidAmount"),due=$("dueDate"),method=$("billPaymentMethod"),preview=$("paymentPreview");
+ if(!paid)return;
+ if(status==="Paid"){paid.value=billTotal.toFixed(2);paid.disabled=true;due.value="";due.disabled=true;method.value="Cash";}
+ else if(status==="Credit"){paid.value="0";paid.disabled=true;due.disabled=false;method.value="Credit";}
+ else {paid.disabled=false;due.disabled=false;if(method.value==="Credit")method.value="Cash";}
+ const p=Number(paid.value||0),d=Math.max(billTotal-p,0);
+ preview.textContent=billTotal?"Paid "+money(p)+" • Credit due "+money(d):"Enter items to calculate payment";
+}
 function calc(){
  let subtotal=0;
  document.querySelectorAll(".line").forEach(r=>{const p=products.find(x=>x.id===r.querySelector(".lp").value),q=+r.querySelector(".lq").value||0,v=(p?.selling_price||0)*q;subtotal+=v;r.querySelector(".lv").textContent=money(v)});
@@ -261,7 +313,7 @@ function calc(){
  const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
  const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
  const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
- $("subtotal").textContent=money(subtotal);$("discountShow").textContent=money(discount);$("gstShow").textContent=`${gp}% • ${money(gst)}`;$("total").textContent=money(total);
+ billTotal=total;$("subtotal").textContent=money(subtotal);$("discountShow").textContent=money(discount);$("gstShow").textContent=`${gp}% • ${money(gst)}`;$("total").textContent=money(total);updatePaymentFields();
  $("gstWrap").classList.toggle("hidden",!gstin);
  $("taxBreakdown").classList.toggle("hidden",!gstin);
  $("taxBreakdown").innerHTML=gstin?(intraState?`<div>CGST ${cgstPercent}%: <strong>${money(cgstAmount)}</strong></div><div>SGST ${sgstPercent}%: <strong>${money(sgstAmount)}</strong></div>`:`<div>IGST ${igstPercent}%: <strong>${money(igstAmount)}</strong></div>`):"";
@@ -276,6 +328,8 @@ $("billForm").addEventListener("submit",async e=>{
  if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);
  if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);
  const gp=gstin?+$("gstPercent").value:0;if(gstin && !(gp>0&&gp<=100))return toast("Enter GST percentage for this bill",false);
+ const paymentStatus=$("paymentStatus").value,paymentMethod=$("billPaymentMethod").value;
+ const enteredPaid=paymentStatus==="Paid"?null:(paymentStatus==="Credit"?0:(+$("paidAmount").value||0));
  const items=[...document.querySelectorAll(".line")].map(r=>{const p=products.find(x=>x.id===r.querySelector(".lp").value);return {p,q:+r.querySelector(".lq").value||0}}).filter(x=>x.p&&x.q>0);
  if(!items.length)return toast("Add an item",false);
  for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
@@ -285,13 +339,17 @@ $("billForm").addEventListener("submit",async e=>{
  const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
  const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
  const profit=items.reduce((a,x)=>a+(x.p.selling_price-x.p.cost_price)*x.q,0)-discount;
+ const paidAmount=paymentStatus==="Paid"?total:Math.max(0,enteredPaid),dueAmount=Math.max(total-paidAmount,0);
+ if(paymentStatus==="Part Paid" && !(paidAmount>0&&paidAmount<total))return toast("For Part Paid, enter an amount between 0 and the bill total.",false);
+ const dueDate=dueAmount>0?($("dueDate").value||null):null;
  const no="CC-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
  let c=customers.find(x=>x.id===$("billingCustomer").value)||customers.find(x=>x.phone===phone);
  const customerData={name, business_name:business, phone,email,gstin,billing_address:billing,delivery_address:delivery};
  if(!c){const q=await db.from("customers").insert(customerData).select().single();if(q.error)return toast(q.error.message,false);c=q.data}
  else{const q=await db.from("customers").update(customerData).eq("id",c.id);if(q.error)return toast(q.error.message,false)}
- const inv=await db.from("invoices").insert({invoice_no:no,customer_id:c.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit}).select().single();
+ const inv=await db.from("invoices").insert({invoice_no:no,customer_id:c.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit,payment_status:paymentStatus,paid_amount:paidAmount,due_amount:dueAmount,due_date:dueDate,payment_method:paymentMethod}).select().single();
  if(inv.error)return toast(inv.error.message,false);
+ if(paidAmount>0){const pay=await db.from("payments").insert({invoice_id:inv.data.id,customer_id:c.id,amount:paidAmount,payment_date:dateKey(),payment_method:paymentMethod,notes:"Initial payment"});if(pay.error)return toast(pay.error.message,false)}
  for(const x of items){
   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q});
   if(a.error)return toast(a.error.message,false);
@@ -309,7 +367,7 @@ $("customerGstin").oninput=e=>e.target.value=e.target.value.toUpperCase().slice(
 $("customerForm").addEventListener("submit",async e=>{e.preventDefault();const phone=normalizePhone($("customerPhone").value),gstin=$("customerGstin").value.trim().toUpperCase();if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);const x={name:$("customerName").value.trim(),business_name:$("businessName").value.trim(),phone,email:$("customerEmail").value.trim(),gstin,billing_address:$("billingAddress").value.trim(),delivery_address:$("deliveryAddress").value.trim()};if(!x.name)return toast("Enter customer name",false);const q=editingCustomerId?db.from("customers").update(x).eq("id",editingCustomerId):db.from("customers").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("customerDialog").close();toast("Customer saved");loadAll()});
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
 $("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const {error}=await db.from("enquiries").insert({name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value});if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
-$("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
+$("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
 
 window.viewInvoice=async id=>{
  const inv=invoices.find(x=>x.id===id); if(!inv)return;
@@ -325,7 +383,7 @@ window.viewInvoice=async id=>{
  const date=new Date(inv.created_at);
  $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
  "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+(hasGst?"TAX INVOICE":"INVOICE")+"</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
- "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> Telangana<br><b>Payment:</b> —</div></div>"+
+ "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> Telangana<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"")+"</div></div>"+
  "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</<p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
  "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
  "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
