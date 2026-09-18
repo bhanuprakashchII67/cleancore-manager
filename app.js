@@ -260,7 +260,7 @@ window.reviewChange=async function(id,approve){
  if(!isAdmin)return;
  const note=approve?"":(prompt("Reason for rejection (optional):","")||"");
  const req=changeRequests.find(x=>x.id===id);
- const rpcName=req?.action==="raw_material_delete"?"review_raw_material_delete_request":req?.action==="customer_delete"?"review_customer_delete_request":"review_change_request";
+ const rpcName=req?.action==="raw_material_delete"?"review_raw_material_delete_request":req?.action==="customer_delete"?"review_customer_delete_request":(req?.action==="customer_create"||req?.action==="customer_update")?"review_customer_change_request":"review_change_request";
  const {data,error}=await db.rpc(rpcName,{p_request_id:id,p_approve:approve,p_note:note});
  if(error)return toast(error.message,false);
  toast(approve?"Change approved and applied.":"Change request rejected.");
