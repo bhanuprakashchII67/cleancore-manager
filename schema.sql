@@ -199,6 +199,46 @@ grant select,insert,update,delete on public.products,public.customers,public.inv
 grant select on public.website_products to anon,authenticated;
 grant insert on public.enquiries to anon;
 
+create or replace function public.sync_website_product()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $
+begin
+  if tg_op='DELETE' then
+    delete from public.website_products where id=old.id;
+    return old;
+  end if;
+  insert into public.website_products(id,name,unit,selling_price,description,additional_details,image_urls,video_urls,active,updated_at)
+  values(new.id,new.name,new.unit,new.selling_price,new.description,new.additional_details,new.image_urls,new.video_urls,true,now())
+  on conflict(id) do update set
+    name=excluded.name,
+    unit=excluded.unit,
+    selling_price=excluded.selling_price,
+    description=excluded.description,
+    additional_details=excluded.additional_details,
+    image_urls=excluded.image_urls,
+    video_urls=excluded.video_urls,
+    active=true,
+    updated_at=now();
+  return new;
+end;
+$;
+revoke all on function public.sync_website_product() from public;
+drop trigger if exists products_sync_website on public.products;
+create trigger products_sync_website
+after insert or update or delete on public.products
+for each row execute function public.sync_website_product();
+
+insert into public.website_products(id,name,unit,selling_price,description,additional_details,image_urls,video_urls,active)
+select id,name,unit,selling_price,description,additional_details,image_urls,video_urls,true
+from public.products
+on conflict(id) do update set
+  name=excluded.name,unit=excluded.unit,selling_price=excluded.selling_price,
+  description=excluded.description,additional_details=excluded.additional_details,
+  image_urls=excluded.image_urls,video_urls=excluded.video_urls,active=true,updated_at=now();
+
 -- Product photos/videos: public read for the future public website, admin-only upload/change/delete.
 insert into storage.buckets(id,name,public)
 values('product-media','product-media',true)
