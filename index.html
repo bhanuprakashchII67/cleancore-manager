@@ -1,85 +1,200 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CleanCore Business Manager</title><link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CleanCore Business Manager</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="toast" class="toast"></div>
-<section id="loginView" class="auth-shell"><div class="auth-card">
-<div class="brand">CC</div><p class="eyebrow">PRIVATE BUSINESS MANAGER</p><h1>CleanCore Manager</h1>
-<p class="muted">Stock, billing, customers, enquiries and sales.</p>
-<form id="loginForm"><label>Email<input id="loginEmail" type="email" value="bhanuprakashchadalawada10@gmail.com" required></label><label>Password<input id="loginPassword" type="password" required></label><button class="btn primary">Sign in</button></form>
-<div class="divider">or</div>
-<form id="otpForm"><label>Email OTP login<input id="otpEmail" type="email" value="bhanuprakashchadalawada10@gmail.com" required></label><button class="btn secondary">Send email OTP</button></form>
-<div id="otpBox" class="hidden"><label>OTP<input id="otpCode" inputmode="numeric" maxlength="6"></label><button id="verifyOtp" class="btn secondary" type="button">Verify OTP</button></div>
-<p class="security-note">Authentication is handled by Supabase. Never store passwords or OTPs in this app.</p>
-</div></section>
+
+<section id="loginView" class="auth-shell">
+  <div class="auth-card">
+    <div class="brand">CC</div>
+    <p class="eyebrow">PRIVATE BUSINESS MANAGER</p>
+    <h1>CleanCore Manager</h1>
+    <p class="muted">Private business dashboard for products, stock, bills, sales and customers.</p>
+    <form id="loginForm">
+      <label>ADMIN PASSWORD
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn primary">Open Dashboard</button>
+    </form>
+    <p class="security-note">Admin access is authenticated securely through Supabase.</p>
+    <p class="version">CleanCore Manager v2.1.0</p>
+  </div>
+</section>
 
 <section id="appView" class="app hidden">
-<aside class="sidebar"><div class="side-brand"><div class="brand small">CC</div><div><b>CleanCore</b><span>Manager</span></div></div>
-<nav>
-<button class="nav active" data-section="dashboard">Dashboard</button><button class="nav" data-section="products">Products & Stock</button>
-<button class="nav" data-section="billing">Create Bill</button><button class="nav" data-section="sales">Sales</button>
-<button class="nav" data-section="customers">Customers</button><button class="nav" data-section="enquiries">Enquiries</button><button class="nav" data-section="settings">Settings</button>
-</nav><button id="logout" class="nav logout">Sign out</button></aside>
-<main class="main"><header class="top"><div><p class="eyebrow">CLEANCORЕ CHEMICAL & CLEANING</p><h2 id="title">Dashboard</h2></div><div id="userChip" class="chip"></div></header>
+<aside class="sidebar">
+  <div class="side-brand"><div class="brand small">CC</div><div><b>CleanCore</b><span>Manager</span></div></div>
+  <nav>
+    <button class="nav active" data-section="dashboard">Dashboard</button>
+    <button class="nav" data-section="products">Products & Stock</button>
+    <button class="nav" data-section="billing">Create Bill</button>
+    <button class="nav" data-section="sales">Sales</button>
+    <button class="nav" data-section="customers">Customers</button>
+    <button class="nav" data-section="enquiries">Enquiries</button>
+    <button class="nav" data-section="settings">Settings</button>
+  </nav>
+  <button id="logout" class="nav logout">Sign out</button>
+</aside>
 
-<section id="dashboard" class="section active"><div class="cards">
-<div class="metric"><span>Today sales</span><strong id="today">₹0</strong></div><div class="metric"><span>This month</span><strong id="month">₹0</strong></div>
-<div class="metric"><span>Monthly profit</span><strong id="profit">₹0</strong></div><div class="metric"><span>Low stock items</span><strong id="low">0</strong></div></div>
-<div class="panel"><div class="panel-head"><h3>Recent invoices</h3><button class="btn small goto" data-goto="billing">New bill</button></div><div id="recent"></div></div></section>
+<main class="main">
+<header class="top">
+  <div>
+    <p class="eyebrow">CLEANCORЕ CHEMICAL & CLEANING</p>
+    <h2 id="title">Dashboard</h2>
+  </div>
+  <div id="userChip" class="chip"></div>
+</header>
 
-<section id="products" class="section"><div class="panel"><div class="panel-head"><div><h3>Products & Stock</h3><p class="muted">Manage finished products, prices, descriptions, photos and videos.</p></div><button id="addProduct" class="btn primary small">+ New Product</button></div><div id="productsTable"></div></div>
-<div class="panel"><div class="panel-head"><div><h3>Raw Materials Stock</h3><p class="muted">Keep raw-material inventory separate from finished products.</p></div><button id="addRaw" class="btn primary small">+ New Raw Material</button></div><div id="rawTable"></div></div></section>
+<section id="dashboard" class="section active">
+  <div class="cards">
+    <div class="metric"><span>Today sales</span><strong id="today">₹0</strong></div>
+    <div class="metric"><span>This month</span><strong id="month">₹0</strong></div>
+    <div class="metric"><span>Monthly profit</span><strong id="profit">₹0</strong></div>
+    <div class="metric"><span>Low stock items</span><strong id="low">0</strong></div>
+  </div>
+  <div class="panel"><div class="panel-head"><h3>Recent invoices</h3><button class="btn small goto" data-goto="billing">New bill</button></div><div id="recent"></div></div>
+</section>
 
-<section id="billing" class="section"><div class="panel"><div class="panel-head"><h3>Create Bill</h3><span class="muted">Invoice + WhatsApp summary</span></div>
-<form id="billForm" class="grid">
-<label>Existing customer<select id="billingCustomer"><option value="">New / enter customer</option></select></label>
-<label>Customer name<input id="custName" required></label>
-<label>Business name<input id="custBusiness"></label><label>Phone<input id="custPhone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required></label>
-<label>Email ID<input id="custEmail" type="email"></label><label>GSTIN (optional)<input id="custGstin" maxlength="15" placeholder="15-character GSTIN"></label>
-<div class="full grid two"><label>Billing address<textarea id="custBilling" rows="2"></textarea></label><label>Delivery address<textarea id="custDelivery" rows="2"></textarea></label></div>
-<label>Discount ₹<input id="discount" type="number" min="0" value="0"></label><label id="gstWrap" class="hidden">GST % for this bill<input id="gstPercent" type="number" min="0" max="100" step="0.01" value="18"></label>
-<div class="full"><div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div><div id="lines"></div></div>
-<div class="total full"><div><div>Subtotal: <strong id="subtotal">₹0</strong></div><div>Discount: <strong id="discountShow">₹0</strong></div><div>GST: <strong id="gstShow">0% • ₹0</strong></div></div><strong id="total">₹0</strong></div>
-<div class="full actions"><button class="btn primary">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
-</form></div></section>
+<section id="products" class="section">
+  <div class="panel">
+    <div class="panel-head">
+      <div><h3>Products & Stock</h3><p class="muted">Manage finished products, prices, descriptions, photos and videos.</p></div>
+      <button id="addProduct" class="btn primary small">+ New Product</button>
+    </div>
+    <div id="productsTable"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <div><h3>Raw Materials Stock</h3><p class="muted">Keep raw-material inventory separate from finished products.</p></div>
+      <button id="addRaw" class="btn primary small">+ New Raw Material</button>
+    </div>
+    <div id="rawTable"></div>
+  </div>
+</section>
 
-<section id="sales" class="section"><div class="panel"><div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
-<div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div><div id="salesTable"></div></div></section>
+<section id="billing" class="section">
+  <div class="panel">
+    <div class="panel-head"><h3>Create Bill</h3><span class="muted">Invoice + WhatsApp summary</span></div>
+    <form id="billForm" class="grid">
+      <label>Existing customer<select id="billingCustomer"><option value="">New / enter customer</option></select></label>
+      <label>Customer name<input id="custName" required></label>
+      <label>Business name<input id="custBusiness"></label>
+      <label>Phone<input id="custPhone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required></label>
+      <label>Email ID<input id="custEmail" type="email"></label>
+      <label>GSTIN (optional)<input id="custGstin" maxlength="15" placeholder="15-character GSTIN"></label>
+      <div class="full grid two">
+        <label>Billing address<textarea id="custBilling" rows="2"></textarea></label>
+        <label>Delivery address<textarea id="custDelivery" rows="2"></textarea></label>
+      </div>
+      <label>Discount ₹<input id="discount" type="number" min="0" value="0"></label>
+      <label id="gstWrap" class="hidden">GST % for this bill<input id="gstPercent" type="number" min="0" max="100" step="0.01" value="18"></label>
+      <div class="full"><div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div><div id="lines"></div></div>
+      <div class="total full">
+        <div>
+          <div>Subtotal: <strong id="subtotal">₹0</strong></div>
+          <div>Discount: <strong id="discountShow">₹0</strong></div>
+          <div>GST: <strong id="gstShow">0% • ₹0</strong></div>
+        </div>
+        <strong id="total">₹0</strong>
+      </div>
+      <div class="full actions"><button class="btn primary">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
+    </form>
+  </div>
+</section>
 
-<section id="customers" class="section"><div class="panel"><div class="panel-head"><div><h3>Customers</h3><p class="muted">Add and edit complete customer records.</p></div><button id="addCustomer" class="btn primary small">+ New Customer</button></div><div id="customersTable"></div></div></section>
+<section id="sales" class="section">
+  <div class="panel">
+    <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
+    <div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div>
+    <div id="salesTable"></div>
+  </div>
+</section>
 
-<section id="enquiries" class="section"><div class="panel"><div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div><div id="enquiriesTable"></div></div></section>
-<section id="settings" class="section"><div class="panel"><h3>Security</h3><p class="muted">Password changes require email reauthentication.</p>
-<button id="changePassword" class="btn primary">Change password</button><div id="passwordBox" class="hidden security-box"><button id="sendReauth" class="btn secondary">Send reauthentication OTP</button>
-<label>Reauthentication OTP<input id="reauthCode" inputmode="numeric" maxlength="6"></label><label>Current password<input id="currentPw" type="password"></label><label>New password<input id="newPw" type="password" minlength="12"></label>
-<button id="updatePw" class="btn primary">Update password</button></div></div>
-<div class="panel"><h3>Connection</h3><p class="muted">Browser uses the Supabase publishable key only.</p><code>https://rwfamxkfqslorxcrjrp.supabase.co</code></div></section>
+<section id="customers" class="section">
+  <div class="panel">
+    <div class="panel-head"><div><h3>Customers</h3><p class="muted">Add and edit complete customer records.</p></div><button id="addCustomer" class="btn primary small">+ New Customer</button></div>
+    <div id="customersTable"></div>
+  </div>
+</section>
+
+<section id="enquiries" class="section">
+  <div class="panel"><div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div><div id="enquiriesTable"></div></div>
+</section>
+
+<section id="settings" class="section">
+  <div class="panel">
+    <h3>Security</h3><p class="muted">Password changes require email reauthentication.</p>
+    <button id="changePassword" class="btn primary">Change password</button>
+    <div id="passwordBox" class="hidden security-box">
+      <button id="sendReauth" class="btn secondary">Send reauthentication OTP</button>
+      <label>Reauthentication OTP<input id="reauthCode" inputmode="numeric" maxlength="6"></label>
+      <label>Current password<input id="currentPw" type="password"></label>
+      <label>New password<input id="newPw" type="password" minlength="12"></label>
+      <button id="updatePw" class="btn primary">Update password</button>
+    </div>
+  </div>
+  <div class="panel"><h3>Connection</h3><p class="muted">Browser uses the Supabase publishable key only.</p><code>https://rwfamxkfqslorxcrjrp.supabase.co</code></div>
+</section>
 </main></section>
 
-<dialog id="productDialog"><form method="dialog" id="productForm" class="dialog"><h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
-<label>Product name<input id="pname" required></label><label>Unit / pack size<input id="punit" value="5 Litre Can" required></label>
-<label>Selling price ₹<input id="pprice" type="number" min="0" value="349" required></label><label>Cost price ₹<input id="pcost" type="number" min="0" value="0" required></label>
-<label>Stock<input id="pstock" type="number" min="0" required></label><label>Low-stock alert<input id="plow" type="number" min="0" value="5" required></label>
-<label>Description<textarea id="pdesc" rows="4" placeholder="Product description"></textarea></label><label>Additional details<textarea id="pdetails" rows="4" placeholder="Specifications, usage, pack details, etc."></textarea></label>
-<label>Photos <input id="pimages" type="file" accept="image/*" multiple></label><label>Videos <input id="pvideos" type="file" accept="video/*" multiple></label>
-<div id="productMedia"></div><p class="muted tiny">Photos and videos are saved in Supabase Storage and can be used on the public website later.</p>
-<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Product</button></div></form></dialog>
+<dialog id="productDialog">
+<form method="dialog" id="productForm" class="dialog">
+  <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
+  <label>Product name<input id="pname" required></label>
+  <label>Unit / pack size<input id="punit" value="5 Litre Can" required></label>
+  <label>Selling price ₹<input id="pprice" type="number" min="0" value="349" required></label>
+  <label>Cost price ₹<input id="pcost" type="number" min="0" value="0" required></label>
+  <label>Stock<input id="pstock" type="number" min="0" required></label>
+  <label>Low-stock alert<input id="plow" type="number" min="0" value="5" required></label>
+  <label>Description<textarea id="pdesc" rows="4" placeholder="Product description"></textarea></label>
+  <label>Additional details<textarea id="pdetails" rows="4" placeholder="Specifications, usage, pack details, etc."></textarea></label>
+  <label>Photos <input id="pimages" type="file" accept="image/*" multiple></label>
+  <label>Videos <input id="pvideos" type="file" accept="video/*" multiple></label>
+  <div id="productMedia"></div><p class="muted tiny">Photos and videos are saved in Supabase Storage and can be used on the public website later.</p>
+  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Product</button></div>
+</form></dialog>
 
-<dialog id="rawDialog"><form method="dialog" id="rawForm" class="dialog"><h3 id="rawDialogTitle">Add Raw Material</h3>
-<label>Raw material name<input id="rawName" required></label><label>Unit<input id="rawUnit" value="Kg" required></label><label>Cost per unit ₹<input id="rawCost" type="number" min="0" value="0"></label><label>Stock<input id="rawStock" type="number" min="0" value="0" required></label><label>Low-stock alert<input id="rawLow" type="number" min="0" value="5" required></label>
-<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div></form></dialog>
+<dialog id="rawDialog">
+<form method="dialog" id="rawForm" class="dialog">
+  <h3 id="rawDialogTitle">Add Raw Material</h3>
+  <label>Raw material name<input id="rawName" required></label>
+  <label>Unit<input id="rawUnit" value="Kg" required></label>
+  <label>Cost per unit ₹<input id="rawCost" type="number" min="0" value="0"></label>
+  <label>Stock<input id="rawStock" type="number" min="0" value="0" required></label>
+  <label>Low-stock alert<input id="rawLow" type="number" min="0" value="5" required></label>
+  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div>
+</form></dialog>
 
-<dialog id="customerDialog"><form method="dialog" id="customerForm" class="dialog"><h3 id="customerDialogTitle">Add New Customer</h3>
-<label>Customer name<input id="customerName" required></label><label>Business name<input id="businessName" required></label><label>Phone number<input id="customerPhone" inputmode="numeric" maxlength="10" required></label><label>Email ID<input id="customerEmail" type="email"></label><label>GSTIN (optional)<input id="customerGstin" maxlength="15"></label>
-<label>Billing address<textarea id="billingAddress" rows="4" required></textarea></label><label>Delivery address<textarea id="deliveryAddress" rows="4"></textarea></label>
-<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Customer</button></div></form></dialog>
+<dialog id="customerDialog">
+<form method="dialog" id="customerForm" class="dialog">
+  <h3 id="customerDialogTitle">Add New Customer</h3>
+  <label>Customer name<input id="customerName" required></label>
+  <label>Business name<input id="businessName" required></label>
+  <label>Phone number<input id="customerPhone" inputmode="numeric" maxlength="10" required></label>
+  <label>Email ID<input id="customerEmail" type="email"></label>
+  <label>GSTIN (optional)<input id="customerGstin" maxlength="15"></label>
+  <label>Billing address<textarea id="billingAddress" rows="4" required></textarea></label>
+  <label>Delivery address<textarea id="deliveryAddress" rows="4"></textarea></label>
+  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Customer</button></div>
+</form></dialog>
 
-<dialog id="enquiryDialog"><form method="dialog" id="enquiryForm" class="dialog"><h3>Enquiry</h3>
-<label>Name<input id="ename" required></label><label>Phone<input id="ephone"></label><label>Business<input id="ebusiness"></label><label>Message<textarea id="emessage"></textarea></label><label>Status<select id="estatus"><option>New</option><option>Contacted</option><option>Converted</option><option>Closed</option></select></label>
-<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div></form></dialog>
+<dialog id="enquiryDialog">
+<form method="dialog" id="enquiryForm" class="dialog">
+  <h3>Enquiry</h3>
+  <label>Name<input id="ename" required></label>
+  <label>Phone<input id="ephone"></label>
+  <label>Business<input id="ebusiness"></label>
+  <label>Message<textarea id="emessage"></textarea></label>
+  <label>Status<select id="estatus"><option>New</option><option>Contacted</option><option>Converted</option><option>Closed</option></select></label>
+  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div>
+</form></dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script>
-</body></html>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
