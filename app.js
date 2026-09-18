@@ -36,7 +36,6 @@ async function loadAccess(){
   const {data:perms,error:perr}=await db.from("employee_permissions").select("module").eq("employee_id",emp.id).eq("enabled",true);
   if(perr)throw new Error(perr.message);
   employee=emp;employeePermissions=new Set((perms||[]).map(x=>x.module));
-  if(!employeePermissions.has("dashboard"))employeePermissions.add("dashboard");
 }
 function applyAccess(){
   document.querySelectorAll(".nav[data-section]").forEach(b=>{
@@ -184,8 +183,8 @@ window.reviewChange=async function(id,approve){
  await loadAll();
 };
 function defaultEmployeeModules(team){
- if(team==="account")return ["dashboard","products","billing","sales","expenses"];
- if(team==="crm")return ["dashboard","customers","enquiries","website_orders"];
+ if(team==="account")return ["products","billing","expenses"];
+ if(team==="crm")return ["customers","enquiries","website_orders"];
  return ["dashboard"];
 }
 function employeeModuleChecks(selected){
@@ -206,6 +205,10 @@ function resetEmployeeForm(){
  $("employeeStarts").value="";$("employeeEnds").value="";
  renderEmployeeModuleChecks("account");$("employeeStatus").textContent="";
 }
+$("addEmployee").onclick=()=>{resetEmployeeForm();$("employeeDialog").showModal()};
+$("employeeTeam").onchange=()=>renderEmployeeModuleChecks($("employeeTeam").value);
+$("employeeForm").addEventListener("submit",createEmployee);
+
 async function createEmployee(e){
  e.preventDefault();
  const status=$("employeeStatus");
