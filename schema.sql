@@ -799,3 +799,33 @@ $$;
 revoke all on function public.delete_raw_material_admin(uuid) from public;
 revoke execute on function public.delete_raw_material_admin(uuid) from anon;
 grant execute on function public.delete_raw_material_admin(uuid) to authenticated;
+
+ 
+-- Archive customers from active lists while preserving financial history.
+alter table public.customers
+  add column if not exists archived_at timestamptz;
+
+create index if not exists customers_archived_idx
+  on public.customers(archived_at);
+
+create or replace function public.archive_customer_admin(p_customer_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  update public.customers
+  set archived_at=coalesce(archived_at,now()),updated_at=now()
+  where id=p_customer_id
+  returning id into v_id;
+  if v_id is null then raise exception 'Customer not found'; end if;
+  return v_id;
+end;
+$$;
+
+revoke all on function public.archive_customer_admin(uuid) from public;
+revoke execute on function public.archive_customer_admin(uuid) from anon;
+grant execute on function public.archive_customer_admin(uuid) to authenticated;
