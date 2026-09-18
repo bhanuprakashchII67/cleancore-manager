@@ -170,3 +170,9 @@ button,input,select,textarea{touch-action:manipulation}
   .nav{font-size:8.5px;padding:5px 0}
   .nav[data-section]::before{font-size:14px;margin-bottom:2px}
 }
+
+/* Net-profit dashboard and 8-item mobile navigation */
+.cards{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:768px){.sidebar nav{grid-template-columns:repeat(8,minmax(0,1fr))}.nav[data-section="expenses"]::before{content:"₹"}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:390px){.sidebar nav{grid-template-columns:repeat(8,minmax(36px,1fr))}.nav{font-size:8px}}
