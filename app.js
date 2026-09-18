@@ -1,4 +1,4 @@
-const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO";
+const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com";
 const {createClient}=supabase; const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 const bootSignout=db.auth.signOut({scope:"local"}).catch(()=>null);
 const $=id=>document.getElementById(id);
@@ -315,7 +315,7 @@ window.viewInvoice=async id=>{
  const inv=invoices.find(x=>x.id===id); if(!inv)return;
  const r=await db.from("invoice_items").select("*").eq("invoice_id",id).order("created_at");
  if(r.error)return toast(r.error.message,false);
- const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
+ const hasGst=Number(inv.gst_amount||0)>0 && String(inv.gstin||"").trim()!==""; const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
  const cgst=Number(inv.cgst_amount||0),sgst=Number(inv.sgst_amount||0),igst=Number(inv.igst_amount||0);
  const taxRows=intra
   ? "<tr><td colspan='5' class='tax-label'>CGST ("+Number(inv.cgst_percent||0)+"%)</td><td>"+money(cgst)+"</td></tr><tr><td colspan='5' class='tax-label'>SGST ("+Number(inv.sgst_percent||0)+"%)</td><td>"+money(sgst)+"</td></tr>"
@@ -324,9 +324,9 @@ window.viewInvoice=async id=>{
  const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
  const date=new Date(inv.created_at);
  $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
- "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div></div><div class='inv-title'><b>TAX INVOICE</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
+ "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+(hasGst?"TAX INVOICE":"INVOICE")+"</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
  "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> Telangana<br><b>Payment:</b> —</div></div>"+
- "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
+ "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</<p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
  "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
  "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
  "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
