@@ -122,6 +122,13 @@
         <div><span>GSTIN</span><strong id="billCustomerGstin">—</strong></div>
       </div>
 
+      <label>Document type
+        <select id="documentType">
+          <option value="SALE">Sales Invoice</option>
+          <option value="QUOTATION">Quotation Invoice</option>
+        </select>
+        <small class="muted">Quotation Invoice is for quoting only. It does not become a sale or reduce stock.</small>
+      </label>
       <label>Bill type
         <select id="billType">
           <option value="NON_GST">Non-GST Bill</option>
@@ -178,8 +185,12 @@
         <strong id="total">₹0</strong>
       </div>
 
-      <div class="full actions"><button type="submit" class="btn primary">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
+      <div class="full actions"><button type="submit" class="btn primary" id="saveBillButton">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
     </form>
+    <div class="panel" style="margin-top:1rem">
+      <div class="panel-head"><div><h3>Recent Quotations</h3><p class="muted">Quotation documents are stored here and excluded from Sales.</p></div></div>
+      <div id="quotationsTable"></div>
+    </div>
   </div>
 </section>
 
@@ -190,7 +201,7 @@
   <div class="panel">
     <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
     <div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div>
-    <div id="salesTable"></div><dialog id="invoiceDialog"><div id="invoicePreview"></div><div class="actions"><button id="printInvoice" class="btn primary">Print Bill / PDF</button><button id="closeInvoice" class="btn">Close</button></div></dialog>
+    <div id="salesTable"></div><dialog id="invoiceDialog"><div id="invoicePreview"></div><div class="actions"><button id="printInvoice" class="btn primary">Print / Save PDF</button><button id="closeInvoice" class="btn">Close</button></div></dialog>
   </div>
 </section>
 
