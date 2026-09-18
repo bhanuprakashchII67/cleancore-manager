@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.4.3">
+<link rel="stylesheet" href="style.css?v=3.5.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v3.4.3</p>
+    <p class="version">CleanCore Manager v3.5.0</p>
   </div>
 </section>
 
@@ -135,25 +135,36 @@
       <label>Discount ₹<input id="discount" type="number" min="0" step="0.01" value="0"></label>
 
       <div class="full payment-box">
-        <div class="panel-head"><b>Payment</b><span id="paymentPreview" class="muted">Select a customer and add items</span></div>
-        <div class="grid two">
+        <div class="panel-head"><b>Payment</b><span id="paymentPreview" class="muted">Select payment type</span></div>
+        <div class="payment-choice-grid">
           <label>Payment type
             <select id="paymentType">
-              <option value="CASH">Cash</option>
-              <option value="ONLINE">Online</option>
-              <option value="CREDIT">Credit</option>
-              <option value="HALF">Half Payment</option>
+              <option value="CASH">Cash — Paid in full</option>
+              <option value="ONLINE">Online — Paid in full</option>
+              <option value="CREDIT">Credit — Full credit</option>
+              <option value="HALF">Half / Part Payment</option>
             </select>
           </label>
-          <label id="billDueDateWrap">Due date
+          <label id="billDueDateWrap">Credit due date
             <input id="dueDate" type="date">
           </label>
         </div>
-        <p class="muted tiny">Cash / Online = fully paid. Credit = fully due. Half Payment = 50% paid and 50% credit.</p>
+        <div class="payment-summary">
+          <div class="payment-summary-item">
+            <span>Now Paying</span>
+            <strong id="payingNowShow">₹0.00</strong>
+            <input id="payingNowInput" class="payment-amount-input hidden" type="number" min="0" step="0.01" value="0">
+          </div>
+          <div class="payment-summary-item credit">
+            <span>Credit Amount</span>
+            <strong id="creditAmountShow">₹0.00</strong>
+          </div>
+        </div>
+        <p class="muted tiny">For Half / Part Payment, enter how much the customer is paying now. Credit is calculated automatically.</p>
       </div>
 
       <div class="full">
-        <div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div>
+        <div class="panel-head"><div><b>Items</b><span class="muted tiny">Set the selling price for this bill directly in the same row.</span></div><button type="button" id="addLine" class="btn small">+ Add item</button></div>
         <div id="lines"></div>
       </div>
 
@@ -451,6 +462,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.4.1").catch(()=>{}));</script>
-<script src="app.js?v=3.4.3"></script>
+<script src="app.js?v=3.5.0"></script>
 </body>
 </html>
