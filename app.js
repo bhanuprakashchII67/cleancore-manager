@@ -832,12 +832,12 @@ function sendBillToCustomer(inv,customer,items){
    if(m)opened++;
  }
 
+ const destinations=[];
+ if(hasPhone)destinations.push("WhatsApp");
+ if(hasEmail)destinations.push("Email");
  const n=$("billSendNotice");
  if(n){
    n.classList.remove("hidden");
-   const destinations=[];
-   if(hasPhone)destinations.push("WhatsApp");
-   if(hasEmail)destinations.push("Email");
    n.innerHTML=destinations.length
      ? "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destinations.join(" + ")+" opened with the bill details. Review and press Send in the opened app."
      : "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> No customer WhatsApp number or email was provided.";
