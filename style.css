@@ -237,3 +237,15 @@ button,input,select,textarea{touch-action:manipulation}
 @media(max-width:390px){
   .history-cards{grid-template-columns:1fr}
 }
+
+
+/* Website order management */
+.order-status{width:auto;min-width:150px;min-height:38px;padding:8px 10px;border:1px solid #dce5ee;border-radius:9px;background:#fff;font:inherit}
+#websiteOrdersTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#websiteOrdersTable table{min-width:900px}
+#websiteOrderDialog{width:min(760px,calc(100vw - 24px));max-width:760px}
+#websiteOrderItems{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:768px){
+  #websiteOrderDialog{width:calc(100vw - 12px);max-width:none}
+  .order-status{min-width:140px}
+}
