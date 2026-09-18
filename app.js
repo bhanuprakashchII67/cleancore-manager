@@ -107,7 +107,7 @@ async function go(id){
 async function loadAll(){
  const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("*").order("name"):null;
  const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("*").order("created_at",{ascending:false}):null;
- const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("*").order("name"):null;
+ const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("*").is("archived_at",null).order("name"):null;
  const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("*").order("created_at",{ascending:false}):null;
  const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("*").order("name"):null;
  const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}):null;
@@ -514,10 +514,27 @@ function renderCustomers(){
   const account=x.auth_user_id?"<span class='badge ok'>Website</span>":"—";
   const s=customerStats(x.id);
   return [esc(x.name),esc(x.business_name),esc(x.phone),account,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
-   "<button class=\"link\" onclick=\"viewCustomerHistory(\'"+x.id+"\')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer(\'"+x.id+"\')\">Edit</button>"];
+   "<button class=\"link\" onclick=\"viewCustomerHistory(\'"+x.id+"\')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer(\'"+x.id+"\')\">Edit</button> <button class=\"link danger\" onclick=\"deleteCustomer(\'"+x.id+"\')\">Remove</button>"];
  }));
  $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone)+")</option>").join("");
 }
+window.deleteCustomer=async function(id){
+ const customer=customers.find(x=>x.id===id);if(!customer)return;
+ const s=customerStats(id);
+ const warning=s.bills.length
+   ?"This customer has "+s.bills.length+" bill"+(s.bills.length===1?"":"s")+" and "+money(s.creditDue)+" credit due. The customer will be removed from the active list, while financial history is preserved."
+   :"Remove this customer from the active customer list?";
+ if(!confirm(warning))return;
+ if(!isAdmin){
+   const ok=await submitChange("customers","customer_delete","customers",id,{archived_at:new Date().toISOString()},"Employee customer removal");
+   if(ok)await loadAll();
+   return;
+ }
+ const {data,error}=await db.rpc("archive_customer_admin",{p_customer_id:id});
+ if(error)return toast(error.message||"Unable to remove customer.",false);
+ toast("Customer removed from active list");
+ await loadAll();
+};
 window.viewCustomerHistory=function(id){
  const c=customers.find(x=>x.id===id);if(!c)return;
  const s=customerStats(id);
