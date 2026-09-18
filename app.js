@@ -201,4 +201,19 @@ $("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","D
 $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
-db.auth.getSession().then(async({data})=>{if(data.session){user=data.session.user;await enter()}});
+
+// Clean session policy: a browser reload/new page starts logged out.
+// While the tab is open, inactivity for 30 minutes also signs out.
+const INACTIVITY_MS=30*60*1000;
+let inactivityTimer;
+async function forceLogout(){try{await db.auth.signOut()}finally{sessionStorage.removeItem("cleancore_session");location.reload()}}
+function armInactivity(){
+  clearTimeout(inactivityTimer);
+  inactivityTimer=setTimeout(forceLogout,INACTIVITY_MS);
+}
+["click","keydown","pointerdown","mousemove","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{if(user)armInactivity()},{passive:true}));
+window.addEventListener("pagehide",()=>{try{db.auth.signOut()}catch(e){}});
+document.addEventListener("visibilitychange",()=>{if(user){if(document.visibilityState==="hidden"){try{db.auth.signOut()}catch(e){}}else{forceLogout()}}});
+sessionStorage.removeItem("cleancore_session");
+db.auth.signOut().finally(()=>{user=null;});
+
