@@ -283,3 +283,6 @@ dialog .dialog{padding-top:52px}
 .send-notice strong{color:#087f79}
 
 .install-app-btn{margin-top:12px;width:100%;justify-content:center}
+
+.refresh-btn{cursor:pointer}
+.refresh-btn:disabled{opacity:.6;cursor:wait}
