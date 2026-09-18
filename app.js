@@ -886,11 +886,94 @@ $("billForm").addEventListener("submit",async e=>{
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
 $("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
-function resetCustomerForm(){editingCustomerId=null;["customerName","businessName","customerPhone","customerEmail","customerGstin","billingAddress","deliveryAddress"].forEach(id=>$(id).value="");$("customerDialogTitle").textContent="Add New Customer"}
-window.editCustomer=id=>{const c=customers.find(x=>x.id===id);if(!c)return;editingCustomerId=id;$("customerName").value=c.name||"";$("businessName").value=c.business_name||"";$("customerPhone").value=c.phone||"";$("customerEmail").value=c.email||"";$("customerGstin").value=c.gstin||"";$("billingAddress").value=c.billing_address||"";$("deliveryAddress").value=c.delivery_address||"";$("customerDialogTitle").textContent="Edit Customer";$("customerDialog").showModal()};
+function composeAddress(prefix){
+ const parts=[
+   $(prefix+"ShopNo").value.trim(),
+   $(prefix+"Colony").value.trim(),
+   $(prefix+"City").value.trim(),
+   $(prefix+"State").value.trim(),
+   $(prefix+"Pincode").value.trim()
+ ].filter(Boolean);
+ return parts.join(", ");
+}
+function fillAddressFields(prefix,c,legacy){
+ const fields=["ShopNo","Colony","City","State","Pincode"];
+ const vals=[
+   c[prefix==="billing"?"billing_shop_no":"delivery_shop_no"],
+   c[prefix==="billing"?"billing_colony":"delivery_colony"],
+   c[prefix==="billing"?"billing_city":"delivery_city"],
+   c[prefix==="billing"?"billing_state":"delivery_state"],
+   c[prefix==="billing"?"billing_pincode":"delivery_pincode"]
+ ];
+ if(!vals.some(Boolean)&&legacy)vals[1]=legacy;
+ fields.forEach((f,i)=>$(prefix+f).value=vals[i]||"");
+}
+
+$("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
+function resetCustomerForm(){
+ editingCustomerId=null;
+ ["customerName","businessName","customerPhone","customerEmail","customerGstin",
+  "billingShopNo","billingColony","billingCity","billingState","billingPincode",
+  "deliveryShopNo","deliveryColony","deliveryCity","deliveryState","deliveryPincode"
+ ].forEach(id=>$(id).value="");
+ $("customerDialogTitle").textContent="Add New Customer";
+}
+window.editCustomer=id=>{
+ const c=customers.find(x=>x.id===id);if(!c)return;
+ editingCustomerId=id;
+ $("customerName").value=c.name||"";
+ $("businessName").value=c.business_name||"";
+ $("customerPhone").value=c.phone||"";
+ $("customerEmail").value=c.email||"";
+ $("customerGstin").value=c.gstin||"";
+ fillAddressFields("billing",c,c.billing_address||"");
+ fillAddressFields("delivery",c,c.delivery_address||"");
+ $("customerDialogTitle").textContent="Edit Customer";
+ $("customerDialog").showModal();
+};
 $("customerPhone").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"").slice(0,10);
 $("customerGstin").oninput=e=>e.target.value=e.target.value.toUpperCase().slice(0,15);
-$("customerForm").addEventListener("submit",async e=>{e.preventDefault();const phone=normalizePhone($("customerPhone").value),gstin=$("customerGstin").value.trim().toUpperCase();if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);const x={name:$("customerName").value.trim(),business_name:$("businessName").value.trim(),phone,email:$("customerEmail").value.trim(),gstin,billing_address:$("billingAddress").value.trim(),delivery_address:$("deliveryAddress").value.trim()};if(!x.name)return toast("Enter customer name",false);if(!isAdmin){const ok=await submitChange("customers",editingCustomerId?"customer_update":"customer_create","customers",editingCustomerId,x,"Employee customer change");if(ok)$("customerDialog").close();return} const q=editingCustomerId?db.from("customers").update(x).eq("id",editingCustomerId):db.from("customers").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("customerDialog").close();toast("Customer saved");loadAll()});
+
+$("customerForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const phone=normalizePhone($("customerPhone").value),gstin=$("customerGstin").value.trim().toUpperCase();
+ if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);
+ if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);
+ const x={
+   name:$("customerName").value.trim(),
+   business_name:$("businessName").value.trim(),
+   phone,
+   email:$("customerEmail").value.trim(),
+   gstin,
+   billing_shop_no:$("billingShopNo").value.trim(),
+   billing_colony:$("billingColony").value.trim(),
+   billing_city:$("billingCity").value.trim(),
+   billing_state:$("billingState").value.trim(),
+   billing_pincode:$("billingPincode").value.trim(),
+   delivery_shop_no:$("deliveryShopNo").value.trim(),
+   delivery_colony:$("deliveryColony").value.trim(),
+   delivery_city:$("deliveryCity").value.trim(),
+   delivery_state:$("deliveryState").value.trim(),
+   delivery_pincode:$("deliveryPincode").value.trim()
+ };
+ if(!x.name)return toast("Enter customer name",false);
+ x.billing_address=composeAddress("billing");
+ x.delivery_address=composeAddress("delivery");
+
+ if(!isAdmin){
+   const ok=await submitChange("customers",editingCustomerId?"customer_update":"customer_create","customers",editingCustomerId,x,"Employee customer change");
+   if(ok)$("customerDialog").close();
+   return;
+ }
+ const q=editingCustomerId
+   ?db.from("customers").update(x).eq("id",editingCustomerId)
+   :db.from("customers").insert(x);
+ const {error}=await q;
+ if(error)return toast(error.message,false);
+ $("customerDialog").close();
+ toast("Customer saved");
+ await loadAll();
+});
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
 $("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
 $("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
