@@ -7,23 +7,28 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.4.1">
+<link rel="stylesheet" href="style.css?v=3.4.2">
 </head>
 <body>
 <div id="toast" class="toast"></div>
 
 <section id="loginView" class="auth-shell">
-  <div class="auth-card simple-login-card">
-    <h1>Login</h1>
+  <div class="auth-card">
+    <div class="brand">CC</div>
+    <p class="eyebrow">PRIVATE BUSINESS MANAGER</p>
+    <h1>CleanCore Manager</h1>
+    <p class="muted">Private business dashboard for products, stock, bills, sales and customers.</p>
     <form id="loginForm">
-      <label>Login
-        <input id="loginIdentifier" type="text" autocomplete="username" placeholder="Enter username or email" required>
+      <label>LOGIN ID
+        <input id="loginIdentifier" type="text" autocomplete="username" placeholder="Enter username or email address" required>
       </label>
-      <label>Password
-        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password" required>
+      <label>PASSWORD
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
       </label>
-      <button class="btn primary" type="submit">Login</button>
+      <button class="btn primary">Sign in</button>
     </form>
+    <p class="security-note">Secure access to your CleanCore business workspace.</p>
+    <p class="version">CleanCore Manager v3.4.2</p>
   </div>
 </section>
 
@@ -308,13 +313,36 @@
 <dialog id="customerDialog">
 <form method="dialog" id="customerForm" class="dialog">
   <h3 id="customerDialogTitle">Add New Customer</h3>
-  <label>Customer name<input id="customerName" required></label>
-  <label>Business name<input id="businessName" required></label>
-  <label>Phone number<input id="customerPhone" inputmode="numeric" maxlength="10" required></label>
-  <label>Email ID<input id="customerEmail" type="email"></label>
-  <label>GSTIN (optional)<input id="customerGstin" maxlength="15"></label>
-  <label>Billing address<textarea id="billingAddress" rows="4" required></textarea></label>
-  <label>Delivery address<textarea id="deliveryAddress" rows="4"></textarea></label>
+  <div class="customer-form-grid">
+    <label>Customer name<input id="customerName" required></label>
+    <label>Business name<input id="businessName" required></label>
+    <label>Phone number<input id="customerPhone" inputmode="numeric" maxlength="10" required></label>
+    <label>Email ID<input id="customerEmail" type="email"></label>
+    <label>GSTIN (optional)<input id="customerGstin" maxlength="15" placeholder="15-character GSTIN"></label>
+  </div>
+
+  <fieldset class="address-fieldset">
+    <legend>Billing address</legend>
+    <div class="customer-form-grid">
+      <label>Shop / Flat No<input id="billingShopNo" placeholder="Shop No, Flat No"></label>
+      <label>Colony / Street<input id="billingColony" placeholder="Colony or street"></label>
+      <label>City<input id="billingCity" placeholder="City"></label>
+      <label>State<input id="billingState" placeholder="State"></label>
+      <label>PIN code<input id="billingPincode" inputmode="numeric" maxlength="6" placeholder="6-digit PIN"></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="address-fieldset">
+    <legend>Delivery address</legend>
+    <div class="customer-form-grid">
+      <label>Shop / Flat No<input id="deliveryShopNo" placeholder="Shop No, Flat No"></label>
+      <label>Colony / Street<input id="deliveryColony" placeholder="Colony or street"></label>
+      <label>City<input id="deliveryCity" placeholder="City"></label>
+      <label>State<input id="deliveryState" placeholder="State"></label>
+      <label>PIN code<input id="deliveryPincode" inputmode="numeric" maxlength="6" placeholder="6-digit PIN"></label>
+    </div>
+  </fieldset>
+
   <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save Customer</button></div>
 </form></dialog>
 
@@ -415,6 +443,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.4.1").catch(()=>{}));</script>
-<script src="app.js?v=3.4.1"></script>
+<script src="app.js?v=3.4.2"></script>
 </body>
 </html>
