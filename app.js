@@ -327,12 +327,12 @@ function renderAll(){
  $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
   esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
   Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
-  `<button class="link" onclick="editProduct('${p.id}')">Edit</button>`
+  `<button class="link" onclick="editProduct('${p.id}')">Edit</button> <button class="link danger" onclick="deleteProduct('${p.id}')">Delete</button>`
  ]));
  $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
   esc(r.name),esc(r.unit),money(r.cost_per_unit),r.stock,
   Number(r.stock)<=Number(r.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
-  `<button class="link" onclick="editRawMaterial('${r.id}')">Edit</button>`
+  `<button class="link" onclick="editRawMaterial('${r.id}')">Edit</button> <button class="link danger" onclick="deleteRawMaterial('${r.id}')">Delete</button>`
  ]));
  renderSales();
  renderExpenses();
@@ -581,6 +581,30 @@ async function uploadFiles(files,folder){
  }
  return urls;
 }
+window.deleteProduct=async id=>{
+  if(!confirm("Delete this product? This will remove it from the active product catalogue."))return;
+  if(!isAdmin){
+    const ok=await submitChange("products","product_delete","products",id,{},"Employee product deletion");
+    if(ok)await loadAll();
+    return;
+  }
+  const {error}=await db.from("products").delete().eq("id",id);
+  if(error)return toast(error.message,false);
+  toast("Product deleted");
+  await loadAll();
+};
+window.deleteRawMaterial=async id=>{
+  if(!confirm("Delete this raw material?"))return;
+  if(!isAdmin){
+    const ok=await submitChange("products","raw_material_delete","raw_materials",id,{},"Employee raw-material deletion");
+    if(ok)await loadAll();
+    return;
+  }
+  const {data,error}=await db.rpc("delete_raw_material_admin",{p_id:id});
+  if(error)return toast(error.message,false);
+  toast("Raw material deleted");
+  await loadAll();
+};
 window.removeProductMedia=async(id,type,encoded)=>{
  const p=products.find(x=>x.id===id);if(!p)return;const u=decodeURIComponent(encoded),key=type==="image"?"image_urls":"video_urls";
  const next=mediaUrls(p,key).filter(x=>x!==u);
