@@ -64,7 +64,10 @@ async function enter(){
  try{
    await loadAccess();
    $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-   $("profileEmail").textContent=isAdmin?user.email:(employee.full_name+" • "+employee.username);
+   $("profileEmail").textContent=isAdmin?user.email:(employee.alert_email||("Username: "+employee.username));
+   if($("profileName"))$("profileName").textContent=isAdmin?"CleanCore Admin":employee.full_name;
+   if($("profileRole"))$("profileRole").textContent=isAdmin?"Administrator":("Employee • "+employee.team);
+   if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
    applyAccess();
    await loadAll();
    const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
