@@ -389,10 +389,23 @@ async function createEmployee(e){
    $("employeeDialog").close();toast("Employee "+username+" created.");await loadAll();
  }
 }
+function isSaleDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="SALE";}
+function isQuotationDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="QUOTATION";}
+function documentLabel(inv){return isQuotationDocument(inv)?"QUOTATION INVOICE":(Number(inv?.gst_amount||0)>0?"TAX INVOICE":"INVOICE");}
+function renderQuotations(){
+ const list=invoices.filter(isQuotationDocument).slice(0,20);
+ const el=$("quotationsTable");
+ if(!el)return;
+ el.innerHTML=table(["Quotation","Customer","Total","Date","Action"],list.map(x=>[
+   esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),
+   '<button type="button" class="link view-quotation" data-invoice-id="'+esc(x.id)+'">View / Print</button>'
+ ]));
+}
 function renderAll(){
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
  const todayKey=dateKey(now),monthKey=todayKey.slice(0,7);
- const td=invoices.filter(x=>new Date(x.created_at)>=day),mo=invoices.filter(x=>new Date(x.created_at)>=mon);
+ const saleInvoices=invoices.filter(isSaleDocument);
+ const td=saleInvoices.filter(x=>new Date(x.created_at)>=day),mo=saleInvoices.filter(x=>new Date(x.created_at)>=mon);
  const grossMonth=mo.reduce((a,x)=>a+Number(x.profit||0),0);
  const monthExpenses=expenses.filter(x=>String(x.expense_date||"").startsWith(monthKey)).reduce((a,x)=>a+Number(x.amount||0),0);
  $("today").textContent=money(td.reduce((a,x)=>a+Number(x.total),0));
@@ -402,21 +415,22 @@ function renderAll(){
  $("netProfit").textContent=money(grossMonth-monthExpenses);
  $("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
- $("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
+ $("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],saleInvoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
   esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
   Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
-  `<button class="link" onclick="editProduct('${p.id}')">Edit</button> <button class="link danger" onclick="deleteProduct('${p.id}')">Delete</button>`
+  '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
  ]));
  $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
   esc(r.name),esc(r.unit),money(r.cost_per_unit),r.stock,
   Number(r.stock)<=Number(r.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
-  `<button class="link" onclick="editRawMaterial('${r.id}')">Edit</button> <button class="link danger" onclick="deleteRawMaterial('${r.id}')">Delete</button>`
+  '<button class="link" onclick="editRawMaterial(\''+r.id+'\')">Edit</button> <button class="link danger" onclick="deleteRawMaterial(\''+r.id+'\')">Delete</button>'
  ]));
  renderSales();
  renderExpenses();
  renderCustomers();
  renderWebsiteOrders();
+ renderQuotations();
  $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
  if($("websiteOrdersPanel"))$("websiteOrdersPanel").style.display=(isAdmin||canAccess("website_orders"))?"":"none";
  if($("enquiriesPanel"))$("enquiriesPanel").style.display=(isAdmin||canAccess("enquiries"))?"":"none";
@@ -447,6 +461,7 @@ function expenseList(){
 function renderExpenses(){
  const list=expenseList();
  const gross=invoices.filter(inv=>{
+   if(!isSaleDocument(inv))return false;
    const d=new Date(inv.created_at);
    const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
    return (!from||d>=new Date(from+"T00:00:00"))&&(!to||d<=new Date(to+"T23:59:59"));
@@ -541,7 +556,7 @@ $("exportExpenses").onclick=()=>{
 };
 function renderSales(){
  const from=$("salesFrom")?.value,to=$("salesTo")?.value;
- let list=invoices.slice();
+ let list=invoices.filter(isSaleDocument);
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
@@ -551,7 +566,7 @@ function renderSales(){
  ]));
 }
 function customerStats(id){
- const bills=invoices.filter(x=>x.customer_id===id);
+ const bills=invoices.filter(x=>x.customer_id===id&&isSaleDocument(x));
  const totalPurchases=bills.reduce((a,x)=>a+Number(x.total||0),0);
  const totalPaid=bills.reduce((a,x)=>a+Number(x.paid_amount||0),0);
  const creditDue=bills.reduce((a,x)=>a+Number(x.due_amount||0),0);
@@ -932,13 +947,26 @@ $("clearBill").onclick=()=>{
  rebuildLines();
 };
 
+$("documentType").onchange=()=>{
+ const isQuotation=$("documentType").value==="QUOTATION";
+ const payBox=document.querySelector(".payment-box");
+ if(payBox)payBox.classList.toggle("hidden",isQuotation);
+ if(isQuotation){
+   $("paymentType").value="CASH";
+   $("payingNowInput").value="0";
+ }
+ calc();
+};
 $("billForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const customer=currentBillCustomer();
- if(!customer)return toast("Select an existing customer first. Add the customer in Customers, then create the bill.",false);
+ if(!customer)return toast("Select an existing customer first. Add the customer in Customers, then create the invoice.",false);
  const name=customer.name||"",business=customer.business_name||"",phone=normalizePhone(customer.phone||""),email=customer.email||"";
  const customerGstin=String(customer.gstin||"").trim().toUpperCase();
+ const documentType=$("documentType").value||"SALE";
+ const isQuotation=documentType==="QUOTATION";
  const billType=$("billType").value;
+ if(!["SALE","QUOTATION"].includes(documentType))return toast("Invalid document type.",false);
  if(!validPhone(phone))return toast("The customer phone number must be exactly 10 digits.",false);
  if(billType==="GST"&&!validGstin(customerGstin))return toast("This customer does not have a valid GSTIN. Add the GSTIN in Customer data first.",false);
  const gstin=billType==="GST"?customerGstin:"";
@@ -950,7 +978,7 @@ $("billForm").addEventListener("submit",async e=>{
    return {p,q:+r.querySelector(".lq").value||0,rate:Math.max(0,+r.querySelector(".lr").value||0)};
  }).filter(x=>x.p&&x.q>0);
  if(!items.length)return toast("Add an item",false);
- for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
+ if(!isQuotation)for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
 
  const subtotal=items.reduce((a,x)=>a+x.rate*x.q,0);
  const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
@@ -961,43 +989,56 @@ $("billForm").addEventListener("submit",async e=>{
  const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
  const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
  const profit=items.reduce((a,x)=>a+(x.rate-x.p.cost_price)*x.q,0)-discount;
- const pay=paymentState(total);
- const no="CC-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
+ const pay=isQuotation?{status:"Quotation",paid:0,due:0,dueDate:null,method:"Quotation"}:paymentState(total);
+ const storedProfit=isQuotation?0:profit;
+ const stamp=new Date().toISOString().slice(0,10).replaceAll("-","");
+ const no=(isQuotation?"QT-":"CC-")+stamp+"-"+String(Date.now()).slice(-5);
 
  if(!isAdmin){
    const payload={
-     invoice_no:no,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+     invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
      billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
-     subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit,
+     subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit:storedProfit,
      payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,
-     items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:(x.rate-x.p.cost_price)*x.q}))
+     items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:isQuotation?0:(x.rate-x.p.cost_price)*x.q}))
    };
-   const ok=await submitChange("billing","invoice_create","invoices",null,payload,"Employee bill submitted for manager approval");
-   if(ok){$("billForm").reset();$("lines").innerHTML="";rebuildLines();}
+   const ok=await submitChange("billing","invoice_create","invoices",null,payload,isQuotation?"Employee quotation submitted for manager approval":"Employee bill submitted for manager approval");
+   if(ok){$("billForm").reset();$("documentType").value="SALE";$("lines").innerHTML="";rebuildLines();}
    return;
  }
 
  const inv=await db.from("invoices").insert({
-   invoice_no:no,customer_id:customer.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,
+   invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,
    billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
    subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,
-   total,profit,payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
+   total,profit:storedProfit,payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
  }).select().single();
  if(inv.error)return toast(inv.error.message,false);
- if(pay.paid>0){
+ if(!isQuotation&&pay.paid>0){
    const payRow=await db.from("payments").insert({invoice_id:inv.data.id,customer_id:customer.id,amount:pay.paid,payment_date:dateKey(),payment_method:pay.method,notes:"Initial payment"});
    if(payRow.error)return toast(payRow.error.message,false);
  }
  for(const x of items){
-   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,hsn_code:x.p.hsn_code||"",qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:(x.rate-x.p.cost_price)*x.q});
+   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,hsn_code:x.p.hsn_code||"",qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:isQuotation?0:(x.rate-x.p.cost_price)*x.q});
    if(a.error)return toast(a.error.message,false);
-   const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);
-   if(b.error)return toast(b.error.message,false);
+   if(!isQuotation){
+     const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);
+     if(b.error)return toast(b.error.message,false);
+   }
  }
  const savedInv=inv.data;
- toast("Invoice "+no+" saved successfully");
- sendBillToCustomer(savedInv,customer,items);
- $("billForm").reset();$("lines").innerHTML="";await loadAll();rebuildLines();
+ if(isQuotation){
+   toast("Quotation "+no+" saved successfully");
+   await loadAll();
+   rebuildLines();
+   await window.viewInvoice(savedInv.id);
+ }else{
+   toast("Invoice "+no+" saved successfully");
+   sendBillToCustomer(savedInv,customer,items);
+   await loadAll();
+   rebuildLines();
+ }
+ $("billForm").reset();$("documentType").value="SALE";$("lines").innerHTML="";await loadAll();rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
 $("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
@@ -1091,11 +1132,13 @@ $("customerForm").addEventListener("submit",async e=>{
 });
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
 $("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
-$("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
+$("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.filter(isSaleDocument).map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
 
 document.addEventListener("click",e=>{
  const btn=e.target.closest?.(".view-bill");
  if(btn){e.preventDefault();window.viewInvoice(btn.dataset.invoiceId);}
+ const quoteBtn=e.target.closest?.(".view-quotation");
+ if(quoteBtn){e.preventDefault();window.viewInvoice(quoteBtn.dataset.invoiceId);}
 });
 async function loadInvoiceItemsForView(invoice){
   let q=await db.from("invoice_items").select("*").eq("invoice_id",invoice.id).order("created_at");
@@ -1123,6 +1166,7 @@ window.viewInvoice=async id=>{
  try{
    const items=await loadInvoiceItemsForView(inv);
    const hasGst=Number(inv.gst_amount||0)>0;
+   const isQuotation=isQuotationDocument(inv);
    const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
    const cgst=Number(inv.cgst_amount||0),sgst=Number(inv.sgst_amount||0),igst=Number(inv.igst_amount||0);
    const taxRows=intra
@@ -1131,24 +1175,32 @@ window.viewInvoice=async id=>{
    const rows=items.map((it,n)=>"<tr><td>"+(n+1)+"</td><td>"+esc(it.product_name)+"</td><td>"+esc(it.hsn_code||"—")+"</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("");
    const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
    const date=new Date(inv.created_at);
-   const gstLabel=hasGst?"TAX INVOICE":"INVOICE";
+   const gstLabel=documentLabel(inv);
    const billingAddress=inv.billing_address||"—";
    const deliveryAddress=inv.delivery_address||"—";
+   const metaStatus=isQuotation
+     ? "<b>Document Type:</b> Quotation Invoice<br><b>Payment Status:</b> Not applicable<br><b>Paid:</b> —<br><b>Credit Due:</b> —"
+     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"");
+   const quoteNote=isQuotation
+     ? "<div class='quote-note'><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document is a price quotation and does not record a sale, payment, or stock movement.</div>"
+     : "";
+   const terms=isQuotation
+     ? "<b>Quotation Terms</b><p>Prices are quoted for the listed items and quantities.<br>This quotation is subject to final confirmation before sale.</p>"
+     : "<b>Terms & Conditions</b><p>Goods once sold will not be taken back unless agreed in writing.<br>Payment as per agreed business terms.<br>Subject to Hyderabad, Telangana jurisdiction.</p>";
+   const footerMark=isQuotation?"FOR QUOTATION":"ORIGINAL FOR RECIPIENT";
    $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
-    "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+gstLabel+"</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
-    "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"")+"</div></div>"+
+    "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+gstLabel+"</b><span>"+footerMark+"</span></div></div>"+
+    "<div class='inv-meta'><div><b>Document No:</b> "+esc(inv.invoice_no)+"<br><b>Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div>"+metaStatus+"</div></div>"+
     "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>Email: "+esc(inv.customer_email||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(billingAddress)+"<br>Delivery: "+esc(deliveryAddress)+"</p></div></div>"+
     "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
     "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
     "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
+    quoteNote+
     "<div class='amount-words'><b>Total in words:</b> "+esc(numberToWordsIndian(Number(inv.total||0)))+" ONLY</div>"+
-    "<div class='inv-bottom'><div><b>Terms & Conditions</b><p>Goods once sold will not be taken back unless agreed in writing.<br>Payment as per agreed business terms.<br>Subject to Hyderabad, Telangana jurisdiction.</p></div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
+    "<div class='inv-bottom'><div>"+terms+"</div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
     "</div>";
    $("invoiceDialog").showModal();
- }catch(err){
-   console.error("Invoice viewer error",err);
-   toast(err?.message||"Unable to open invoice.",false);
- }
+ }catch(err){console.error("Invoice viewer error",err);toast(err?.message||"Unable to open invoice.",false);}
 };
 function buildCustomerBillMessage(inv,customer,items=[]){
  const itemLines=items.map(x=>"• "+(x.p?.name||x.product_name||"Item")+" × "+(x.q||x.qty||1)+" @ "+money(x.p?.selling_price||x.unit_price||0)+" = "+money(x.p?(x.p.selling_price*x.q):x.line_total));
@@ -1242,17 +1294,12 @@ $("printInvoice").onclick=async e=>{
   const html=getPrintableInvoiceHtml();
   const frame=document.createElement("iframe");
   frame.title="CleanCore Invoice";
-  Object.assign(frame.style,{position:"fixed",left:"-10000px",top:"0",width:"900px",height:"1100px",border:"0",opacity:"0",pointerEvents:"none"});
-  document.body.appendChild(frame);
-  let cleaned=false;
-  const cleanup=()=>{if(cleaned)return;cleaned=true;setTimeout(()=>frame.remove(),300);};
-  frame.onload=()=>{
-   setTimeout(()=>{
-    try{frame.contentWindow.focus();frame.contentWindow.print();cleanup();}
-    catch(err){cleanup();toast("Print was blocked by the browser. Use the browser Print / Save as PDF command.",false);}
-   },120);
-  };
-  frame.srcdoc=html;
+  const printWindow=window.open("about:blank","_blank","width=1000,height=900");
+  if(!printWindow)return toast("Allow pop-ups for CleanCore to print or save the PDF.",false);
+  printWindow.document.open();
+  printWindow.document.write(html.replace("</body></html>","<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};<\\/script></body></html>"));
+  printWindow.document.close();
+  printWindow.focus();
  }catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
