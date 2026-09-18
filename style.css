@@ -304,3 +304,9 @@ dialog .dialog{padding-top:52px}
 .section-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:0 2px}
 .section-toolbar>span{font-size:12px;font-weight:700;color:#6a7d8f}
 .page-refresh{white-space:nowrap}
+
+.customer-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 16px}
+.address-fieldset{border:1px solid #dce5ee;border-radius:12px;padding:14px 15px 12px;margin:16px 0;background:#fbfcfd}
+.address-fieldset legend{padding:0 8px;font-weight:900;color:#22364b;font-size:13px}
+.address-fieldset .customer-form-grid{gap:2px 14px}
+@media(max-width:650px){.customer-form-grid,.address-fieldset .customer-form-grid{grid-template-columns:1fr}}
