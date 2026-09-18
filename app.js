@@ -190,7 +190,7 @@ async function loadAll(){
  const qWO=(isAdmin||canAccess("website_orders"))?db.from("website_orders").select("*").order("created_at",{ascending:false}):null;
  const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qWO]);
  const [p,i,cu,e,r,x,pm,wo]=qs;
- for(const q of qs)if(q?.error)return toast(q.error.message,false);
+ for(const q of qs)if(q?.error)throw new Error(q.error.message);
  products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
  if(isAdmin){
    const [er,ep,cr,ar,nr]=await Promise.all([
@@ -200,7 +200,7 @@ async function loadAll(){
      db.from("access_requests").select("*").order("created_at",{ascending:false}),
      db.from("manager_notifications").select("*").order("created_at",{ascending:false})
    ]);
-   for(const q of [er,ep,cr,ar,nr])if(q?.error)return toast(q.error.message,false);
+   for(const q of [er,ep,cr,ar,nr])if(q?.error)throw new Error(q.error.message);
    employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];
    renderEmployeeData();
  }
@@ -1230,23 +1230,37 @@ $("printInvoice").onclick=async e=>{
  e.preventDefault();
  try{
    const html=getPrintableInvoiceHtml();
-   const w=window.open("","_blank","noopener,noreferrer,width=900,height=1100");
-   if(w){
-     w.document.open();w.document.write(html);w.document.close();
-     w.focus();
-     setTimeout(()=>{try{w.print()}catch(err){console.error(err)}},300);
-     return;
-   }
-   const oldTitle=document.title;
-   document.title="CleanCore Invoice";
-   document.body.classList.add("printing-invoice");
+   const frame=document.createElement("iframe");
+   frame.setAttribute("aria-hidden","true");
+   frame.style.position="fixed";
+   frame.style.right="0";
+   frame.style.bottom="0";
+   frame.style.width="1px";
+   frame.style.height="1px";
+   frame.style.border="0";
+   frame.style.opacity="0";
+   frame.style.pointerEvents="none";
+   document.body.appendChild(frame);
+
    const cleanup=()=>{
-     document.body.classList.remove("printing-invoice");
-     document.title=oldTitle;
+     try{frame.remove()}catch(err){}
    };
-   window.addEventListener("afterprint",cleanup,{once:true});
-   setTimeout(()=>window.print(),50);
+   const win=frame.contentWindow;
+   if(!win)throw new Error("Could not prepare the print window.");
+
+   frame.onload=()=>{
+     try{
+       win.focus();
+       setTimeout(()=>{
+         try{win.print();setTimeout(cleanup,800)}catch(err){cleanup();toast("The browser blocked printing. Use the browser print command to save as PDF.",false)}
+       },100);
+     }catch(err){cleanup();toast(err?.message||"Unable to print invoice.",false)}
+   };
+   win.document.open();
+   win.document.write(html);
+   win.document.close();
  }catch(err){
+   console.error("Invoice print error",err);
    toast(err?.message||"Unable to print invoice.",false);
  }
 };
