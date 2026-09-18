@@ -223,3 +223,17 @@ button,input,select,textarea{touch-action:manipulation}
   .invoice-preview .inv-bottom{display:block}
   .invoice-preview .inv-bottom>div+div{border-left:0;border-top:1px solid #dce5ee}
 }
+
+/* Customer purchase and credit history */
+.history-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0 16px}
+.history-cards>div{padding:12px;border:1px solid #dce5ee;border-radius:10px;background:#f8fbfe}
+.history-cards span{display:block;color:#6c7a8d;font-size:11px}
+.history-cards b{display:block;margin-top:4px;font-size:16px}
+.payment-box{padding:14px;border:1px solid #dce5ee;border-radius:12px;background:#f8fbfe}
+.payment-box .panel-head{margin-bottom:5px}
+@media(max-width:768px){
+  .history-cards{grid-template-columns:1fr 1fr}
+}
+@media(max-width:390px){
+  .history-cards{grid-template-columns:1fr}
+}
