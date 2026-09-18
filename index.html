@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=2.4.0">
+<link rel="stylesheet" href="style.css?v=2.5.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -16,12 +16,15 @@
     <h1>CleanCore Manager</h1>
     <p class="muted">Private business dashboard for products, stock, bills, sales and customers.</p>
     <form id="loginForm">
-      <label>ADMIN PASSWORD
+      <label>USERNAME / ADMIN EMAIL
+        <input id="loginIdentifier" type="text" autocomplete="username" placeholder="Admin email or employee username" required>
+      </label>
+      <label>PASSWORD
         <input id="loginPassword" type="password" autocomplete="current-password" required>
       </label>
-      <button class="btn primary">Open Dashboard</button>
+      <button class="btn primary">Open Manager</button>
     </form>
-    <p class="security-note">Admin access is authenticated securely through Supabase.</p>
+    <p class="security-note">Manager and employee access is controlled by role, permissions and time limits.</p>
     <p class="version">CleanCore Manager v2.4.0</p>
   </div>
 </section>
@@ -201,7 +204,7 @@
 
 <section id="settings" class="section">
   <div class="panel">
-    <h3>Security</h3><p class="muted">Password changes require email reauthentication.</p>
+    <div class="panel-head"><div><h3>Security</h3><p class="muted">Manager account security and employee access control.</p></div></div>
     <button id="changePassword" class="btn primary">Change password</button>
     <div id="passwordBox" class="hidden security-box">
       <button id="sendReauth" class="btn secondary">Send reauthentication OTP</button>
@@ -211,6 +214,30 @@
       <button id="updatePw" class="btn primary">Update password</button>
     </div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div><h3>Employees & Access</h3><p class="muted">Create employee usernames/passwords, assign sections, and set start/end date and time.</p></div>
+      <button id="addEmployee" class="btn primary small">+ Add Employee</button>
+    </div>
+    <div id="employeesTable"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div><h3>Manager Approval Queue</h3><p id="approvalSummary" class="muted">Employee changes waiting for approval.</p></div><span id="approvalCount" class="badge warn">0</span></div>
+    <div id="changeRequestsTable"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div><h3>Restricted Access Alerts</h3><p id="accessSummary" class="muted">Attempts by employees to open sections outside their permissions are recorded here.</p></div><span id="accessAlertCount" class="badge warn">0</span></div>
+    <div id="accessRequestsTable"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div><h3>Email Notification Queue</h3><p class="muted">Security alerts and approval requests are queued to the Manager email.</p></div></div>
+    <div id="notificationTable"></div>
+  </div>
+
   <div class="panel"><h3>Connection</h3><p class="muted">Browser uses the Supabase publishable key only.</p><code>https://rwfamxkfqslorxcryjrp.supabase.co</code></div>
 </section>
 </main></section>
@@ -303,6 +330,24 @@
   </div>
 </dialog>
 
+<dialog id="employeeDialog">
+<form method="dialog" id="employeeForm" class="dialog">
+  <h3>Create Employee Access</h3>
+  <label>Username<input id="employeeUsername" autocomplete="off" required placeholder="e.g. arun.accounts"></label>
+  <label>Employee name<input id="employeeFullName" required placeholder="Full name"></label>
+  <label>Team template<select id="employeeTeam"><option value="account">Account Team</option><option value="crm">CRM Team</option><option value="custom">Custom</option></select></label>
+  <label>Alert email <span class="muted tiny">(optional)</span><input id="employeeAlertEmail" type="email" placeholder="Employee email"></label>
+  <label>Password<input id="employeePassword" type="password" minlength="8" autocomplete="new-password" required></label>
+  <div class="employee-time-grid">
+    <label>Access starts<input id="employeeStarts" type="datetime-local"></label>
+    <label>Access ends<input id="employeeEnds" type="datetime-local"></label>
+  </div>
+  <div><b>Manager sections they may open</b><div id="employeePermissions" class="permission-grid"></div></div>
+  <p id="employeeStatus" class="cc-status" aria-live="polite"></p>
+  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" type="submit">Create Employee</button></div>
+</form>
+</dialog>
+
 <dialog id="enquiryDialog">
 <form method="dialog" id="enquiryForm" class="dialog">
   <h3>Enquiry</h3>
@@ -315,6 +360,6 @@
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.4.0"></script>
+<script src="app.js?v=2.5.0"></script>
 </body>
 </html>
