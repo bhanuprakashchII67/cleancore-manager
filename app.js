@@ -85,7 +85,8 @@ document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.da
 document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
 async function go(id){
  const module=SECTION_MODULE[id];
- if(!isAdmin&&(!module||!canAccess(module))){await logUnauthorized(module||id,"NAVIGATION","Attempted to open restricted Manager section");toast("Access denied. The Manager has been notified.",false);return;}
+ const allowed=id==="enquiries" ? (isAdmin||canAccess("enquiries")||canAccess("website_orders")) : (isAdmin||!!module&&canAccess(module));
+ if(!allowed){await logUnauthorized(module||id,"NAVIGATION","Attempted to open restricted Manager section");toast("Access denied. The Manager has been notified.",false);return;}
  document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));
  document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
  $("title").textContent=document.querySelector('.nav[data-section="'+id+'"]')?.textContent||id;
@@ -136,6 +137,7 @@ function renderEmployeeData(){
  const pending=changeRequests.filter(x=>x.status==="Pending");
  if($("approvalCount"))$("approvalCount").textContent=String(pending.length);
  if($("accessAlertCount"))$("accessAlertCount").textContent=String(accessRequests.length);
+ if($("approvalSummary"))$("approvalSummary").textContent=pending.length+" request"+(pending.length===1?"":"s")+" waiting for Manager approval.";
  if($("changeRequestsTable")){
    $("changeRequestsTable").innerHTML=table(["Employee","Module","Action","Target","Requested","Status","Review"],changeRequests.map(r=>{
      const e=employeeById(r.employee_id);
@@ -258,6 +260,9 @@ function renderAll(){
  renderCustomers();
  renderWebsiteOrders();
  $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date"],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at)]));
+ if($("websiteOrdersPanel"))$("websiteOrdersPanel").style.display=(isAdmin||canAccess("website_orders"))?"":"none";
+ if($("enquiriesPanel"))$("enquiriesPanel").style.display=(isAdmin||canAccess("enquiries"))?"":"none";
+ if($("addEnquiry"))$("addEnquiry").disabled=(!isAdmin&&!canAccess("enquiries"));
  rebuildLines();
 }
 function expenseList(){
