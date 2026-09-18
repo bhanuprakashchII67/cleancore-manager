@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.1.0">
+<link rel="stylesheet" href="style.css?v=3.3.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -50,6 +50,7 @@
     <h2 id="title">Dashboard</h2>
   </div>
   <div class="profile-wrap">
+<button id="refreshManager" class="chip refresh-btn" type="button" title="Refresh data" aria-label="Refresh data">↻ Refresh</button>
 <button id="profileBtn" class="chip profile-btn" type="button">👤 Profile</button>
 <div id="profileMenu" class="profile-menu hidden">
 <div class="profile-photo">CC</div>
@@ -260,7 +261,7 @@
   <label>Photos <input id="pimages" type="file" accept="image/*" multiple></label>
   <label>Videos <input id="pvideos" type="file" accept="video/*" multiple></label>
   <div id="productMedia"></div><p class="muted tiny">Photos and videos are saved in Supabase Storage and can be used on the public website later.</p>
-  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Product</button></div>
+  <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save Product</button></div>
 </form></dialog>
 
 <dialog id="rawDialog">
@@ -271,7 +272,7 @@
   <label>Cost per unit ₹<input id="rawCost" type="number" min="0" value="0"></label>
   <label>Stock<input id="rawStock" type="number" min="0" value="0" required></label>
   <label>Low-stock alert<input id="rawLow" type="number" min="0" value="5" required></label>
-  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div>
+  <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save</button></div>
 </form></dialog>
 
 <dialog id="customerDialog">
@@ -284,7 +285,7 @@
   <label>GSTIN (optional)<input id="customerGstin" maxlength="15"></label>
   <label>Billing address<textarea id="billingAddress" rows="4" required></textarea></label>
   <label>Delivery address<textarea id="deliveryAddress" rows="4"></textarea></label>
-  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Customer</button></div>
+  <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save Customer</button></div>
 </form></dialog>
 
 <dialog id="expenseDialog">
@@ -320,7 +321,7 @@
   <label>Payment method<select id="expensePayment"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Credit</option></select></label>
   <label>Notes<textarea id="expenseNotes" rows="3" placeholder="What was this expense for?"></textarea></label>
   <p class="muted tiny">Raw-material purchases entered here reduce net profit. Raw-material stock quantity is maintained separately in Raw Materials Stock. Keep product cost prices consistent to avoid counting the same raw-material cost twice.</p>
-  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Expense</button></div>
+  <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save Expense</button></div>
 </form></dialog>
 
 <dialog id="changeRequestDialog">
@@ -365,7 +366,7 @@
   <p id="employeeStatus" class="cc-status" aria-live="polite"></p>
   <div class="actions">
     <button id="employeeCloseButton" class="btn hidden" type="button">Done</button>
-    <button class="btn" value="cancel" type="button" id="employeeCancelButton">Cancel</button>
+    <button type="button" class="btn" value="cancel" data-dialog-cancel="1" type="button" id="employeeCancelButton">Cancel</button>
     <button id="employeeCreateButton" class="btn primary" type="submit">Create Employee</button>
   </div>
 </form>
@@ -379,10 +380,10 @@
   <label>Business<input id="ebusiness"></label>
   <label>Message<textarea id="emessage"></textarea></label>
   <label>Status<select id="estatus"><option>New</option><option>Contacted</option><option>Converted</option><option>Closed</option></select></label>
-  <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div>
+  <div class="actions"><button type="button" class="btn" value="cancel" data-dialog-cancel="1">Cancel</button><button class="btn primary" value="default">Save</button></div>
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=3.2.0"></script>
+<script src="app.js?v=3.3.0"></script>
 </body>
 </html>
