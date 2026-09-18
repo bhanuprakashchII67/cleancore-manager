@@ -11,6 +11,7 @@ const STAFF_AUTH_DOMAIN="@staff.cleancore.local";
 const ALL_MODULES=["dashboard","products","billing","sales","customers","enquiries","website_orders","expenses"];
 const MODULE_LABELS={dashboard:"Dashboard",products:"Products & Stock",billing:"Billing",sales:"Sales",customers:"Customers",enquiries:"Leads / Enquiries",website_orders:"Website Orders",expenses:"Expenses"};
 const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing",sales:"sales",customers:"customers",enquiries:"enquiries",expenses:"expenses",settings:"settings"};
+const EMPLOYEE_PORTAL_BASE="https://bhanuprakashchII67.github.io/cleancore-website/employee.html";
 let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
@@ -38,17 +39,8 @@ function canAccess(module){return isAdmin||employeePermissions.has(module)}
 async function loadAccess(){
   isAdmin=false;employee=null;employeePermissions=new Set();
   const {data:profile}=await db.from("profiles").select("role").eq("id",user.id).maybeSingle();
-  if(profile?.role==="admin"){isAdmin=true;employeePermissions=new Set(ALL_MODULES);return;}
-  const {data:emp,error}=await db.from("employees").select("*").eq("auth_user_id",user.id).maybeSingle();
-  if(error||!emp)throw new Error("Employee account not found.");
-  const now=Date.now(),start=emp.starts_at?new Date(emp.starts_at).getTime():-Infinity,end=emp.ends_at?new Date(emp.ends_at).getTime():Infinity;
-  if(!emp.active||now<start||now>end){
-    await db.rpc("log_employee_access_attempt",{p_module:"login",p_action:"LOGIN_OUTSIDE_ALLOWED_TIME",p_reason:"Employee attempted login outside the configured active window."}).catch(()=>null);
-    throw new Error("Your employee access is inactive or outside the allowed date/time.");
-  }
-  const {data:perms,error:perr}=await db.from("employee_permissions").select("module").eq("employee_id",emp.id).eq("enabled",true);
-  if(perr)throw new Error(perr.message);
-  employee=emp;employeePermissions=new Set((perms||[]).map(x=>x.module));
+  if(profile?.role!=="admin")throw new Error("This Manager workspace is restricted to the main Manager account. Use your employee portal link.");
+  isAdmin=true;employeePermissions=new Set(ALL_MODULES);
 }
 function applyAccess(){
   document.querySelectorAll(".nav[data-section]").forEach(b=>{
@@ -147,18 +139,38 @@ function employeeById(id){return employees.find(x=>x.id===id)}
 function renderEmployeeData(){
  if(!isAdmin)return;
  if($("employeesTable")){
-   $("employeesTable").innerHTML=table(["Employee","Username","Team","Access","Start","End","Permissions","Action"],employees.map(e=>{
+   $("employeesTable").innerHTML=table(["Employee","Username","Team","Access","Start","End","Permissions","Portal link","Action"],employees.map(e=>{
      const expired=e.ends_at&&new Date(e.ends_at)<new Date();
      const state=e.active&&!expired?"Active":"Disabled / expired";
      const perms=employeePermissionsFor(e.id).join(", ")||"None";
+     const portal=(e.portal_key?EMPLOYEE_PORTAL_BASE+"?key="+e.portal_key:"—");
      return [esc(e.full_name),esc(e.username),esc(e.team),state,formatAccessDate(e.starts_at),formatAccessDate(e.ends_at),esc(perms),
+       e.portal_key?"<button class='link' onclick=\"copyEmployeePortal('"+e.portal_key+"')\">Copy link</button>":"—",
        "<button class='link' onclick=\"toggleEmployeeActive('"+e.id+"',"+(!e.active)+")\">"+(e.active?"Disable":"Enable")+"</button> <button class='link' onclick=\"resetEmployeePassword('"+e.id+"')\">Reset password</button>"];
    }));
  }
  const pending=changeRequests.filter(x=>x.status==="Pending");
  if($("approvalCount"))$("approvalCount").textContent=String(pending.length);
- if($("accessAlertCount"))$("accessAlertCount").textContent=String(accessRequests.length);
- if($("approvalSummary"))$("approvalSummary").textContent=pending.length+" request"+(pending.length===1?"":"s")+" waiting for Manager approval.";
+ const ticketRows=accessRequests.filter(x=>x.action==="REQUEST_ACCESS");
+ const alertRows=accessRequests.filter(x=>x.action!=="REQUEST_ACCESS");
+ if($("accessAlertCount"))$("accessAlertCount").textContent=String(alertRows.length);
+ if($("accessTicketCount"))$("accessTicketCount").textContent=String(ticketRows.filter(x=>x.status==="Pending").length);
+ if($("approvalSummary"))$("approvalSummary").textContent=pending.length+" change request"+(pending.length===1?"":"s")+" waiting for Manager approval.";
+ if($("accessTicketsTable")){
+   $("accessTicketsTable").innerHTML=table(["Employee","Requested access","Reason","Requested","Status","Action"],ticketRows.map(r=>{
+     const e=employeeById(r.employee_id);
+     const buttons=r.status==="Pending"
+       ? "<button class='link' onclick=\"reviewAccessRequest('"+r.id+"',true)\">Grant</button> <button class='link danger' onclick=\"reviewAccessRequest('"+r.id+"',false)\">Deny</button>"
+       : esc(r.status||"Reviewed");
+     return [esc(e?.username||"—"),esc(MODULE_LABELS[r.module]||r.module),esc(r.reason||"—"),formatAccessDate(r.created_at),esc(r.status||"Pending"),buttons];
+   }));
+ }
+ if($("accessRequestsTable")){
+   $("accessRequestsTable").innerHTML=table(["Employee","Module","Action","Reason","Date"],alertRows.slice(0,100).map(r=>{
+     const e=employeeById(r.employee_id);
+     return [esc(e?.username||"—"),esc(MODULE_LABELS[r.module]||r.module),esc(r.action),esc(r.reason||"—"),formatAccessDate(r.created_at)];
+   }));
+ }
  if($("changeRequestsTable")){
    $("changeRequestsTable").innerHTML=table(["Employee","Module","Action","Target","Requested","Status","Review"],changeRequests.map(r=>{
      const e=employeeById(r.employee_id);
@@ -181,6 +193,11 @@ function renderEmployeeData(){
    $("notificationTable").innerHTML=table(["Type","Subject","Email","Status","Date"],managerNotifications.slice(0,100).map(n=>[esc(n.notification_type),esc(n.subject),esc(n.email_to),esc(n.email_status),formatAccessDate(n.created_at)]));
  }
 }
+window.copyEmployeePortal=async function(key){
+ const url=EMPLOYEE_PORTAL_BASE+"?key="+key;
+ try{await navigator.clipboard.writeText(url);toast("Employee portal link copied");}
+ catch(e){prompt("Copy this employee portal link:",url);}
+};
 window.toggleEmployeeActive=async function(id,active){
  if(!isAdmin)return;
  const {error}=await db.from("employees").update({active,updated_at:new Date().toISOString()}).eq("id",id);
@@ -207,6 +224,14 @@ window.viewChangeRequest=function(id){
  $("changeRequestDialog").showModal();
 };
 $("closeChangeRequest").onclick=function(){$("changeRequestDialog").close()};
+window.reviewAccessRequest=async function(id,approve){
+ if(!isAdmin)return;
+ const note=approve?"":(prompt("Reason for denial (optional):","")||"");
+ const {data,error}=await db.rpc("review_access_request",{p_request_id:id,p_approve:approve,p_note:note});
+ if(error)return toast(error.message,false);
+ toast(approve?"Access granted.":"Access request denied.");
+ await loadAll();
+};
 window.reviewChange=async function(id,approve){
  if(!isAdmin)return;
  const note=approve?"":(prompt("Reason for rejection (optional):","")||"");
@@ -236,6 +261,10 @@ function resetEmployeeForm(){
  $("employeeUsername").value="";$("employeeFullName").value="";$("employeeAlertEmail").value="";
  $("employeeTeam").value="account";$("employeePassword").value="";
  $("employeeStarts").value="";$("employeeEnds").value="";
+ $("employeePortalLink").value="";
+ $("employeePortalBox").classList.add("hidden");
+ $("employeeCreateButton").classList.remove("hidden");
+ $("employeeCloseButton").classList.add("hidden");
  renderEmployeeModuleChecks("account");$("employeeStatus").textContent="";
 }
 $("addEmployee").onclick=()=>{resetEmployeeForm();$("employeeDialog").showModal()};
@@ -263,7 +292,16 @@ async function createEmployee(e){
  const {data,error}=result;
  if(error)return status.textContent=(error.message||"Could not create employee.")+" Please try again.";
  if(data?.error)return status.textContent=data.error;
- $("employeeDialog").close();toast("Employee "+username+" created.");await loadAll();
+ if(data?.portal_url){
+   $("employeePortalLink").value=data.portal_url;
+   $("employeePortalBox").classList.remove("hidden");
+   $("employeeCreateButton").classList.add("hidden");
+   $("employeeCloseButton").classList.remove("hidden");
+   status.textContent="Employee created. Give this unique portal link to the employee.";
+   await loadAll();
+ } else {
+   $("employeeDialog").close();toast("Employee "+username+" created.");await loadAll();
+ }
 }
 function renderAll(){
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
