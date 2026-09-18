@@ -17,7 +17,7 @@ function isoDate(d){return new Date(d).toLocaleDateString("en-IN")}
 function mediaUrls(p,key){const v=p?.[key];return Array.isArray(v)?v:[]}
 
 async function adminCheck(){const {data,error}=await db.from("profiles").select("role").eq("id",user.id).single();if(error||data?.role!=="admin")throw new Error("This account is not authorized as a CleanCore admin.")}
-async function enter(){try{await adminCheck();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("userChip").textContent=user.email;await loadAll()}catch(e){await db.auth.signOut();toast(e.message,false)}}
+async function enter(){try{await adminCheck();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("profileEmail").textContent=user.email;await loadAll()}catch(e){await db.auth.signOut();toast(e.message,false)}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();const password=$("loginPassword").value;if(!password)return toast("Enter your admin password.",false);try{const {data,error}=await db.auth.signInWithPassword({email:"bhanuprakashchadalawada10@gmail.com",password});if(error)return toast("Login failed: "+error.message,false);if(!data?.session)return toast("Login failed: No session returned.",false);user=data.user;await enter()}catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}});
 $("logout").onclick=async()=>{await db.auth.signOut();location.reload()};
 document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.dataset.section));
@@ -173,6 +173,10 @@ $("billForm").addEventListener("submit",async e=>{
  if(!items.length)return toast("Add an item",false);
  for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
  const subtotal=items.reduce((a,x)=>a+x.p.selling_price*x.q,0),discount=Math.min(subtotal,Math.max(0,+$("discount").value||0)),taxable=subtotal-discount,gst=taxable*gp/100,total=taxable+gst;
+ const intraState=gstin ? gstin.slice(0,2)==="36" : false;
+ const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
+ const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
+ const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
  const profit=items.reduce((a,x)=>a+(x.p.selling_price-x.p.cost_price)*x.q,0)-discount;
  const no="CC-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
  let c=customers.find(x=>x.id===$("billingCustomer").value)||customers.find(x=>x.phone===phone);
