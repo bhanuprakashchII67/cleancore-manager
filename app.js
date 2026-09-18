@@ -321,6 +321,7 @@ window.editExpense=id=>{
 };
 window.deleteExpense=async id=>{
  if(!confirm("Delete this expense?"))return;
+ if(!isAdmin){const ok=await submitChange("expenses","expense_delete","expenses",id,{},"Employee expense deletion");if(ok)await loadAll();return;}
  const {error}=await db.from("expenses").delete().eq("id",id);
  if(error)return toast(error.message,false);
  toast("Expense deleted");
@@ -397,6 +398,7 @@ function renderWebsiteOrders(){
 window.updateWebsiteOrderStatus=async function(id,status){
  const allowed=["New","Confirmed","Processing","Out for Delivery","Delivered","Cancelled"];
  if(!allowed.includes(status))return;
+ if(!isAdmin){const ok=await submitChange("website_orders","website_order_status","website_orders",id,{status},"Employee website-order status change");if(ok){const o=websiteOrders.find(x=>x.id===id);if(o)o.status=status;renderWebsiteOrders();}return;}
  const {error}=await db.from("website_orders").update({status,updated_at:new Date().toISOString()}).eq("id",id);
  if(error)return toast(error.message,false);
  const o=websiteOrders.find(x=>x.id===id);if(o)o.status=status;
@@ -451,6 +453,11 @@ $("paymentForm").addEventListener("submit",async function(e){
  const amount=+$("paymentAmount").value;
  if(!(amount>0&&amount<=Number(inv.due_amount||0)))return toast("Payment must be greater than 0 and not exceed the outstanding credit.",false);
  const payment_date=$("paymentDate").value||dateKey();
+ if(!isAdmin){
+   const ok=await submitChange("billing","payment_create","invoices",inv.id,{customer_id:inv.customer_id,amount,payment_date,payment_method:$("paymentMethod").value,notes:$("paymentNotes").value.trim()},"Employee payment record");
+   if(ok)$("paymentDialog").close();
+   return;
+ }
  const ins=await db.from("payments").insert({invoice_id:inv.id,customer_id:inv.customer_id,amount,payment_date,payment_method:$("paymentMethod").value,notes:$("paymentNotes").value.trim()});
  if(ins.error)return toast(ins.error.message,false);
  const paid=Number(inv.paid_amount||0)+amount,due=Math.max(Number(inv.total||0)-paid,0);
@@ -489,7 +496,9 @@ async function uploadFiles(files,folder){
 }
 window.removeProductMedia=async(id,type,encoded)=>{
  const p=products.find(x=>x.id===id);if(!p)return;const u=decodeURIComponent(encoded),key=type==="image"?"image_urls":"video_urls";
- const next=mediaUrls(p,key).filter(x=>x!==u);const {error}=await db.from("products").update({[key]:next}).eq("id",id);if(error)return toast(error.message,false);toast("Media removed");await loadAll();const fresh=products.find(x=>x.id===id);if(fresh)renderProductMedia(fresh);
+ const next=mediaUrls(p,key).filter(x=>x!==u);
+ if(!isAdmin){await submitChange("products","product_media_update","products",id,{[key]:next},"Employee product media change");return;}
+ const {error}=await db.from("products").update({[key]:next}).eq("id",id);if(error)return toast(error.message,false);toast("Media removed");await loadAll();const fresh=products.find(x=>x.id===id);if(fresh)renderProductMedia(fresh);
 }
 $("productForm").addEventListener("submit",async e=>{
  e.preventDefault();
