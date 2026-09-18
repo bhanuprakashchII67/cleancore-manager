@@ -54,6 +54,11 @@ create table if not exists public.invoices(
   sgst_amount numeric(12,2) not null default 0,
   igst_percent numeric(6,2) not null default 0,
   igst_amount numeric(12,2) not null default 0,
+  payment_status text not null default 'Credit',
+  paid_amount numeric(12,2) not null default 0,
+  due_amount numeric(12,2) not null default 0,
+  due_date date,
+  payment_method text not null default 'Credit',
  total numeric(12,2) not null default 0, profit numeric(12,2) not null default 0,
  created_at timestamptz not null default now()
 );
@@ -63,6 +68,11 @@ alter table public.invoices add column if not exists billing_address text not nu
 alter table public.invoices add column if not exists delivery_address text not null default '';
 alter table public.invoices add column if not exists gst_percent numeric(6,2) not null default 0;
 alter table public.invoices add column if not exists gst_amount numeric(12,2) not null default 0;
+alter table public.invoices add column if not exists payment_status text not null default 'Credit';
+alter table public.invoices add column if not exists paid_amount numeric(12,2) not null default 0;
+alter table public.invoices add column if not exists due_amount numeric(12,2) not null default 0;
+alter table public.invoices add column if not exists due_date date;
+alter table public.invoices add column if not exists payment_method text not null default 'Credit';
 
 create table if not exists public.invoice_items(
  id uuid primary key default gen_random_uuid(), invoice_id uuid not null references public.invoices(id) on delete cascade,
@@ -71,10 +81,42 @@ create table if not exists public.invoice_items(
  line_total numeric(12,2) not null, line_profit numeric(12,2) not null, created_at timestamptz not null default now()
 );
 
+create table if not exists public.payments(
+ id uuid primary key default gen_random_uuid(),
+ invoice_id uuid not null references public.invoices(id) on delete cascade,
+ customer_id uuid references public.customers(id) on delete set null,
+ amount numeric(12,2) not null check(amount>0),
+ payment_date date not null default current_date,
+ payment_method text not null default 'Cash',
+ notes text not null default '',
+ created_at timestamptz not null default now()
+);
+create index if not exists payments_invoice_idx on public.payments(invoice_id);
+create index if not exists payments_customer_idx on public.payments(customer_id);
+
+create table if not exists public.website_products(
+ id uuid primary key references public.products(id) on delete cascade,
+ name text not null,
+ unit text not null,
+ selling_price numeric(12,2) not null,
+ description text not null default '',
+ additional_details text not null default '',
+ image_urls jsonb not null default '[]'::jsonb,
+ video_urls jsonb not null default '[]'::jsonb,
+ active boolean not null default true,
+ created_at timestamptz not null default now(),
+ updated_at timestamptz not null default now()
+);
+
 create table if not exists public.enquiries(
  id uuid primary key default gen_random_uuid(), name text not null, phone text, business text, message text,
  status text not null default 'New', created_at timestamptz not null default now()
 );
+
+alter table public.enquiries add column if not exists source text not null default 'manager';
+alter table public.enquiries add column if not exists product_name text;
+alter table public.enquiries add column if not exists quantity numeric(14,3);
+alter table public.enquiries add column if not exists email text;
 
 create table if not exists public.raw_materials(
  id uuid primary key default gen_random_uuid(),
@@ -122,6 +164,8 @@ alter table public.invoice_items enable row level security;
 alter table public.enquiries enable row level security;
 alter table public.raw_materials enable row level security;
 alter table public.expenses enable row level security;
+alter table public.payments enable row level security;
+alter table public.website_products enable row level security;
 
 drop policy if exists profiles_self on public.profiles;
 create policy profiles_self on public.profiles for select to authenticated using(id=auth.uid() and role='admin');
@@ -140,10 +184,20 @@ drop policy if exists raw_materials_admin on public.raw_materials;
 create policy raw_materials_admin on public.raw_materials for all to authenticated using(public.is_admin()) with check(public.is_admin());
 drop policy if exists expenses_admin on public.expenses;
 create policy expenses_admin on public.expenses for all to authenticated using(public.is_admin()) with check(public.is_admin());
+drop policy if exists payments_admin on public.payments;
+create policy payments_admin on public.payments for all to authenticated using(public.is_admin()) with check(public.is_admin());
+drop policy if exists website_products_public_read on public.website_products;
+create policy website_products_public_read on public.website_products for select to anon,authenticated using(active=true);
+drop policy if exists website_products_admin_write on public.website_products;
+create policy website_products_admin_write on public.website_products for all to authenticated using(public.is_admin()) with check(public.is_admin());
+drop policy if exists enquiries_website_insert on public.enquiries;
+create policy enquiries_website_insert on public.enquiries for insert to anon,authenticated with check(source='website');
 
 grant usage on schema public to authenticated;
 grant select on public.profiles to authenticated;
-grant select,insert,update,delete on public.products,public.customers,public.invoices,public.invoice_items,public.enquiries,public.raw_materials,public.expenses to authenticated;
+grant select,insert,update,delete on public.products,public.customers,public.invoices,public.invoice_items,public.enquiries,public.raw_materials,public.expenses,public.payments to authenticated;
+grant select on public.website_products to anon,authenticated;
+grant insert on public.enquiries to anon;
 
 -- Product photos/videos: public read for the future public website, admin-only upload/change/delete.
 insert into storage.buckets(id,name,public)
