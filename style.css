@@ -265,3 +265,15 @@ button,input,select,textarea{touch-action:manipulation}
   .permission-grid,.employee-time-grid{grid-template-columns:1fr}
   #employeeDialog{width:calc(100vw - 16px)}
 }
+
+
+/* Universal close button for every Manager popup */
+dialog{position:fixed}
+.dialog-x{
+ position:absolute;right:14px;top:12px;width:36px;height:36px;min-height:36px;
+ border:0;border-radius:50%;background:#f0f4f7;color:#425466;
+ font-size:26px;line-height:32px;font-weight:700;cursor:pointer;
+ display:grid;place-items:center;z-index:3;
+}
+.dialog-x:hover{background:#e4eaee;color:#0b1f33}
+dialog .dialog{padding-top:52px}
