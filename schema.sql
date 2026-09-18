@@ -664,3 +664,78 @@ begin
 end; $$;
 revoke all on function public.review_change_request(uuid,boolean,text) from public;
 grant execute on function public.review_change_request(uuid,boolean,text) to authenticated;
+
+
+-- Separate employee portal links and employee-raised access tickets.
+alter table public.employees
+  add column if not exists portal_key uuid not null default gen_random_uuid();
+
+create unique index if not exists employees_portal_key_unique
+  on public.employees(portal_key);
+
+alter table public.access_requests
+  add column if not exists status text not null default 'Pending'
+    check(status in ('Pending','Approved','Rejected')),
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists reviewed_by uuid references auth.users(id) on delete set null;
+
+create index if not exists access_requests_status_idx
+  on public.access_requests(status,created_at desc);
+
+drop policy if exists access_requests_employee_own on public.access_requests;
+create policy access_requests_employee_own
+  on public.access_requests for select to authenticated
+  using(exists(
+    select 1 from public.employees e
+    where e.id=access_requests.employee_id and e.auth_user_id=auth.uid()
+  ));
+
+create or replace function public.request_additional_access(p_module text,p_reason text default '')
+returns uuid language plpgsql security definer set search_path=public
+as $$
+declare v_emp public.employees%rowtype; v_id uuid;
+begin
+  if not exists(select 1 from (values ('dashboard'),('products'),('billing'),('sales'),('customers'),('enquiries'),('website_orders'),('expenses')) m(module) where m.module=p_module)
+    then raise exception 'Invalid access section'; end if;
+  select * into v_emp from public.employees where auth_user_id=auth.uid() and active=true
+    and (starts_at is null or now()>=starts_at) and (ends_at is null or now()<=ends_at) limit 1;
+  if v_emp.id is null then raise exception 'Employee access is inactive or expired'; end if;
+  if public.employee_has_permission(p_module) then raise exception 'You already have this access'; end if;
+  insert into public.access_requests(employee_id,module,action,reason,status)
+  values(v_emp.id,p_module,'REQUEST_ACCESS',coalesce(p_reason,''),'Pending') returning id into v_id;
+  insert into public.audit_logs(actor_user_id,employee_id,actor_type,event_type,module,action,metadata)
+  values(auth.uid(),v_emp.id,'employee','ACCESS_REQUEST',p_module,'REQUEST_ACCESS',jsonb_build_object('reason',coalesce(p_reason,'')));
+  insert into public.manager_notifications(notification_type,subject,body,related_id)
+  values('Access request','CleanCore employee requested additional access',
+         'Employee "'||v_emp.username||'" requested access to "'||p_module||'" at '||to_char(now(),'YYYY-MM-DD HH24:MI:SS TZH:TZM')||'. Reason: '||coalesce(p_reason,''),v_id);
+  return v_id;
+end; $$;
+revoke all on function public.request_additional_access(text,text) from public;
+grant execute on function public.request_additional_access(text,text) to authenticated;
+
+create or replace function public.review_access_request(p_request_id uuid,p_approve boolean,p_note text default '')
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare r public.access_requests%rowtype;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  select * into r from public.access_requests where id=p_request_id for update;
+  if r.id is null then raise exception 'Access request not found'; end if;
+  if r.status<>'Pending' then raise exception 'Access request is already reviewed'; end if;
+  if p_approve then
+    insert into public.employee_permissions(employee_id,module,enabled)
+      values(r.employee_id,r.module,true)
+      on conflict(employee_id,module) do update set enabled=true;
+    update public.access_requests set status='Approved',reviewed_at=now(),reviewed_by=auth.uid() where id=r.id;
+    insert into public.audit_logs(actor_user_id,employee_id,actor_type,event_type,module,action,metadata)
+      values(auth.uid(),r.employee_id,'admin','ACCESS_APPROVED',r.module,'GRANT_ACCESS',jsonb_build_object('request_id',r.id,'note',coalesce(p_note,'')));
+    return jsonb_build_object('status','Approved','request_id',r.id,'module',r.module);
+  else
+    update public.access_requests set status='Rejected',reviewed_at=now(),reviewed_by=auth.uid() where id=r.id;
+    insert into public.audit_logs(actor_user_id,employee_id,actor_type,event_type,module,action,metadata)
+      values(auth.uid(),r.employee_id,'admin','ACCESS_REJECTED',r.module,'DENY_ACCESS',jsonb_build_object('request_id',r.id,'note',coalesce(p_note,'')));
+    return jsonb_build_object('status','Rejected','request_id',r.id,'module',r.module);
+  end if;
+end; $$;
+revoke all on function public.review_access_request(uuid,boolean,text) from public;
+grant execute on function public.review_access_request(uuid,boolean,text) to authenticated;
