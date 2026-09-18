@@ -465,15 +465,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
-  const K="cleancore_manager_cache_reset_353";
+  const K="cleancore_manager_cache_reset_360";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
       "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
       "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
-    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=353"));
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=360"));
   }
 })();
+</script>
+<script>
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.6.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 <script src="app.js?v=3.6.0"></script>
 </body>
