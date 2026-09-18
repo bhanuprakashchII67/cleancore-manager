@@ -907,3 +907,25 @@ alter table public.products add column if not exists hsn_code text;
 alter table public.invoice_items add column if not exists hsn_code text;
 alter table public.website_order_items add column if not exists hsn_code text;
 alter table public.invoices add column if not exists place_of_supply text;
+
+
+-- quotation_invoice_document_type
+alter table public.invoices
+  add column if not exists document_type text not null default 'SALE';
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid='public.invoices'::regclass and conname='invoices_document_type_check'
+  ) then
+    alter table public.invoices
+      add constraint invoices_document_type_check
+      check (document_type in ('SALE','QUOTATION'));
+  end if;
+end $$;
+create index if not exists invoices_document_type_created_idx
+  on public.invoices(document_type,created_at desc);
+
+-- The deployed review_change_request function contains the quotation-specific
+-- behavior: quotations are stored and itemized, but do not create payments,
+-- do not decrement product stock, and do not contribute to sales/profit.
