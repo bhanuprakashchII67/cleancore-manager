@@ -299,3 +299,8 @@ dialog .dialog{padding-top:52px}
 .icon-delete-btn{display:inline-grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:8px;background:transparent;color:#c0392b;cursor:pointer}
 .icon-delete-btn:hover{background:#fff0ee;color:#a93226}
 .icon-delete-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* Per-page Manager refresh control */
+.section-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:0 2px}
+.section-toolbar>span{font-size:12px;font-weight:700;color:#6a7d8f}
+.page-refresh{white-space:nowrap}
