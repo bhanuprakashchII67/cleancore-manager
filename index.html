@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.3.0">
+<link rel="stylesheet" href="style.css?v=3.4.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -98,28 +98,57 @@
   <div class="panel">
     <div class="panel-head"><h3>Create Bill</h3><span class="muted">Invoice</span></div>
     <form id="billForm" class="grid">
-      <label>Existing customer<select id="billingCustomer"><option value="">New / enter customer</option></select></label>
-      <label>Customer name<input id="custName" required></label>
-      <label>Business name<input id="custBusiness"></label>
-      <label>Phone<input id="custPhone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required></label>
-      <label>Email ID<input id="custEmail" type="email"></label>
-      <label>GSTIN (optional)<input id="custGstin" maxlength="15" placeholder="15-character GSTIN"></label>
-      <div class="full grid two">
-        <label>Billing address<textarea id="custBilling" rows="2"></textarea></label>
-        <label>Delivery address<textarea id="custDelivery" rows="2"></textarea></label>
+      <label class="full">Customer
+        <select id="billingCustomer" required>
+          <option value="">Select customer</option>
+        </select>
+        <small class="muted">Customer name, GSTIN and address details come from the Customer record.</small>
+      </label>
+
+      <div id="selectedCustomerCard" class="full bill-customer-card">
+        <div><span>Customer</span><strong id="billCustomerName">—</strong></div>
+        <div><span>Business</span><strong id="billCustomerBusiness">—</strong></div>
+        <div><span>Phone</span><strong id="billCustomerPhone">—</strong></div>
+        <div><span>Email</span><strong id="billCustomerEmail">—</strong></div>
+        <div><span>GSTIN</span><strong id="billCustomerGstin">—</strong></div>
+        <div><span>Address</span><strong id="billCustomerAddress">—</strong></div>
       </div>
-      <label>Discount ₹<input id="discount" type="number" min="0" value="0"></label>
+
+      <label>Bill type
+        <select id="billType">
+          <option value="NON_GST">Non-GST Bill</option>
+          <option value="GST">GST Bill</option>
+        </select>
+      </label>
+      <label id="gstRateWrap" class="hidden">GST rate %
+        <input id="gstPercent" type="number" min="0" max="100" step="0.01" value="18">
+      </label>
+
+      <label>Discount ₹<input id="discount" type="number" min="0" step="0.01" value="0"></label>
+
       <div class="full payment-box">
-        <div class="panel-head"><b>Payment / Credit</b><span id="paymentPreview" class="muted">Enter items to calculate payment</span></div>
+        <div class="panel-head"><b>Payment</b><span id="paymentPreview" class="muted">Select a customer and add items</span></div>
         <div class="grid two">
-          <label>Payment status<select id="paymentStatus"><option value="Credit">Credit</option><option value="Paid">Paid</option><option value="Part Paid">Part Paid</option></select></label>
-          <label>Amount received ₹<input id="paidAmount" type="number" min="0" step="0.01" value="0"></label>
-          <label>Due date<input id="dueDate" type="date"></label>
-          <label>Payment method<select id="billPaymentMethod"><option>Credit</option><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option></select></label>
+          <label>Payment type
+            <select id="paymentType">
+              <option value="CASH">Cash</option>
+              <option value="ONLINE">Online</option>
+              <option value="CREDIT">Credit</option>
+              <option value="HALF">Half Payment</option>
+            </select>
+          </label>
+          <label id="billDueDateWrap">Due date
+            <input id="dueDate" type="date">
+          </label>
         </div>
+        <p class="muted tiny">Cash / Online = fully paid. Credit = fully due. Half Payment = 50% paid and 50% credit.</p>
       </div>
-      <label id="gstWrap" class="hidden">GST % for this bill<input id="gstPercent" type="number" min="0" max="100" step="0.01" value="18"></label><div id="taxBreakdown" class="full tax-breakdown hidden"></div>
-      <div class="full"><div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div><div id="lines"></div></div>
+
+      <div class="full">
+        <div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div>
+        <div id="lines"></div>
+      </div>
+
       <div class="total full">
         <div>
           <div>Subtotal: <strong id="subtotal">₹0</strong></div>
@@ -128,7 +157,8 @@
         </div>
         <strong id="total">₹0</strong>
       </div>
-      <div class="full actions"><button class="btn primary">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
+
+      <div class="full actions"><button type="submit" class="btn primary">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
     </form>
   </div>
 </section>
@@ -384,6 +414,6 @@
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=3.3.0"></script>
+<script src="app.js?v=3.4.0"></script>
 </body>
 </html>
