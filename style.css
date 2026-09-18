@@ -176,3 +176,20 @@ button,input,select,textarea{touch-action:manipulation}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:768px){.sidebar nav{grid-template-columns:repeat(8,minmax(0,1fr))}.nav[data-section="expenses"]::before{content:"₹"}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:390px){.sidebar nav{grid-template-columns:repeat(8,minmax(36px,1fr))}.nav{font-size:8px}}
+
+/* Compact, unambiguous mobile navigation labels */
+@media(max-width:768px){
+  .nav[data-section]{font-size:0}
+  .nav[data-section]::after{display:block;font-size:9px;line-height:1.05}
+  .nav[data-section="dashboard"]::after{content:"Home"}
+  .nav[data-section="products"]::after{content:"Products"}
+  .nav[data-section="billing"]::after{content:"Bill"}
+  .nav[data-section="sales"]::after{content:"Sales"}
+  .nav[data-section="customers"]::after{content:"Customers"}
+  .nav[data-section="enquiries"]::after{content:"Enquiries"}
+  .nav[data-section="expenses"]::after{content:"Expenses"}
+  .nav[data-section="settings"]::after{content:"Settings"}
+}
+@media(max-width:390px){
+  .nav[data-section]::after{font-size:8px}
+}
