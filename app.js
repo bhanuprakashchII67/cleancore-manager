@@ -270,6 +270,13 @@ function resetEmployeeForm(){
 $("addEmployee").onclick=()=>{resetEmployeeForm();$("employeeDialog").showModal()};
 $("employeeTeam").onchange=()=>renderEmployeeModuleChecks($("employeeTeam").value);
 $("employeeForm").addEventListener("submit",createEmployee);
+$("employeeCancelButton").onclick=()=>$("employeeDialog").close();
+$("employeeCloseButton").onclick=()=>{$("employeeDialog").close();resetEmployeeForm()};
+$("copyEmployeePortalButton").onclick=async()=>{
+ const url=$("employeePortalLink").value;
+ try{await navigator.clipboard.writeText(url);toast("Portal link copied");}
+ catch(e){prompt("Copy portal link:",url);}
+};
 
 async function createEmployee(e){
  e.preventDefault();
