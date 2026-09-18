@@ -63,13 +63,14 @@ async function refreshPageData(btn){
    btn.disabled=false;btn.innerHTML=old;
  }
 }
-document.addEventListener("click",e=>{
- const btn=e.target.closest?.("[data-page-refresh]");
- if(!btn)return;
- e.preventDefault();
- e.stopPropagation();
- refreshPageData(btn);
-});
+function bindRefreshControls(){
+ const top=$("refreshManager");
+ if(top)top.onclick=e=>{e.preventDefault();e.stopPropagation();refreshManagerData();};
+ document.querySelectorAll("[data-page-refresh]").forEach(btn=>{
+  btn.type="button";
+  btn.onclick=e=>{e.preventDefault();e.stopPropagation();refreshPageData(btn);};
+ });
+}
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
 function validPhone(v){return phoneRE.test(normalizePhone(v))}
@@ -401,7 +402,7 @@ function renderAll(){
  $("netProfit").textContent=money(grossMonth-monthExpenses);
  $("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
- $("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),"<button type='button' class='icon-delete-btn' title='Delete invoice' aria-label='Delete invoice' onclick="deleteInvoice('"+x.id+"')"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+ $("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
   esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
   Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
@@ -1238,40 +1239,21 @@ function getPrintableInvoiceHtml(){
 $("printInvoice").onclick=async e=>{
  e.preventDefault();
  try{
-   const html=getPrintableInvoiceHtml();
-   const frame=document.createElement("iframe");
-   frame.setAttribute("aria-hidden","true");
-   frame.style.position="fixed";
-   frame.style.right="0";
-   frame.style.bottom="0";
-   frame.style.width="1px";
-   frame.style.height="1px";
-   frame.style.border="0";
-   frame.style.opacity="0";
-   frame.style.pointerEvents="none";
-   document.body.appendChild(frame);
-
-   const cleanup=()=>{
-     try{frame.remove()}catch(err){}
-   };
-   const win=frame.contentWindow;
-   if(!win)throw new Error("Could not prepare the print window.");
-
-   frame.onload=()=>{
-     try{
-       win.focus();
-       setTimeout(()=>{
-         try{win.print();setTimeout(cleanup,800)}catch(err){cleanup();toast("The browser blocked printing. Use the browser print command to save as PDF.",false)}
-       },100);
-     }catch(err){cleanup();toast(err?.message||"Unable to print invoice.",false)}
-   };
-   win.document.open();
-   win.document.write(html);
-   win.document.close();
- }catch(err){
-   console.error("Invoice print error",err);
-   toast(err?.message||"Unable to print invoice.",false);
- }
+  const html=getPrintableInvoiceHtml();
+  const frame=document.createElement("iframe");
+  frame.title="CleanCore Invoice";
+  Object.assign(frame.style,{position:"fixed",left:"-10000px",top:"0",width:"900px",height:"1100px",border:"0",opacity:"0",pointerEvents:"none"});
+  document.body.appendChild(frame);
+  let cleaned=false;
+  const cleanup=()=>{if(cleaned)return;cleaned=true;setTimeout(()=>frame.remove(),300);};
+  frame.onload=()=>{
+   setTimeout(()=>{
+    try{frame.contentWindow.focus();frame.contentWindow.print();cleanup();}
+    catch(err){cleanup();toast("Print was blocked by the browser. Use the browser Print / Save as PDF command.",false);}
+   },120);
+  };
+  frame.srcdoc=html;
+ }catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
@@ -1356,4 +1338,5 @@ async function bootstrapManagerSession(){
 window.addEventListener("storage",e=>{
   if(e.key===MANAGER_LOGIN_EXPIRY_KEY)armManagerExpiryTimer();
 });
+bindRefreshControls();
 bootstrapManagerSession();
