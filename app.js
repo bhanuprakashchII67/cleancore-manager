@@ -27,7 +27,7 @@ document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
 function go(id){document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));$("title").textContent=document.querySelector(`.nav[data-section="${id}"]`)?.textContent||id}
 
 async function loadAll(){
- const [p,i,c,e,r,x,pm]=await Promise.all([
+ const [p,i,c,e,r,x,pm,wo]=await Promise.all([
   db.from("products").select("*").order("name"),
   db.from("invoices").select("*").order("created_at",{ascending:false}),
   db.from("customers").select("*").order("name"),
