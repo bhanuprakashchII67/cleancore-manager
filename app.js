@@ -1189,9 +1189,9 @@ $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,pass
 // Persistent Manager login policy: one successful login stays active for 7 days.
 // The 7-day window survives reloads, tab switches and reopening the installed/browser app.
 // It is absolute from the successful login and is not extended by activity.
-const MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
-const MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
-let managerExpiryTimer=null;
+var MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
+var MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
+var managerExpiryTimer=null;
 
 function clearManagerLoginWindow(){
   clearTimeout(managerExpiryTimer);
