@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=2.2.2">
+<link rel="stylesheet" href="style.css?v=2.3.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -22,7 +22,7 @@
       <button class="btn primary">Open Dashboard</button>
     </form>
     <p class="security-note">Admin access is authenticated securely through Supabase.</p>
-    <p class="version">CleanCore Manager v2.2.2</p>
+    <p class="version">CleanCore Manager v2.3.0</p>
   </div>
 </section>
 
@@ -106,6 +106,15 @@
         <label>Delivery address<textarea id="custDelivery" rows="2"></textarea></label>
       </div>
       <label>Discount ₹<input id="discount" type="number" min="0" value="0"></label>
+      <div class="full payment-box">
+        <div class="panel-head"><b>Payment / Credit</b><span id="paymentPreview" class="muted">Enter items to calculate payment</span></div>
+        <div class="grid two">
+          <label>Payment status<select id="paymentStatus"><option value="Credit">Credit</option><option value="Paid">Paid</option><option value="Part Paid">Part Paid</option></select></label>
+          <label>Amount received ₹<input id="paidAmount" type="number" min="0" step="0.01" value="0"></label>
+          <label>Due date<input id="dueDate" type="date"></label>
+          <label>Payment method<select id="billPaymentMethod"><option>Credit</option><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option></select></label>
+        </div>
+      </div>
       <label id="gstWrap" class="hidden">GST % for this bill<input id="gstPercent" type="number" min="0" max="100" step="0.01" value="18"></label><div id="taxBreakdown" class="full tax-breakdown hidden"></div>
       <div class="full"><div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div><div id="lines"></div></div>
       <div class="total full">
@@ -135,6 +144,30 @@
     <div id="customersTable"></div>
   </div>
 </section>
+
+<dialog id="customerHistoryDialog">
+  <div class="dialog">
+    <h3 id="customerHistoryTitle">Purchase History</h3>
+    <div id="customerHistorySummary"></div>
+    <div id="customerHistoryTable"></div>
+    <div class="actions"><button id="closeCustomerHistory" class="btn">Close</button></div>
+  </div>
+</dialog>
+
+<dialog id="paymentDialog">
+  <form method="dialog" id="paymentForm" class="dialog">
+    <h3>Record Payment</h3>
+    <input id="paymentInvoiceId" type="hidden">
+    <p><b>Invoice:</b> <span id="paymentInvoiceNo"></span></p>
+    <p><b>Customer:</b> <span id="paymentCustomerName"></span></p>
+    <p><b>Outstanding:</b> <span id="paymentOutstanding"></span></p>
+    <label>Payment date<input id="paymentDate" type="date" required></label>
+    <label>Amount received ₹<input id="paymentAmount" type="number" min="0.01" step="0.01" required></label>
+    <label>Payment method<select id="paymentMethod"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option></select></label>
+    <label>Notes<textarea id="paymentNotes" rows="3"></textarea></label>
+    <div class="actions"><button type="button" id="closePayment" class="btn">Cancel</button><button class="btn primary" value="default">Save Payment</button></div>
+  </form>
+</dialog>
 
 <section id="enquiries" class="section">
   <div class="panel"><div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div><div id="enquiriesTable"></div></div>
@@ -263,6 +296,6 @@
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.2.2"></script>
+<script src="app.js?v=2.3.0"></script>
 </body>
 </html>
