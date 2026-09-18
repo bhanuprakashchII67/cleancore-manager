@@ -599,7 +599,11 @@ window.viewWebsiteOrder=async function(id){
  const invBtn=$("viewWebsiteInvoice");
  if(invBtn){
    invBtn.classList.toggle("hidden",!o.invoice_id);
-   invBtn.onclick=()=>{if(o.invoice_id)window.viewInvoice(o.invoice_id);};
+   invBtn.onclick=()=>{
+     if(!o.invoice_id)return;
+     $("websiteOrderDialog").close();
+     setTimeout(()=>window.viewInvoice(o.invoice_id),50);
+   };
  }
  $("websiteOrderDialog").showModal();
 };
@@ -1080,29 +1084,58 @@ document.addEventListener("click",e=>{
  const btn=e.target.closest?.(".view-bill");
  if(btn){e.preventDefault();window.viewInvoice(btn.dataset.invoiceId);}
 });
+async function loadInvoiceItemsForView(invoice){
+  let q=await db.from("invoice_items").select("*").eq("invoice_id",invoice.id).order("created_at");
+  if(q.error)throw q.error;
+  if(Array.isArray(q.data)&&q.data.length)return q.data;
+
+  // Website-created invoices may have their line items stored with the originating order.
+  const wo=websiteOrders.find(x=>x.invoice_id===invoice.id)||null;
+  if(wo){
+    const wq=await db.from("website_order_items").select("*").eq("order_id",wo.id).order("created_at");
+    if(wq.error)throw wq.error;
+    return (wq.data||[]).map(it=>({
+      product_name:it.product_name,
+      hsn_code:it.hsn_code||"",
+      qty:it.qty,
+      unit_price:it.unit_price,
+      line_total:it.line_total
+    }));
+  }
+  return [];
+}
 window.viewInvoice=async id=>{
- const inv=invoices.find(x=>x.id===id); if(!inv)return;
- const r=await db.from("invoice_items").select("*").eq("invoice_id",id).order("created_at");
- if(r.error)return toast(r.error.message,false);
- const hasGst=Number(inv.gst_amount||0)>0; const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
- const cgst=Number(inv.cgst_amount||0),sgst=Number(inv.sgst_amount||0),igst=Number(inv.igst_amount||0);
- const taxRows=intra
-  ? "<tr><td colspan='5' class='tax-label'>CGST ("+Number(inv.cgst_percent||0)+"%)</td><td>"+money(cgst)+"</td></tr><tr><td colspan='5' class='tax-label'>SGST ("+Number(inv.sgst_percent||0)+"%)</td><td>"+money(sgst)+"</td></tr>"
-  : (igst>0 ? "<tr><td colspan='5' class='tax-label'>IGST ("+Number(inv.igst_percent||0)+"%)</td><td>"+money(igst)+"</td></tr>" : "");
- const rows=(r.data||[]).map((it,n)=>"<tr><td>"+(n+1)+"</td><td>"+esc(it.product_name)+"</td><td>"+esc(it.hsn_code||"—")+"</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("");
- const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
- const date=new Date(inv.created_at);
- $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
- "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+(hasGst?"TAX INVOICE":"INVOICE")+"</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
- "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"")+"</div></div>"+
- "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(inv.billing_address||"—")+"</p></div></div>"+
- "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
- "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
- "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
- "<div class='amount-words'><b>Total in words:</b> "+esc(numberToWordsIndian(Number(inv.total||0)))+" ONLY</div>"+
- "<div class='inv-bottom'><div><b>Terms & Conditions</b><p>Goods once sold will not be taken back unless agreed in writing.<br>Payment as per agreed business terms.<br>Subject to Hyderabad, Telangana jurisdiction.</p></div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
- "</div>";
- $("invoiceDialog").showModal();
+ const inv=invoices.find(x=>x.id===id);
+ if(!inv)return toast("Invoice not found. Refresh Manager data and try again.",false);
+ try{
+   const items=await loadInvoiceItemsForView(inv);
+   const hasGst=Number(inv.gst_amount||0)>0;
+   const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
+   const cgst=Number(inv.cgst_amount||0),sgst=Number(inv.sgst_amount||0),igst=Number(inv.igst_amount||0);
+   const taxRows=intra
+    ? "<tr><td colspan='5' class='tax-label'>CGST ("+Number(inv.cgst_percent||0)+"%)</td><td>"+money(cgst)+"</td></tr><tr><td colspan='5' class='tax-label'>SGST ("+Number(inv.sgst_percent||0)+"%)</td><td>"+money(sgst)+"</td></tr>"
+    : (igst>0 ? "<tr><td colspan='5' class='tax-label'>IGST ("+Number(inv.igst_percent||0)+"%)</td><td>"+money(igst)+"</td></tr>" : "");
+   const rows=items.map((it,n)=>"<tr><td>"+(n+1)+"</td><td>"+esc(it.product_name)+"</td><td>"+esc(it.hsn_code||"—")+"</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("");
+   const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
+   const date=new Date(inv.created_at);
+   const gstLabel=hasGst?"TAX INVOICE":"INVOICE";
+   const billingAddress=inv.billing_address||"—";
+   const deliveryAddress=inv.delivery_address||"—";
+   $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
+    "<div class='inv-header'><div><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+gstLabel+"</b><span>ORIGINAL FOR RECIPIENT</span></div></div>"+
+    "<div class='inv-meta'><div><b>Invoice No:</b> "+esc(inv.invoice_no)+"<br><b>Invoice Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div><b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"")+"</div></div>"+
+    "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Hyderabad, Telangana<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>Email: "+esc(inv.customer_email||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(billingAddress)+"<br>Delivery: "+esc(deliveryAddress)+"</p></div></div>"+
+    "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
+    "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
+    "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
+    "<div class='amount-words'><b>Total in words:</b> "+esc(numberToWordsIndian(Number(inv.total||0)))+" ONLY</div>"+
+    "<div class='inv-bottom'><div><b>Terms & Conditions</b><p>Goods once sold will not be taken back unless agreed in writing.<br>Payment as per agreed business terms.<br>Subject to Hyderabad, Telangana jurisdiction.</p></div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
+    "</div>";
+   $("invoiceDialog").showModal();
+ }catch(err){
+   console.error("Invoice viewer error",err);
+   toast(err?.message||"Unable to open invoice.",false);
+ }
 };
 function buildCustomerBillMessage(inv,customer,items=[]){
  const itemLines=items.map(x=>"• "+(x.p?.name||x.product_name||"Item")+" × "+(x.q||x.qty||1)+" @ "+money(x.p?.selling_price||x.unit_price||0)+" = "+money(x.p?(x.p.selling_price*x.q):x.line_total));
