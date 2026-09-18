@@ -193,3 +193,33 @@ button,input,select,textarea{touch-action:manipulation}
 @media(max-width:390px){
   .nav[data-section]::after{font-size:8px}
 }
+
+/* Professional invoice preview */
+.invoice-preview{background:#fff;color:#17212b}
+.invoice-preview .inv-header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border:1px solid #dce5ee;border-bottom:3px solid #159a91;padding:18px;background:linear-gradient(135deg,#fff,#f4fbfa)}
+.invoice-preview .inv-brand{font-size:25px;font-weight:900;color:#0b1f33}
+.invoice-preview .inv-sub{font-size:12px;font-weight:800;color:#159a91;margin:3px 0 7px}
+.invoice-preview .inv-title{text-align:right;color:#0b1f33}
+.invoice-preview .inv-title b{display:block;font-size:20px;letter-spacing:.5px}
+.invoice-preview .inv-title span{display:block;font-size:10px;color:#66727d;margin-top:4px}
+.invoice-preview .inv-meta,.invoice-preview .inv-parties{border:1px solid #dce5ee;border-top:0}
+.invoice-preview .inv-meta{display:grid;grid-template-columns:1fr 1fr;padding:12px;gap:12px}
+.invoice-preview .inv-parties{display:grid;grid-template-columns:1fr 1fr}
+.invoice-preview .inv-parties>div{padding:14px}
+.invoice-preview .inv-parties>div+div{border-left:1px solid #dce5ee}
+.invoice-preview .invoice-items{width:100%;border-collapse:collapse;margin-top:14px}
+.invoice-preview .invoice-items th{background:#0b1f33;color:#fff}
+.invoice-preview .invoice-items th,.invoice-preview .invoice-items td{padding:9px;border:1px solid #dce5ee}
+.invoice-preview .invoice-items tr:nth-child(even){background:#f8fbfd}
+.invoice-preview .grand-total td{background:#e8f5f3;font-size:15px}
+.invoice-preview .amount-words{border:1px solid #dce5ee;background:#f8fbfd;padding:11px;margin-top:10px}
+.invoice-preview .inv-bottom{display:grid;grid-template-columns:1fr 1fr;border:1px solid #dce5ee;margin-top:10px}
+.invoice-preview .inv-bottom>div{padding:12px}
+.invoice-preview .inv-bottom>div+div{border-left:1px solid #dce5ee}
+@media(max-width:600px){
+  .invoice-preview .inv-header,.invoice-preview .inv-meta,.invoice-preview .inv-parties{display:block}
+  .invoice-preview .inv-title{text-align:left;margin-top:12px}
+  .invoice-preview .inv-parties>div+div{border-left:0;border-top:1px solid #dce5ee}
+  .invoice-preview .inv-bottom{display:block}
+  .invoice-preview .inv-bottom>div+div{border-left:0;border-top:1px solid #dce5ee}
+}
