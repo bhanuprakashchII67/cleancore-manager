@@ -46,13 +46,17 @@ function applyAccess(){
 }
 async function logUnauthorized(module,action,reason=""){
   if(isAdmin)return;
-  try{await db.rpc("log_employee_access_attempt",{p_module:module,p_action:action,p_reason:reason})}catch(e){}
+  try{
+    const {data,error}=await db.rpc("log_employee_access_attempt",{p_module:module,p_action:action,p_reason:reason});
+    if(!error&&data)await db.functions.invoke("manager-notify",{body:{related_id:data}}).catch(()=>null);
+  }catch(e){}
 }
 async function submitChange(module,action,targetTable,targetId,payload,reason=""){
   if(isAdmin)return false;
   if(!canAccess(module)){await logUnauthorized(module,"CHANGE_REQUEST",reason||"Change attempted without permission");toast("Access denied. This action has been logged.",false);return false;}
   const {data,error}=await db.rpc("submit_change_request",{p_module:module,p_action:action,p_target_table:targetTable,p_target_id:targetId||null,p_payload:payload||{},p_reason:reason||""});
   if(error){toast(error.message,false);return false;}
+  if(data)db.functions.invoke("manager-notify",{body:{related_id:data}}).catch(()=>null);
   toast("Change submitted to Manager for approval. Request "+String(data||"").slice(0,8));
   return true;
 }
