@@ -68,9 +68,10 @@ function renderSales(){
  let list=invoices.slice();
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
- $("salesSummary").textContent=`${list.length} bill${list.length===1?"":"s"} • ${money(list.reduce((a,x)=>a+Number(x.total),0))} sales`;
- $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Date"],list.map(x=>[
-  esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),`${Number(x.gst_percent||0)}% (${money(x.gst_amount||0)})`,money(x.total),money(x.profit),new Date(x.created_at).toLocaleString("en-IN")
+ $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
+ $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Date","Action"],list.map(x=>[
+  esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),String(Number(x.gst_percent||0))+"%",money(x.total),money(x.profit),new Date(x.created_at).toLocaleString("en-IN"),
+  '<button class="link" onclick="viewInvoice(\''+x.id+'\')">View Bill</button>'
  ]));
 }
 function renderCustomers(){
@@ -198,6 +199,34 @@ $("customerForm").addEventListener("submit",async e=>{e.preventDefault();const p
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
 $("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const {error}=await db.from("enquiries").insert({name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value});if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
 $("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
+
+window.viewInvoice=async id=>{
+ const inv=invoices.find(x=>x.id===id); if(!inv)return;
+ const r=await db.from("invoice_items").select("*").eq("invoice_id",id).order("created_at");
+ if(r.error)return toast(r.error.message,false);
+ const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
+ const tax=intra
+  ? "<div>CGST "+Number(inv.cgst_percent||0)+"%: <b>"+money(inv.cgst_amount)+"</b></div><div>SGST "+Number(inv.sgst_percent||0)+"%: <b>"+money(inv.sgst_amount)+"</b></div>"
+  : (Number(inv.igst_amount||0)>0 ? "<div>IGST "+Number(inv.igst_percent||0)+"%: <b>"+money(inv.igst_amount)+"</b></div>" : "");
+ $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
+ "<h2>CleanCore Chemical & Cleaning</h2><p>Hyderabad • +91 91827 25773</p>"+
+ "<p><b>Invoice:</b> "+esc(inv.invoice_no)+"<br><b>Date:</b> "+new Date(inv.created_at).toLocaleString("en-IN")+"</p><hr>"+
+ "<p><b>Customer:</b> "+esc(inv.customer_name)+"<br><b>Business:</b> "+esc(inv.customer_business||"—")+"<br><b>Phone:</b> "+esc(inv.customer_phone||"—")+"<br><b>GSTIN:</b> "+esc(inv.gstin||"—")+"<br><b>Billing:</b> "+esc(inv.billing_address||"—")+"<br><b>Delivery:</b> "+esc(inv.delivery_address||"—")+"</p>"+
+ "<table class='invoice-items'><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>"+
+ (r.data||[]).map(it=>"<tr><td>"+esc(it.product_name)+"</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("")+
+ "</tbody></table><div class='invoice-totals'>Subtotal: <b>"+money(inv.subtotal)+"</b><br>Discount: <b>"+money(inv.discount)+"</b><br>"+tax+"<br><strong>Total: "+money(inv.total)+"</strong></div></div>";
+ $("invoiceDialog").showModal();
+};
+$("closeInvoice").onclick=()=>$("invoiceDialog").close();
+$("printInvoice").onclick=()=>{
+ const w=window.open("","_blank","width=900,height=900");
+ if(!w)return toast("Allow pop-ups to print the bill.",false);
+ w.document.write("<html><head><title>CleanCore Invoice</title><style>body{font-family:Arial;padding:30px}.invoice-items{width:100%;border-collapse:collapse}.invoice-items th,.invoice-items td{border:1px solid #ccc;padding:8px}.invoice-totals{text-align:right;margin-top:20px}</style></head><body>"+$("invoicePreview").innerHTML+"</body></html>");
+ w.document.close(); w.focus(); w.print();
+};
+$("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
+$("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
+$("profileLogout").onclick=async()=>{await db.auth.signOut();location.reload()};
 $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
