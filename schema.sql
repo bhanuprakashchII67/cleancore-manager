@@ -779,3 +779,23 @@ end;
 $$;
 revoke all on function public.save_raw_material_admin(uuid,text,text,numeric,numeric,numeric) from public;
 grant execute on function public.save_raw_material_admin(uuid,text,text,numeric,numeric,numeric) to authenticated;
+
+
+-- Manager-only raw-material deletion endpoint.
+create or replace function public.delete_raw_material_admin(p_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  delete from public.raw_materials where id=p_id returning id into v_id;
+  if v_id is null then raise exception 'Raw material not found'; end if;
+  return v_id;
+end;
+$$;
+revoke all on function public.delete_raw_material_admin(uuid) from public;
+revoke execute on function public.delete_raw_material_admin(uuid) from anon;
+grant execute on function public.delete_raw_material_admin(uuid) to authenticated;
