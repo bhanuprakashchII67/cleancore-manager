@@ -294,3 +294,8 @@ dialog .dialog{padding-top:52px}
 .tax-warning{padding:10px 12px;border-radius:9px;background:#fff4df;color:#8a5700;font-weight:700}
 @media(max-width:900px){.bill-customer-card{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.bill-customer-card{grid-template-columns:1fr}}
+
+/* Enquiry delete bin icon */
+.icon-delete-btn{display:inline-grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:8px;background:transparent;color:#c0392b;cursor:pointer}
+.icon-delete-btn:hover{background:#fff0ee;color:#a93226}
+.icon-delete-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
