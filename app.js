@@ -936,7 +936,9 @@ function calc(){
 $("clearBill").onclick=()=>{
  $("billForm").reset();
  $("billingCustomer").value="";
+ $("documentType").value="SALE";
  $("billType").value="NON_GST";
+ const paymentBox=document.querySelector(".payment-box"); if(paymentBox)paymentBox.classList.remove("hidden");
  $("paymentType").value="CASH";
  $("gstPercent").value="18";
  ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin"].forEach(id=>$(id).textContent="—");
@@ -1003,7 +1005,7 @@ $("billForm").addEventListener("submit",async e=>{
      items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:isQuotation?0:(x.rate-x.p.cost_price)*x.q}))
    };
    const ok=await submitChange("billing","invoice_create","invoices",null,payload,isQuotation?"Employee quotation submitted for manager approval":"Employee bill submitted for manager approval");
-   if(ok){$("billForm").reset();$("documentType").value="SALE";$("lines").innerHTML="";rebuildLines();}
+   if(ok){$("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();}
    return;
  }
 
@@ -1038,7 +1040,7 @@ $("billForm").addEventListener("submit",async e=>{
    await loadAll();
    rebuildLines();
  }
- $("billForm").reset();$("documentType").value="SALE";$("lines").innerHTML="";await loadAll();rebuildLines();
+ $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";await loadAll();rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
 $("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
