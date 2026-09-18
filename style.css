@@ -83,3 +83,63 @@ button,input,select,textarea{touch-action:manipulation}
   .line{grid-template-columns:1fr 62px 76px 36px}
   .top h2{font-size:21px}
 }
+
+/* Dedicated phone layout */
+@media (max-width: 768px){
+  body{font-size:14px}
+  .app{display:block;min-height:100vh}
+  .sidebar{
+    position:fixed;left:0;right:0;bottom:0;top:auto;
+    height:auto;z-index:50;padding:6px 4px 7px;
+    background:#071a33;border-top:1px solid #183454;
+    box-shadow:0 -8px 24px #001d3a33;
+  }
+  .side-brand{display:none}
+  .sidebar nav{
+    display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
+    gap:2px;overflow:visible;padding:0;
+  }
+  .nav{
+    min-height:52px;padding:7px 2px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;white-space:normal;font-size:10px;line-height:1.15;
+  }
+  .nav[data-section]::before{display:block;font-size:17px;line-height:1;margin-bottom:3px}
+  .nav[data-section="dashboard"]::before{content:"⌂"}
+  .nav[data-section="products"]::before{content:"▣"}
+  .nav[data-section="billing"]::before{content:"＋"}
+  .nav[data-section="sales"]::before{content:"₹"}
+  .nav[data-section="customers"]::before{content:"♙"}
+  .nav[data-section="enquiries"]::before{content:"✉"}
+  .nav[data-section="settings"]::before{content:"⚙"}
+  .logout{display:none}
+  .main{padding:12px 10px 82px;width:100%;min-width:0}
+  .top{position:sticky;top:0;background:#f5f8fb;padding:7px 0 10px;z-index:20}
+  .top .eyebrow{font-size:9px;letter-spacing:.09em}
+  .top h2{font-size:22px}
+  .profile-btn{min-height:40px;padding:8px 10px}
+  .cards{grid-template-columns:1fr 1fr;gap:8px}
+  .metric{padding:13px 11px}
+  .metric strong{font-size:18px}
+  .metric span{font-size:11px}
+  .panel{padding:12px;border-radius:12px}
+  .panel-head h3{font-size:16px}
+  .panel-head .muted{font-size:11px}
+  .btn{min-height:44px}
+  input,select,textarea{min-height:44px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .filters label{min-width:0;font-size:12px}
+  .filters #clearSalesFilter{grid-column:1/-1}
+  #invoiceDialog{width:calc(100vw - 12px);max-width:none}
+  #invoicePreview{max-height:65vh}
+  #invoiceDialog>.actions{padding:10px 12px 12px}
+  #invoiceDialog>.actions .btn{flex:1 1 100%}
+}
+@media (max-width:390px){
+  .sidebar nav{grid-template-columns:repeat(7,minmax(38px,1fr))}
+  .nav{font-size:9px}
+  .nav[data-section]::before{font-size:15px}
+  .main{padding-left:7px;padding-right:7px}
+  .cards{gap:6px}
+  .metric{padding:11px 8px}
+}
