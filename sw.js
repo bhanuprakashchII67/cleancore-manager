@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cleancore-manager-v3.4.3';
+const CACHE_NAME = 'cleancore-manager-v3.5.1';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
