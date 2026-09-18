@@ -1,127 +1,85 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CleanCore Business Manager</title><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.webmanifest"></head>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CleanCore Business Manager</title><link rel="stylesheet" href="style.css">
+</head>
 <body>
-<div id="login" class="login"><div class="loginbox">
-  <div class="brand" style="padding-left:0;color:#0b1f33">CleanCore <span>Manager</span></div>
-  <h1>Business Dashboard</h1>
-  <p class="small">Private browser-based manager for products, stock, bills, sales and profit.</p>
-  <label>ADMIN PIN</label><input id="pin" type="password" placeholder="Create/use PIN">
-  <button class="btn primary" style="width:100%;margin-top:12px" onclick="login()">Open Dashboard</button>
-  <p class="small" style="margin-top:12px">First time: enter any PIN you want. It is stored only in this browser.</p>
-</div></div>
+<div id="toast" class="toast"></div>
+<section id="loginView" class="auth-shell"><div class="auth-card">
+<div class="brand">CC</div><p class="eyebrow">PRIVATE BUSINESS MANAGER</p><h1>CleanCore Manager</h1>
+<p class="muted">Stock, billing, customers, enquiries and sales.</p>
+<form id="loginForm"><label>Email<input id="loginEmail" type="email" value="bhanuprakashchadalawada10@gmail.com" required></label><label>Password<input id="loginPassword" type="password" required></label><button class="btn primary">Sign in</button></form>
+<div class="divider">or</div>
+<form id="otpForm"><label>Email OTP login<input id="otpEmail" type="email" value="bhanuprakashchadalawada10@gmail.com" required></label><button class="btn secondary">Send email OTP</button></form>
+<div id="otpBox" class="hidden"><label>OTP<input id="otpCode" inputmode="numeric" maxlength="6"></label><button id="verifyOtp" class="btn secondary" type="button">Verify OTP</button></div>
+<p class="security-note">Authentication is handled by Supabase. Never store passwords or OTPs in this app.</p>
+</div></section>
 
-<div id="app" class="app" style="display:none">
-<aside class="side"><div class="brand">CleanCore <span>Manager</span></div><div class="nav">
-<button class="active" data-page="dashboard">Dashboard</button><button data-page="products">Products & Stock</button><button data-page="billing">Create Bill</button><button data-page="sales">Sales</button><button data-page="enquiries">Enquiries</button><button data-page="customers">Customers</button><button data-page="settings">Settings</button>
-</div></aside>
-<nav class="navmobile mobile">
-<button onclick="showPage('dashboard')">Home</button><button onclick="showPage('products')">Stock</button><button onclick="showPage('billing')">Bill</button><button onclick="showPage('sales')">Sales</button><button onclick="showPage('settings')">More</button>
-</nav>
-<main class="main">
-<div class="top"><h1 id="pageTitle">Dashboard</h1><div class="row"><span class="pill">+91 91827 25773</span><button class="btn light" onclick="logout()">Lock</button></div></div>
+<section id="appView" class="app hidden">
+<aside class="sidebar"><div class="side-brand"><div class="brand small">CC</div><div><b>CleanCore</b><span>Manager</span></div></div>
+<nav>
+<button class="nav active" data-section="dashboard">Dashboard</button><button class="nav" data-section="products">Products & Stock</button>
+<button class="nav" data-section="billing">Create Bill</button><button class="nav" data-section="sales">Sales</button>
+<button class="nav" data-section="customers">Customers</button><button class="nav" data-section="enquiries">Enquiries</button><button class="nav" data-section="settings">Settings</button>
+</nav><button id="logout" class="nav logout">Sign out</button></aside>
+<main class="main"><header class="top"><div><p class="eyebrow">CLEANCORЕ CHEMICAL & CLEANING</p><h2 id="title">Dashboard</h2></div><div id="userChip" class="chip"></div></header>
 
-<section id="dashboard" class="section active">
-<div class="grid4">
-<div class="card stat"><label>TODAY'S SALES</label><strong id="todaySales">₹0</strong><small id="todayOrders">0 bills</small></div>
-<div class="card stat"><label>THIS WEEK</label><strong id="weekSales">₹0</strong><small>Sales value</small></div>
-<div class="card stat"><label>THIS MONTH</label><strong id="monthSales">₹0</strong><small>Sales value</small></div>
-<div class="card stat"><label>MONTHLY PROFIT</label><strong id="monthProfit">₹0</strong><small>Based on your cost prices</small></div>
-</div>
-<div class="card" style="margin-top:16px"><div class="row between"><div><h2 style="margin:0;color:#0b1f33">Quick actions</h2><p class="muted">Manage the business from one place.</p></div><div class="row"><button class="btn primary" onclick="showPage('billing')">+ Create Bill</button><button class="btn dark" onclick="showPage('products')">Manage Stock</button></div></div></div>
-<div class="card" style="margin-top:16px"><h2 style="color:#0b1f33">Low stock</h2><div id="lowStock"></div></div>
-</section>
+<section id="dashboard" class="section active"><div class="cards">
+<div class="metric"><span>Today sales</span><strong id="today">₹0</strong></div><div class="metric"><span>This month</span><strong id="month">₹0</strong></div>
+<div class="metric"><span>Monthly profit</span><strong id="profit">₹0</strong></div><div class="metric"><span>Low stock items</span><strong id="low">0</strong></div></div>
+<div class="panel"><div class="panel-head"><h3>Recent invoices</h3><button class="btn small goto" data-goto="billing">New bill</button></div><div id="recent"></div></div></section>
 
-<section id="products" class="section">
-<div class="row between"><div><h2 style="color:#0b1f33">Products & Stock</h2><p class="muted">Selling price is ₹349 per 5 Litre Can by default. Add your actual cost price to calculate profit.</p></div><input class="search" id="productSearch" oninput="renderProducts()" placeholder="Search products"></div>
-<div class="productgrid" id="productGrid" style="margin-top:18px"></div>
-</section>
+<section id="products" class="section"><div class="panel"><div class="panel-head"><div><h3>Products & Stock</h3><p class="muted">Manage finished products, prices, descriptions, photos and videos.</p></div><button id="addProduct" class="btn primary small">+ New Product</button></div><div id="productsTable"></div></div>
+<div class="panel"><div class="panel-head"><div><h3>Raw Materials Stock</h3><p class="muted">Keep raw-material inventory separate from finished products.</p></div><button id="addRaw" class="btn primary small">+ New Raw Material</button></div><div id="rawTable"></div></div></section>
 
-<section id="billing" class="section">
-<div class="card"><div class="row between"><div><h2 style="margin:0;color:#0b1f33">Create Bill</h2><p class="muted">Make an invoice, save the sale and send the customer a WhatsApp message.</p></div><button class="btn light" onclick="clearBill()">Clear</button></div>
-<div class="formgrid" style="margin-top:18px">
-<div><label>CUSTOMER NAME</label><input id="custName" placeholder="Customer / company name"></div>
-<div><label>CUSTOMER PHONE</label><input id="custPhone" placeholder="10-digit WhatsApp number"></div>
-<div><label>GSTIN (OPTIONAL)</label><input id="custGst" placeholder="GST number"></div>
-<div><label>DISCOUNT (₹)</label><input id="discount" type="number" value="0" min="0" oninput="renderCart()"></div>
-</div>
-<div style="margin-top:22px" class="tablewrap"><table class="table"><thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr></thead><tbody id="cart"></tbody></table></div>
-<div class="row" style="margin-top:14px"><select id="addProduct" style="max-width:340px"></select><button class="btn primary" onclick="addToCart()">Add Product</button></div>
-<div class="totalbox"><div>Subtotal: <b id="subtotal">₹0</b></div><div>Discount: <b id="discountView">₹0</b></div><div class="total">Total: <span id="billTotal">₹0</span></div></div>
-<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn dark" onclick="saveBill(false)">Save Bill</button><button class="btn primary" onclick="saveBill(true)">Save & WhatsApp</button></div>
-</div>
-</section>
+<section id="billing" class="section"><div class="panel"><div class="panel-head"><h3>Create Bill</h3><span class="muted">Invoice + WhatsApp summary</span></div>
+<form id="billForm" class="grid">
+<label>Existing customer<select id="billingCustomer"><option value="">New / enter customer</option></select></label>
+<label>Customer name<input id="custName" required></label>
+<label>Business name<input id="custBusiness"></label><label>Phone<input id="custPhone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required></label>
+<label>Email ID<input id="custEmail" type="email"></label><label>GSTIN (optional)<input id="custGstin" maxlength="15" placeholder="15-character GSTIN"></label>
+<div class="full grid two"><label>Billing address<textarea id="custBilling" rows="2"></textarea></label><label>Delivery address<textarea id="custDelivery" rows="2"></textarea></label></div>
+<label>Discount ₹<input id="discount" type="number" min="0" value="0"></label><label id="gstWrap" class="hidden">GST % for this bill<input id="gstPercent" type="number" min="0" max="100" step="0.01" value="18"></label>
+<div class="full"><div class="panel-head"><b>Items</b><button type="button" id="addLine" class="btn small">+ Add item</button></div><div id="lines"></div></div>
+<div class="total full"><div><div>Subtotal: <strong id="subtotal">₹0</strong></div><div>Discount: <strong id="discountShow">₹0</strong></div><div>GST: <strong id="gstShow">0% • ₹0</strong></div></div><strong id="total">₹0</strong></div>
+<div class="full actions"><button class="btn primary">Save Bill</button><button type="button" id="clearBill" class="btn">Clear</button></div>
+</form></div></section>
 
-<section id="sales" class="section">
-<div class="row between"><div><h2 style="color:#0b1f33">Sales & Profit</h2><p class="muted">Daily, weekly and monthly totals from saved bills.</p></div><button class="btn light" onclick="exportData()">Export Data</button></div>
-<div class="grid4" style="margin-top:18px"><div class="card stat"><label>TODAY</label><strong id="sToday">₹0</strong></div><div class="card stat"><label>LAST 7 DAYS</label><strong id="sWeek">₹0</strong></div><div class="card stat"><label>THIS MONTH</label><strong id="sMonth">₹0</strong></div><div class="card stat"><label>MONTH PROFIT</label><strong id="sProfit">₹0</strong></div></div>
-<div class="card" style="margin-top:16px"><h2 style="color:#0b1f33">Bills</h2><div class="tablewrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Total</th><th>Profit</th><th>Action</th></tr></thead><tbody id="salesTable"></tbody></table></div></div>
-</section>
+<section id="sales" class="section"><div class="panel"><div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
+<div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div><div id="salesTable"></div></div></section>
 
-<section id="enquiries" class="section">
-<div class="card"><div class="row between"><div><h2 style="color:#0b1f33">Enquiries</h2><p class="muted">This dashboard is ready for website enquiry integration.</p></div><button class="btn light" onclick="clearEnquiries()">Clear enquiries</button></div><div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Product</th><th>Message</th></tr></thead><tbody id="enquiryTable"></tbody></table></div></div>
-</section>
+<section id="customers" class="section"><div class="panel"><div class="panel-head"><div><h3>Customers</h3><p class="muted">Add and edit complete customer records.</p></div><button id="addCustomer" class="btn primary small">+ New Customer</button></div><div id="customersTable"></div></div></section>
 
-<section id="customers" class="section">
-<div class="card"><div class="row between"><div><h2 style="color:#0b1f33">Customers</h2><p class="muted">Customers are created automatically when you save a bill.</p></div></div><div class="tablewrap"><table class="table"><thead><tr><th>Customer</th><th>Phone</th><th>GSTIN</th><th>Total Purchases</th><th>Bills</th></tr></thead><tbody id="customerTable"></tbody></table></div></div>
-</section>
+<section id="enquiries" class="section"><div class="panel"><div class="panel-head"><h3>Enquiries</h3><button id="addEnquiry" class="btn primary small">Add enquiry</button></div><div id="enquiriesTable"></div></div></section>
+<section id="settings" class="section"><div class="panel"><h3>Security</h3><p class="muted">Password changes require email reauthentication.</p>
+<button id="changePassword" class="btn primary">Change password</button><div id="passwordBox" class="hidden security-box"><button id="sendReauth" class="btn secondary">Send reauthentication OTP</button>
+<label>Reauthentication OTP<input id="reauthCode" inputmode="numeric" maxlength="6"></label><label>Current password<input id="currentPw" type="password"></label><label>New password<input id="newPw" type="password" minlength="12"></label>
+<button id="updatePw" class="btn primary">Update password</button></div></div>
+<div class="panel"><h3>Connection</h3><p class="muted">Browser uses the Supabase publishable key only.</p><code>https://rwfamxkfqslorxcrjrp.supabase.co</code></div></section>
+</main></section>
 
-<section id="settings" class="section">
-<div class="card"><h2 style="color:#0b1f33">Business Settings</h2><p class="muted">These details appear on your bills.</p><div class="formgrid">
-<div><label>BUSINESS NAME</label><input id="bizName" value="CleanCore Chemical & Cleaning"></div>
-<div><label>PHONE</label><input id="bizPhone" value="+91 91827 25773"></div>
-<div><label>CITY</label><input id="bizCity" value="Hyderabad, Telangana"></div>
-<div><label>GSTIN (OPTIONAL)</label><input id="bizGst"></div>
-</div><button class="btn primary" style="margin-top:15px" onclick="saveSettings()">Save Settings</button></div>
-<div class="card" style="margin-top:16px"><h2 style="color:#0b1f33">Data</h2><p class="muted">Export a backup regularly. This free version stores data in this browser.</p><button class="btn dark" onclick="exportData()">Download Backup</button><button class="btn danger" style="margin-left:8px" onclick="resetAll()">Delete All Business Data</button></div>
-</section>
+<dialog id="productDialog"><form method="dialog" id="productForm" class="dialog"><h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
+<label>Product name<input id="pname" required></label><label>Unit / pack size<input id="punit" value="5 Litre Can" required></label>
+<label>Selling price ₹<input id="pprice" type="number" min="0" value="349" required></label><label>Cost price ₹<input id="pcost" type="number" min="0" value="0" required></label>
+<label>Stock<input id="pstock" type="number" min="0" required></label><label>Low-stock alert<input id="plow" type="number" min="0" value="5" required></label>
+<label>Description<textarea id="pdesc" rows="4" placeholder="Product description"></textarea></label><label>Additional details<textarea id="pdetails" rows="4" placeholder="Specifications, usage, pack details, etc."></textarea></label>
+<label>Photos <input id="pimages" type="file" accept="image/*" multiple></label><label>Videos <input id="pvideos" type="file" accept="video/*" multiple></label>
+<div id="productMedia"></div><p class="muted tiny">Photos and videos are saved in Supabase Storage and can be used on the public website later.</p>
+<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Product</button></div></form></dialog>
 
-<section id="invoiceView" class="section"></section>
-</main></div>
+<dialog id="rawDialog"><form method="dialog" id="rawForm" class="dialog"><h3 id="rawDialogTitle">Add Raw Material</h3>
+<label>Raw material name<input id="rawName" required></label><label>Unit<input id="rawUnit" value="Kg" required></label><label>Cost per unit ₹<input id="rawCost" type="number" min="0" value="0"></label><label>Stock<input id="rawStock" type="number" min="0" value="0" required></label><label>Low-stock alert<input id="rawLow" type="number" min="0" value="5" required></label>
+<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div></form></dialog>
 
-<div id="modal" class="modal"><div class="modalbox"><div class="modalhead"><h2 id="modalTitle">Edit</h2><button class="btn light" onclick="closeModal()">Close</button></div><div id="modalBody" style="margin-top:18px"></div></div></div>
+<dialog id="customerDialog"><form method="dialog" id="customerForm" class="dialog"><h3 id="customerDialogTitle">Add New Customer</h3>
+<label>Customer name<input id="customerName" required></label><label>Business name<input id="businessName" required></label><label>Phone number<input id="customerPhone" inputmode="numeric" maxlength="10" required></label><label>Email ID<input id="customerEmail" type="email"></label><label>GSTIN (optional)<input id="customerGstin" maxlength="15"></label>
+<label>Billing address<textarea id="billingAddress" rows="4" required></textarea></label><label>Delivery address<textarea id="deliveryAddress" rows="4"></textarea></label>
+<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save Customer</button></div></form></dialog>
 
-<script>
-const defaultProducts = [{"id": "dishwash", "name": "Dishwash Liquid", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}, {"id": "floor", "name": "Floor Cleaner", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}, {"id": "toilet", "name": "Toilet Cleaner", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}, {"id": "glass", "name": "Glass Cleaner", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}, {"id": "handwash", "name": "Hand Wash", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}, {"id": "surface", "name": "Hard Surface Cleaner", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}, {"id": "allinone", "name": "All-in-One Cleaner", "price": 349, "cost": 0, "stock": 0, "unit": "5 Litre Can"}];
-let products = JSON.parse(localStorage.getItem('cc_products') || 'null') || defaultProducts;
-let bills = JSON.parse(localStorage.getItem('cc_bills') || '[]');
-let enquiries = JSON.parse(localStorage.getItem('cc_enquiries') || '[]');
-let settings = JSON.parse(localStorage.getItem('cc_settings') || 'null') || {name:'CleanCore Chemical & Cleaning',phone:'+91 91827 25773',city:'Hyderabad, Telangana',gst:''};
-let cart=[];
+<dialog id="enquiryDialog"><form method="dialog" id="enquiryForm" class="dialog"><h3>Enquiry</h3>
+<label>Name<input id="ename" required></label><label>Phone<input id="ephone"></label><label>Business<input id="ebusiness"></label><label>Message<textarea id="emessage"></textarea></label><label>Status<select id="estatus"><option>New</option><option>Contacted</option><option>Converted</option><option>Closed</option></select></label>
+<div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="default">Save</button></div></form></dialog>
 
-const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
-const save=()=>{localStorage.setItem('cc_products',JSON.stringify(products));localStorage.setItem('cc_bills',JSON.stringify(bills));localStorage.setItem('cc_enquiries',JSON.stringify(enquiries));localStorage.setItem('cc_settings',JSON.stringify(settings));};
-function login(){let p=document.getElementById('pin').value.trim();if(!p)return alert('Enter a PIN.');if(!localStorage.getItem('cc_pin'))localStorage.setItem('cc_pin',p);if(localStorage.getItem('cc_pin')!==p)return alert('Incorrect PIN.');document.getElementById('login').style.display='none';document.getElementById('app').style.display='flex';renderAll();}
-function logout(){document.getElementById('app').style.display='none';document.getElementById('login').style.display='grid';document.getElementById('pin').value='';}
-function showPage(id){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===id));document.getElementById('pageTitle').textContent={dashboard:'Dashboard',products:'Products & Stock',billing:'Create Bill',sales:'Sales & Profit',enquiries:'Enquiries',customers:'Customers',settings:'Settings'}[id]||'Invoice';if(id==='products')renderProducts();if(id==='sales')renderSales();if(id==='enquiries')renderEnquiries();if(id==='customers')renderCustomers();if(id==='billing')setupBilling();}
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
-
-function dates(){let now=new Date();let day=new Date(now);day.setHours(0,0,0,0);let week=new Date(day);week.setDate(day.getDate()-6);let month=new Date(now.getFullYear(),now.getMonth(),1);return {day,week,month};}
-function billProfit(b){return b.items.reduce((s,i)=>s+(i.price-i.cost)*i.qty,0)-b.discount;}
-function totals(){let d=dates(), inRange=(b,from)=>new Date(b.date)>=from;let today=bills.filter(b=>inRange(b,d.day));let week=bills.filter(b=>inRange(b,d.week));let month=bills.filter(b=>inRange(b,d.month));return {today,week,month,todayS:today.reduce((s,b)=>s+b.total,0),weekS:week.reduce((s,b)=>s+b.total,0),monthS:month.reduce((s,b)=>s+b.total,0),profit:month.reduce((s,b)=>s+billProfit(b),0)};}
-function renderDashboard(){let t=totals();document.getElementById('todaySales').textContent=money(t.todayS);document.getElementById('todayOrders').textContent=t.today.length+' bills';document.getElementById('weekSales').textContent=money(t.weekS);document.getElementById('monthSales').textContent=money(t.monthS);document.getElementById('monthProfit').textContent=money(t.profit);document.getElementById('sToday').textContent=money(t.todayS);document.getElementById('sWeek').textContent=money(t.weekS);document.getElementById('sMonth').textContent=money(t.monthS);document.getElementById('sProfit').textContent=money(t.profit);let low=products.filter(p=>p.stock<=5);document.getElementById('lowStock').innerHTML=low.length?low.map(p=>`<div class="row between" style="padding:10px 0;border-bottom:1px solid var(--line)"><b>${p.name}</b><span class="pill">${p.stock} cans left</span></div>`).join(''):'<div class="empty">No products at or below 5 cans.</div>';}
-function renderProducts(){let q=(document.getElementById('productSearch')?.value||'').toLowerCase();document.getElementById('productGrid').innerHTML=products.filter(p=>p.name.toLowerCase().includes(q)).map(p=>`<div class="card product"><h3>${p.name}</h3><div class="muted">${p.unit}</div><div class="row between" style="margin:14px 0"><div><div class="muted">Selling price</div><div class="price">${money(p.price)}</div></div><div style="text-align:right"><div class="muted">Stock</div><div class="price">${p.stock}</div></div></div><div class="bar"><i style="width:${Math.min(100,p.stock*5)}%"></i></div><button class="btn dark" style="width:100%;margin-top:15px" onclick="editProduct('${p.id}')">Edit Price / Cost / Stock</button></div>`).join('');}
-function editProduct(id){let p=products.find(x=>x.id===id);document.getElementById('modalTitle').textContent='Edit '+p.name;document.getElementById('modalBody').innerHTML=`<div class="formgrid"><div><label>SELLING PRICE (₹)</label><input id="ep" type="number" value="${p.price}"></div><div><label>YOUR COST PRICE (₹)</label><input id="ec" type="number" value="${p.cost}"></div><div><label>STOCK (5 LITRE CANS)</label><input id="es" type="number" value="${p.stock}"></div></div><p class="small">Cost price is required for accurate profit reporting. It is not shown to customers.</p><button class="btn primary" onclick="updateProduct('${id}')">Save Changes</button>`;document.getElementById('modal').classList.add('show');}
-function updateProduct(id){let p=products.find(x=>x.id===id);p.price=+document.getElementById('ep').value||0;p.cost=+document.getElementById('ec').value||0;p.stock=Math.max(0,+document.getElementById('es').value||0);save();closeModal();renderAll();}
-function closeModal(){document.getElementById('modal').classList.remove('show');}
-
-function setupBilling(){let s=document.getElementById('addProduct');s.innerHTML=products.map(p=>`<option value="${p.id}">${p.name} — ${money(p.price)}</option>`).join('');renderCart();}
-function addToCart(){let id=document.getElementById('addProduct').value,p=products.find(x=>x.id===id);let item=cart.find(x=>x.id===id);if(item)item.qty++;else cart.push({id:p.id,name:p.name,price:p.price,cost:p.cost,qty:1});renderCart();}
-function removeCart(i){cart.splice(i,1);renderCart();}
-function changeQty(i,v){cart[i].qty=Math.max(1,+v||1);renderCart();}
-function renderCart(){let sub=cart.reduce((s,i)=>s+i.price*i.qty,0);let disc=Math.max(0,+document.getElementById('discount')?.value||0);document.getElementById('cart').innerHTML=cart.length?cart.map((i,n)=>`<tr><td>${i.name}</td><td>${money(i.price)}</td><td><input style="width:75px" type="number" min="1" value="${i.qty}" onchange="changeQty(${n},this.value)"></td><td>${money(i.price*i.qty)}</td><td><button class="btn danger" onclick="removeCart(${n})">Remove</button></td></tr>`).join(''):'<tr><td colspan="5" class="empty">Add products to create a bill.</td></tr>';document.getElementById('subtotal').textContent=money(sub);document.getElementById('discountView').textContent=money(disc);document.getElementById('billTotal').textContent=money(Math.max(0,sub-disc));}
-function clearBill(){cart=[];['custName','custPhone','custGst'].forEach(id=>document.getElementById(id).value='');document.getElementById('discount').value=0;renderCart();}
-function saveBill(send){if(!cart.length)return alert('Add at least one product.');let name=document.getElementById('custName').value.trim()||'Walk-in Customer',phone=document.getElementById('custPhone').value.trim(),gst=document.getElementById('custGst').value.trim();for(let i of cart){let p=products.find(x=>x.id===i.id);if(i.qty>p.stock)return alert(`${p.name}: only ${p.stock} cans in stock.`);}let sub=cart.reduce((s,i)=>s+i.price*i.qty,0),disc=Math.max(0,+document.getElementById('discount').value||0),total=Math.max(0,sub-disc);let b={id:'CC-'+Date.now().toString().slice(-7),date:new Date().toISOString(),customer:name,phone,gst,items:JSON.parse(JSON.stringify(cart)),discount:disc,total};bills.unshift(b);cart.forEach(i=>{let p=products.find(x=>x.id===i.id);p.stock-=i.qty;});save();renderAll();if(send&&phone)sendWhatsApp(b);else if(send&&!phone)alert('Bill saved. Add the customer WhatsApp number to send it automatically.');alert('Bill saved successfully.');clearBill();}
-function invoiceText(b){let lines=b.items.map(i=>`${i.name} x ${i.qty} = ${money(i.price*i.qty)}`).join('\\n');return `*${settings.name}*\\nInvoice: ${b.id}\\nCustomer: ${b.customer}\\n\\n${lines}\\n\\nSubtotal: ${money(b.items.reduce((s,i)=>s+i.price*i.qty,0))}\\nDiscount: ${money(b.discount)}\\n*Total: ${money(b.total)}*\\n\\nThank you for your business.`;}
-function sendWhatsApp(b){let ph=b.phone.replace(/\\D/g,'');if(ph.length===10)ph='91'+ph;window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(invoiceText(b)),'_blank');}
-function printBill(id){let b=bills.find(x=>x.id===id);let inv=`<div class="invoice"><div class="invoicehead"><div><h2>${settings.name}</h2><div>${settings.city}</div><div>${settings.phone}</div></div><div><b>INVOICE</b><br>${b.id}<br>${new Date(b.date).toLocaleString('en-IN')}</div></div><p><b>Bill To:</b> ${b.customer}<br>${b.phone||''}<br>${b.gst?'GSTIN: '+b.gst:''}</p><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead><tbody>${b.items.map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${money(i.price)}</td><td>${money(i.price*i.qty)}</td></tr>`).join('')}</tbody></table><div class="totalbox">Subtotal: ${money(b.items.reduce((s,i)=>s+i.price*i.qty,0))}<br>Discount: ${money(b.discount)}<div class="total">Total: ${money(b.total)}</div></div><p style="margin-top:45px">Thank you for your business.</p></div>`;document.getElementById('invoiceView').innerHTML=inv;showPage('invoiceView');setTimeout(()=>window.print(),100);}
-function renderSales(){let t=totals();document.getElementById('salesTable').innerHTML=bills.length?bills.map(b=>`<tr><td>${b.id}</td><td>${new Date(b.date).toLocaleDateString('en-IN')}</td><td>${b.customer}</td><td>${money(b.total)}</td><td>${money(billProfit(b))}</td><td><button class="btn light" onclick="printBill('${b.id}')">Print</button> <button class="btn primary" onclick="sendWhatsApp(bills.find(x=>x.id==='${b.id}'))">WhatsApp</button></td></tr>`).join(''):'<tr><td colspan="6" class="empty">No sales yet.</td></tr>';}
-function renderEnquiries(){document.getElementById('enquiryTable').innerHTML=enquiries.length?enquiries.map(e=>`<tr><td>${new Date(e.date).toLocaleDateString('en-IN')}</td><td>${e.name||''}</td><td>${e.phone||''}</td><td>${e.product||''}</td><td>${e.message||''}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No enquiries yet.</td></tr>';}
-function clearEnquiries(){if(confirm('Delete all enquiries?')){enquiries=[];save();renderEnquiries();}}
-function renderCustomers(){let map={};bills.forEach(b=>{let k=(b.phone||b.customer).toLowerCase();if(!map[k])map[k]={name:b.customer,phone:b.phone,gst:b.gst,total:0,bills:0};map[k].total+=b.total;map[k].bills++;});document.getElementById('customerTable').innerHTML=Object.values(map).length?Object.values(map).map(c=>`<tr><td>${c.name}</td><td>${c.phone||''}</td><td>${c.gst||''}</td><td>${money(c.total)}</td><td>${c.bills}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No customers yet.</td></tr>';}
-function saveSettings(){settings.name=document.getElementById('bizName').value.trim()||settings.name;settings.phone=document.getElementById('bizPhone').value.trim()||settings.phone;settings.city=document.getElementById('bizCity').value.trim();settings.gst=document.getElementById('bizGst').value.trim();save();alert('Settings saved.');}
-function exportData(){let data={products,bills,enquiries,settings,exportedAt:new Date().toISOString()};let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='cleancore-backup.json';a.click();}
-function resetAll(){if(confirm('This deletes products, bills, customers and enquiries from this browser. Continue?')){localStorage.removeItem('cc_products');localStorage.removeItem('cc_bills');localStorage.removeItem('cc_enquiries');location.reload();}}
-function renderAll(){renderDashboard();renderProducts();renderSales();renderEnquiries();renderCustomers();setupBilling();document.getElementById('bizName').value=settings.name;document.getElementById('bizPhone').value=settings.phone;document.getElementById('bizCity').value=settings.city;document.getElementById('bizGst').value=settings.gst||'';}
-</script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(()=>{});}</script></body></html>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script>
+</body></html>
