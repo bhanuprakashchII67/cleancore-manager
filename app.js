@@ -1209,7 +1209,7 @@ function numberToWordsIndian(n){
  return s.trim()+" RUPEES";
 }
 $("closeInvoice").onclick=()=>$("invoiceDialog").close();
-$("printInvoice").onclick=()=>{
+$("printInvoice").onclick=(e)=>{
  e.preventDefault();
  if(!$("invoicePreview")?.innerHTML.trim())return toast("Open a bill before printing.",false);
  const title=document.title;
