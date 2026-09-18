@@ -1,6 +1,27 @@
 const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com";
 const {createClient}=supabase; const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 const bootSignout=db.auth.signOut({scope:"local"}).catch(()=>null);
+let deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+ e.preventDefault();
+ deferredInstallPrompt=e;
+ ["installAppLogin","installAppProfile"].forEach(id=>$(id)?.classList.remove("hidden"));
+});
+window.addEventListener("appinstalled",()=>{
+ deferredInstallPrompt=null;
+ ["installAppLogin","installAppProfile"].forEach(id=>$(id)?.classList.add("hidden"));
+});
+async function installManagerApp(){
+ if(!deferredInstallPrompt){
+   toast("Use your browser's Install app / Add to Home Screen option.",false);
+   return;
+ }
+ deferredInstallPrompt.prompt();
+ await deferredInstallPrompt.userChoice;
+ deferredInstallPrompt=null;
+ ["installAppLogin","installAppProfile"].forEach(id=>$(id)?.classList.add("hidden"));
+}
+
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(n||0));
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -870,7 +891,9 @@ $("printInvoice").onclick=()=>{
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
-$("profileLogout").onclick=async()=>{await db.auth.signOut();location.reload()};
+$("profileLogout").onclick=async()=>{await db.auth.signOut();location.reload()};$("installAppLogin").onclick=installManagerApp;
+$("installAppProfile").onclick=installManagerApp;
+navigator.serviceWorker?.register("sw.js?v=3.0.0").catch(()=>{});
 $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
