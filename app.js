@@ -6,8 +6,8 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const phoneRE=/^[6-9]\d{9}$/;
 const gstRE=/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[];
-let editingProductId=null, editingCustomerId=null, editingRawId=null;
+let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[];
+let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
@@ -26,27 +26,34 @@ document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
 function go(id){document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));$("title").textContent=document.querySelector(`.nav[data-section="${id}"]`)?.textContent||id}
 
 async function loadAll(){
- const [p,i,c,e,r]=await Promise.all([
+ const [p,i,c,e,r,x]=await Promise.all([
   db.from("products").select("*").order("name"),
   db.from("invoices").select("*").order("created_at",{ascending:false}),
   db.from("customers").select("*").order("name"),
   db.from("enquiries").select("*").order("created_at",{ascending:false}),
-  db.from("raw_materials").select("*").order("name")
+  db.from("raw_materials").select("*").order("name"),
+  db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false})
  ]);
  if(p.error)return toast(p.error.message,false);
  if(i.error)return toast(i.error.message,false);
  if(c.error)return toast(c.error.message,false);
  if(e.error)return toast(e.error.message,false);
  if(r.error)return toast(r.error.message,false);
- products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];
+ if(x.error)return toast(x.error.message,false);
+ products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];expenses=x.data||[];
  renderAll();
 }
 function renderAll(){
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
+ const todayKey=now.toISOString().slice(0,10),monthKey=todayKey.slice(0,7);
  const td=invoices.filter(x=>new Date(x.created_at)>=day),mo=invoices.filter(x=>new Date(x.created_at)>=mon);
+ const grossMonth=mo.reduce((a,x)=>a+Number(x.profit||0),0);
+ const monthExpenses=expenses.filter(x=>String(x.expense_date||"").startsWith(monthKey)).reduce((a,x)=>a+Number(x.amount||0),0);
  $("today").textContent=money(td.reduce((a,x)=>a+Number(x.total),0));
  $("month").textContent=money(mo.reduce((a,x)=>a+Number(x.total),0));
- $("profit").textContent=money(mo.reduce((a,x)=>a+Number(x.profit),0));
+ $("grossProfit").textContent=money(grossMonth);
+ $("monthlyExpenses").textContent=money(monthExpenses);
+ $("netProfit").textContent=money(grossMonth-monthExpenses);
  $("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  $("recent").innerHTML=table(["Invoice","Customer","Total","Date"],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN")]));
  $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
@@ -60,10 +67,105 @@ function renderAll(){
   `<button class="link" onclick="editRawMaterial('${r.id}')">Edit</button>`
  ]));
  renderSales();
+ renderExpenses();
  renderCustomers();
  $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Message","Status","Date"],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.message),esc(x.status),isoDate(x.created_at)]));
  rebuildLines();
 }
+function expenseList(){
+ const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
+ return expenses.filter(x=>(!from||String(x.expense_date)>=from)&&(!to||String(x.expense_date)<=to));
+}
+function renderExpenses(){
+ const list=expenseList();
+ const gross=list.length ? invoices.filter(inv=>{
+   const d=new Date(inv.created_at);
+   const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
+   return (!from||d>=new Date(from+"T00:00:00"))&&(!to||d<=new Date(to+"T23:59:59"));
+ }).reduce((a,x)=>a+Number(x.profit||0),0) : 0;
+ const totalExp=list.reduce((a,x)=>a+Number(x.amount||0),0);
+ $("expenseSummary").textContent=list.length+" expense"+(list.length===1?"":"s")+" • "+money(totalExp);
+ $("expenseToday").textContent=money(expenses.filter(x=>String(x.expense_date)===new Date().toISOString().slice(0,10)).reduce((a,x)=>a+Number(x.amount||0),0));
+ $("expensePeriod").textContent=money(totalExp);
+ $("expenseGross").textContent=money(gross);
+ $("expenseNet").textContent=money(gross-totalExp);
+ $("expensesTable").innerHTML=table(["Date","Category","Vendor / Payee","Payment","Amount","Notes","Action"],list.map(x=>[
+  esc(x.expense_date),esc(x.category),esc(x.vendor||"—"),esc(x.payment_method),money(x.amount),esc(x.notes||""),
+  "<button class='link' onclick=\"editExpense('"+x.id+"')\">Edit</button> <button class='link danger' onclick=\"deleteExpense('"+x.id+"')\">Delete</button>"
+ ]));
+}
+function resetExpenseForm(){
+ editingExpenseId=null;
+ $("expenseDate").value=new Date().toISOString().slice(0,10);
+ $("expenseCategory").value="Other";
+ $("expenseAmount").value="";
+ $("expenseVendor").value="";
+ $("expensePayment").value="Cash";
+ $("expenseNotes").value="";
+ $("expenseRawMaterial").value="";
+ $("expenseQty").value="";
+ $("expenseRawWrap").classList.add("hidden");
+ $("expenseQtyWrap").classList.add("hidden");
+ $("expenseDialogTitle").textContent="Add Business Expense";
+}
+function toggleExpenseRawFields(){
+ const show=$("expenseCategory").value==="Raw Materials";
+ $("expenseRawWrap").classList.toggle("hidden",!show);
+ $("expenseQtyWrap").classList.toggle("hidden",!show);
+ if(!show){$("expenseRawMaterial").value="";$("expenseQty").value=""}
+}
+$("addExpense").onclick=()=>{resetExpenseForm();$("expenseDialog").showModal()};
+$("expenseCategory").onchange=toggleExpenseRawFields;
+window.editExpense=id=>{
+ const x=expenses.find(e=>e.id===id);if(!x)return;
+ editingExpenseId=id;
+ $("expenseDate").value=x.expense_date||new Date().toISOString().slice(0,10);
+ $("expenseCategory").value=x.category||"Other";
+ $("expenseAmount").value=x.amount??"";
+ $("expenseVendor").value=x.vendor||"";
+ $("expensePayment").value=x.payment_method||"Cash";
+ $("expenseNotes").value=x.notes||"";
+ $("expenseRawMaterial").value=x.raw_material_id||"";
+ $("expenseQty").value=x.quantity??"";
+ $("expenseDialogTitle").textContent="Edit Business Expense";
+ toggleExpenseRawFields();
+ $("expenseDialog").showModal();
+};
+window.deleteExpense=async id=>{
+ if(!confirm("Delete this expense?"))return;
+ const {error}=await db.from("expenses").delete().eq("id",id);
+ if(error)return toast(error.message,false);
+ toast("Expense deleted");
+ await loadAll();
+};
+$("expenseForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const date=$("expenseDate").value,category=$("expenseCategory").value,amount=+$("expenseAmount").value;
+ if(!date)return toast("Select expense date",false);
+ if(!(amount>0))return toast("Enter an expense amount greater than 0",false);
+ const qty=category==="Raw Materials"?(+$("expenseQty").value||0):null;
+ if(category==="Raw Materials" && qty<0)return toast("Quantity cannot be negative",false);
+ const x={
+   expense_date:date,category,amount,
+   vendor:$("expenseVendor").value.trim(),
+   payment_method:$("expensePayment").value,
+   notes:$("expenseNotes").value.trim(),
+   raw_material_id:category==="Raw Materials"&&$("expenseRawMaterial").value?$("expenseRawMaterial").value:null,
+   quantity:qty,
+   unit_cost:category==="Raw Materials"&&qty>0?amount/qty:null
+ };
+ const q=editingExpenseId?db.from("expenses").update(x).eq("id",editingExpenseId):db.from("expenses").insert(x);
+ const {error}=await q;if(error)return toast(error.message,false);
+ $("expenseDialog").close();toast("Expense saved");await loadAll();
+});
+$("expenseFrom").onchange=renderExpenses;$("expenseTo").onchange=renderExpenses;
+$("clearExpenseFilter").onclick=()=>{$("expenseFrom").value="";$("expenseTo").value="";renderExpenses()};
+$("exportExpenses").onclick=()=>{
+ const list=expenseList();
+ const rows=[["Date","Category","Vendor / Payee","Payment Method","Amount","Notes"],...list.map(x=>[x.expense_date,x.category,x.vendor,x.payment_method,x.amount,x.notes])];
+ const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-expenses.csv";a.click();
+};
 function renderSales(){
  const from=$("salesFrom")?.value,to=$("salesTo")?.value;
  let list=invoices.slice();
