@@ -18,7 +18,7 @@ function mediaUrls(p,key){const v=p?.[key];return Array.isArray(v)?v:[]}
 
 async function adminCheck(){const {data,error}=await db.from("profiles").select("role").eq("id",user.id).single();if(error||data?.role!=="admin")throw new Error("This account is not authorized as a CleanCore admin.")}
 async function enter(){try{await adminCheck();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("userChip").textContent=user.email;await loadAll()}catch(e){await db.auth.signOut();toast(e.message,false)}}
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();const password=$("loginPassword").value;if(!password)return toast("Enter your admin password.",false);const {data,error}=await db.auth.signInWithPassword({email:"bhanuprakashchadalawada10@gmail.com",password});if(error)return toast(error.message,false);user=data.user;await enter()});
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();const password=$("loginPassword").value;if(!password)return toast("Enter your admin password.",false);try{const {data,error}=await db.auth.signInWithPassword({email:"bhanuprakashchadalawada10@gmail.com",password});if(error)return toast("Login failed: "+error.message,false);user=data.user;await enter()}catch(err){return toast("Connection error: "+(err?.message||"Failed to fetch"),false)}});
 $("logout").onclick=async()=>{await db.auth.signOut();location.reload()};
 document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.dataset.section));
 document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
