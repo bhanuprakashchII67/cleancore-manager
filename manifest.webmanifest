@@ -2,7 +2,7 @@
   "id":"./index.html",
   "name":"CleanCore Business Manager",
   "short_name":"CleanCore Manager",
-  "start_url":"./index.html",
+  "start_url":"./index.html?v=3.4.1",
   "scope":"./",
   "display":"standalone",
   "display_override":["window-controls-overlay","standalone"],
