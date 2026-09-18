@@ -739,3 +739,43 @@ begin
 end; $$;
 revoke all on function public.review_access_request(uuid,boolean,text) from public;
 grant execute on function public.review_access_request(uuid,boolean,text) to authenticated;
+
+
+-- Admin-only raw-material save endpoint used by the Manager UI.
+create or replace function public.save_raw_material_admin(
+  p_id uuid default null,
+  p_name text default '',
+  p_unit text default 'Kg',
+  p_cost_per_unit numeric default 0,
+  p_stock numeric default 0,
+  p_low_stock_threshold numeric default 5
+)
+returns uuid
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  if nullif(trim(coalesce(p_name,'')),'') is null then raise exception 'Raw material name is required'; end if;
+  if p_id is null then
+    insert into public.raw_materials(name,unit,cost_per_unit,stock,low_stock_threshold)
+    values(trim(p_name),coalesce(nullif(trim(p_unit),''),'Kg'),greatest(coalesce(p_cost_per_unit,0),0),greatest(coalesce(p_stock,0),0),greatest(coalesce(p_low_stock_threshold,0),0))
+    returning id into v_id;
+  else
+    update public.raw_materials
+    set name=trim(p_name),unit=coalesce(nullif(trim(p_unit),''),'Kg'),
+        cost_per_unit=greatest(coalesce(p_cost_per_unit,0),0),
+        stock=greatest(coalesce(p_stock,0),0),
+        low_stock_threshold=greatest(coalesce(p_low_stock_threshold,0),0),
+        updated_at=now()
+    where id=p_id
+    returning id into v_id;
+    if v_id is null then raise exception 'Raw material not found'; end if;
+  end if;
+  return v_id;
+end;
+$$;
+revoke all on function public.save_raw_material_admin(uuid,text,text,numeric,numeric,numeric) from public;
+grant execute on function public.save_raw_material_admin(uuid,text,text,numeric,numeric,numeric) to authenticated;
