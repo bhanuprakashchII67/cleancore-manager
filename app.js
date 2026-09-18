@@ -178,9 +178,9 @@ function renderSales(){
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
- $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Date","Action"],list.map(x=>[
-  esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),String(Number(x.gst_percent||0))+"%",money(x.total),money(x.profit),new Date(x.created_at).toLocaleString("en-IN"),
-  '<button class="link" onclick="viewInvoice(\''+x.id+'\')">View Bill</button>'
+ $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Paid","Credit","Status","Date","Action"],list.map(x=>[
+  esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),String(Number(x.gst_percent||0))+"%",money(x.total),money(x.profit),money(x.paid_amount),money(x.due_amount),esc(x.payment_status||"Credit"),new Date(x.created_at).toLocaleString("en-IN"),
+  '<button class="link" onclick="viewInvoice(\\\''+x.id+'\\\')">View Bill</button>'
  ]));
 }
 function customerStats(id){
