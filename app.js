@@ -342,6 +342,7 @@ $("expenseForm").addEventListener("submit",async e=>{
    quantity:qty,
    unit_cost:category==="Raw Materials"&&qty>0?amount/qty:null
  };
+ if(!isAdmin){const ok=await submitChange("expenses",editingExpenseId?"expense_update":"expense_create","expenses",editingExpenseId,x,"Employee expense change");if(ok)$("expenseDialog").close();return;}
  const q=editingExpenseId?db.from("expenses").update(x).eq("id",editingExpenseId):db.from("expenses").insert(x);
  const {error}=await q;if(error)return toast(error.message,false);
  $("expenseDialog").close();toast("Expense saved");await loadAll();
@@ -496,6 +497,12 @@ $("productForm").addEventListener("submit",async e=>{
  if(!name)return toast("Enter product name",false);
  const old=editingProductId?products.find(p=>p.id===editingProductId):null;
  let image_urls=mediaUrls(old,"image_urls"),video_urls=mediaUrls(old,"video_urls");
+ if(!isAdmin){
+   const x={name,unit:$("punit").value.trim(),selling_price:price,cost_price:cost,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
+   const ok=await submitChange("products",editingProductId?"product_update":"product_create","products",editingProductId,x,"Employee product change");
+   if(ok)$("productDialog").close();
+   return;
+ }
  try{
   if($("pimages").files.length)image_urls=image_urls.concat(await uploadFiles($("pimages").files,"images"));
   if($("pvideos").files.length)video_urls=video_urls.concat(await uploadFiles($("pvideos").files,"videos"));
@@ -508,7 +515,7 @@ $("productForm").addEventListener("submit",async e=>{
 function resetRawForm(){editingRawId=null;$("rawName").value="";$("rawUnit").value="Kg";$("rawCost").value=0;$("rawStock").value=0;$("rawLow").value=5;$("rawDialogTitle").textContent="Add Raw Material"}
 $("addRaw").onclick=()=>{resetRawForm();$("rawDialog").showModal()};
 window.editRawMaterial=id=>{const r=rawMaterials.find(x=>x.id===id);if(!r)return;editingRawId=id;$("rawName").value=r.name||"";$("rawUnit").value=r.unit||"Kg";$("rawCost").value=r.cost_per_unit??0;$("rawStock").value=r.stock??0;$("rawLow").value=r.low_stock_threshold??5;$("rawDialogTitle").textContent="Edit Raw Material";$("rawDialog").showModal()};
-$("rawForm").addEventListener("submit",async e=>{e.preventDefault();const x={name:$("rawName").value.trim(),unit:$("rawUnit").value.trim(),cost_per_unit:+$("rawCost").value,stock:+$("rawStock").value,low_stock_threshold:+$("rawLow").value};if(!x.name)return toast("Enter raw material name",false);const q=editingRawId?db.from("raw_materials").update(x).eq("id",editingRawId):db.from("raw_materials").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("rawDialog").close();toast("Raw material saved");loadAll()});
+$("rawForm").addEventListener("submit",async e=>{e.preventDefault();const x={name:$("rawName").value.trim(),unit:$("rawUnit").value.trim(),cost_per_unit:+$("rawCost").value,stock:+$("rawStock").value,low_stock_threshold:+$("rawLow").value};if(!x.name)return toast("Enter raw material name",false);if(!isAdmin){const ok=await submitChange("products",editingRawId?"raw_material_update":"raw_material_create","raw_materials",editingRawId,x,"Employee raw-material change");if(ok)$("rawDialog").close();return} const q=editingRawId?db.from("raw_materials").update(x).eq("id",editingRawId):db.from("raw_materials").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("rawDialog").close();toast("Raw material saved");loadAll()});
 
 function addLine(){
  const r=document.createElement("div");r.className="line";
@@ -590,9 +597,9 @@ function resetCustomerForm(){editingCustomerId=null;["customerName","businessNam
 window.editCustomer=id=>{const c=customers.find(x=>x.id===id);if(!c)return;editingCustomerId=id;$("customerName").value=c.name||"";$("businessName").value=c.business_name||"";$("customerPhone").value=c.phone||"";$("customerEmail").value=c.email||"";$("customerGstin").value=c.gstin||"";$("billingAddress").value=c.billing_address||"";$("deliveryAddress").value=c.delivery_address||"";$("customerDialogTitle").textContent="Edit Customer";$("customerDialog").showModal()};
 $("customerPhone").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"").slice(0,10);
 $("customerGstin").oninput=e=>e.target.value=e.target.value.toUpperCase().slice(0,15);
-$("customerForm").addEventListener("submit",async e=>{e.preventDefault();const phone=normalizePhone($("customerPhone").value),gstin=$("customerGstin").value.trim().toUpperCase();if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);const x={name:$("customerName").value.trim(),business_name:$("businessName").value.trim(),phone,email:$("customerEmail").value.trim(),gstin,billing_address:$("billingAddress").value.trim(),delivery_address:$("deliveryAddress").value.trim()};if(!x.name)return toast("Enter customer name",false);const q=editingCustomerId?db.from("customers").update(x).eq("id",editingCustomerId):db.from("customers").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("customerDialog").close();toast("Customer saved");loadAll()});
+$("customerForm").addEventListener("submit",async e=>{e.preventDefault();const phone=normalizePhone($("customerPhone").value),gstin=$("customerGstin").value.trim().toUpperCase();if(!validPhone(phone))return toast("Phone must be exactly 10 digits and start with 6-9",false);if(!validGstin(gstin))return toast("Enter a valid 15-character GSTIN",false);const x={name:$("customerName").value.trim(),business_name:$("businessName").value.trim(),phone,email:$("customerEmail").value.trim(),gstin,billing_address:$("billingAddress").value.trim(),delivery_address:$("deliveryAddress").value.trim()};if(!x.name)return toast("Enter customer name",false);if(!isAdmin){const ok=await submitChange("customers",editingCustomerId?"customer_update":"customer_create","customers",editingCustomerId,x,"Employee customer change");if(ok)$("customerDialog").close();return} const q=editingCustomerId?db.from("customers").update(x).eq("id",editingCustomerId):db.from("customers").insert(x);const {error}=await q;if(error)return toast(error.message,false);$("customerDialog").close();toast("Customer saved");loadAll()});
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
-$("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const {error}=await db.from("enquiries").insert({name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value});if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
+$("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
 $("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
 
 window.viewInvoice=async id=>{
