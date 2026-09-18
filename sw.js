@@ -19,8 +19,6 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  // Always get HTML/navigation requests from the network so GitHub Pages
-  // updates are not hidden by an old cached index.html.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request, { cache: 'no-store' })
@@ -29,7 +27,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network first for app files; fall back to cache when offline.
   event.respondWith(
     fetch(request)
       .then(response => {
