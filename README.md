@@ -1,6 +1,6 @@
 # CleanCore Manager — Supabase-connected starter
 
-Supabase URL: https://rwfamxkfqslorxcrjrp.supabase.co
+Supabase URL: https://rwfamxkfqslorxcryjrp.supabase.co
 
 ## First setup
 1. Supabase → SQL Editor.
