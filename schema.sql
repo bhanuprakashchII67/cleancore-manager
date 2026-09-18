@@ -48,6 +48,12 @@ create table if not exists public.invoices(
  billing_address text not null default '', delivery_address text not null default '',
  subtotal numeric(12,2) not null default 0, discount numeric(12,2) not null default 0,
  gst_percent numeric(6,2) not null default 0, gst_amount numeric(12,2) not null default 0,
+  cgst_percent numeric(6,2) not null default 0,
+  cgst_amount numeric(12,2) not null default 0,
+  sgst_percent numeric(6,2) not null default 0,
+  sgst_amount numeric(12,2) not null default 0,
+  igst_percent numeric(6,2) not null default 0,
+  igst_amount numeric(12,2) not null default 0,
  total numeric(12,2) not null default 0, profit numeric(12,2) not null default 0,
  created_at timestamptz not null default now()
 );
