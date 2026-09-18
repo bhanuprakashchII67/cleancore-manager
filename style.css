@@ -337,3 +337,12 @@ dialog .dialog{padding-top:52px}
  .modern-line .lv{font-size:13px}
  .payment-summary{grid-template-columns:1fr}
 }
+
+@media print{
+  body.printing-invoice{background:#fff!important}
+  body.printing-invoice>*{display:none!important}
+  body.printing-invoice #invoiceDialog{display:block!important;position:static!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;max-height:none!important;border:0!important;box-shadow:none!important;background:#fff!important;padding:0!important;margin:0!important;overflow:visible!important}
+  body.printing-invoice #invoiceDialog::backdrop{display:none!important}
+  body.printing-invoice #invoiceDialog .actions{display:none!important}
+  body.printing-invoice #invoicePreview{display:block!important;width:100%!important}
+}
