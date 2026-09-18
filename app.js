@@ -6,7 +6,7 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const phoneRE=/^[6-9]\d{9}$/;
 const gstRE=/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[];
+let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
@@ -34,7 +34,8 @@ async function loadAll(){
   db.from("enquiries").select("*").order("created_at",{ascending:false}),
   db.from("raw_materials").select("*").order("name"),
   db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}),
-  db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false})
+  db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false}),
+  db.from("website_orders").select("*").order("created_at",{ascending:false})
  ]);
  if(p.error)return toast(p.error.message,false);
  if(i.error)return toast(i.error.message,false);
@@ -43,7 +44,8 @@ async function loadAll(){
  if(r.error)return toast(r.error.message,false);
  if(x.error)return toast(x.error.message,false);
  if(pm.error)return toast(pm.error.message,false);
- products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];expenses=x.data||[];payments=pm.data||[];
+ if(wo.error)return toast(wo.error.message,false);
+ products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];expenses=x.data||[];payments=pm.data||[];websiteOrders=wo.data||[];
  renderAll();
 }
 function renderAll(){
@@ -58,6 +60,7 @@ function renderAll(){
  $("monthlyExpenses").textContent=money(monthExpenses);
  $("netProfit").textContent=money(grossMonth-monthExpenses);
  $("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
+ if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
  $("recent").innerHTML=table(["Invoice","Customer","Total","Date"],invoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN")]));
  $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
   esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
@@ -72,6 +75,7 @@ function renderAll(){
  renderSales();
  renderExpenses();
  renderCustomers();
+ renderWebsiteOrders();
  $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date"],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at)]));
  rebuildLines();
 }
@@ -191,10 +195,54 @@ function customerStats(id){
  const lastPurchase=bills.length?bills.reduce((a,x)=>new Date(x.created_at)>new Date(a)?x.created_at:a,bills[0].created_at):null;
  return {bills,totalPurchases,totalPaid,creditDue,lastPurchase};
 }
+
+function renderWebsiteOrders(){
+ const list=websiteOrders.slice();
+ $("websiteOrdersSummary").textContent=list.filter(x=>x.status==="New").length+" new order"+(list.filter(x=>x.status==="New").length===1?"":"s")+" • "+list.length+" total website orders";
+ $("websiteOrdersTable").innerHTML=table(["Order","Customer","Business","Phone","Total","Status","Date","Action"],list.map(o=>{
+   const cust=customers.find(c=>c.id===o.customer_id);
+   const statuses=["New","Confirmed","Processing","Out for Delivery","Delivered","Cancelled"];
+   const opts=statuses.map(s=>"<option value=\""+s+"\""+(s===o.status?" selected":"")+">"+s+"</option>").join("");
+   return [
+     esc(o.order_no),
+     esc(cust?.name||"—"),
+     esc(cust?.business_name||"—"),
+     esc(cust?.phone||"—"),
+     money(o.total),
+     "<select class=\"order-status\" aria-label=\"Order status\" onchange=\"updateWebsiteOrderStatus('"+o.id+"',this.value)\">"+opts+"</select>",
+     new Date(o.created_at).toLocaleString("en-IN"),
+     "<button class=\"link\" onclick=\"viewWebsiteOrder('"+o.id+"')\">View</button>"
+   ];
+ }));
+}
+window.updateWebsiteOrderStatus=async function(id,status){
+ const allowed=["New","Confirmed","Processing","Out for Delivery","Delivered","Cancelled"];
+ if(!allowed.includes(status))return;
+ const {error}=await db.from("website_orders").update({status,updated_at:new Date().toISOString()}).eq("id",id);
+ if(error)return toast(error.message,false);
+ const o=websiteOrders.find(x=>x.id===id);if(o)o.status=status;
+ renderWebsiteOrders();
+ $("websiteOrdersNew").textContent=websiteOrders.filter(x=>x.status==="New").length;
+ toast("Website order status updated");
+};
+window.viewWebsiteOrder=async function(id){
+ const o=websiteOrders.find(x=>x.id===id);if(!o)return;
+ const cust=customers.find(c=>c.id===o.customer_id);
+ const {data,error}=await db.from("website_order_items").select("*").eq("order_id",id).order("created_at");
+ if(error)return toast(error.message,false);
+ $("websiteOrderTitle").textContent=o.order_no+" — "+(cust?.business_name||cust?.name||"Customer");
+ $("websiteOrderSummary").innerHTML="<div class=\"history-cards\"><div><span>Customer</span><b>"+esc(cust?.name||"—")+"</b></div><div><span>Phone</span><b>"+esc(cust?.phone||"—")+"</b></div><div><span>Status</span><b>"+esc(o.status)+"</b></div><div><span>Total</span><b>"+money(o.total)+"</b></div></div>";
+ $("websiteOrderCustomer").innerHTML="<p><b>Business:</b> "+esc(cust?.business_name||"—")+"<br><b>Email:</b> "+esc(cust?.email||"—")+"<br><b>Delivery address:</b> "+esc(cust?.delivery_address||"—")+"</p>";
+ $("websiteOrderItems").innerHTML=table(["Product","Unit","Qty","Rate","Line total"],(data||[]).map(it=>[esc(it.product_name),esc(it.unit),it.qty,money(it.unit_price),money(it.line_total)]));
+ $("websiteOrderNotes").textContent=o.notes||"No order note.";
+ $("websiteOrderDialog").showModal();
+};
+$("closeWebsiteOrder").onclick=function(){$("websiteOrderDialog").close()};
 function renderCustomers(){
- $("customersTable").innerHTML=table(["Customer","Business","Phone","Total purchases","Paid","Credit due","Last purchase","Action"],customers.map(x=>{
+ $("customersTable").innerHTML=table(["Customer","Business","Phone","Website account","Total purchases","Paid","Credit due","Last purchase","Action"],customers.map(x=>{
+  const account=x.auth_user_id?"<span class='badge ok'>Website</span>":"—";
   const s=customerStats(x.id);
-  return [esc(x.name),esc(x.business_name),esc(x.phone),money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
+  return [esc(x.name),esc(x.business_name),esc(x.phone),account,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
    "<button class=\"link\" onclick=\"viewCustomerHistory(\'"+x.id+"\')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer(\'"+x.id+"\')\">Edit</button>"];
  }));
  $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone)+")</option>").join("");
