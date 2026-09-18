@@ -585,6 +585,21 @@ $("billForm").addEventListener("submit",async e=>{
  if(paymentStatus==="Part Paid" && !(paidAmount>0&&paidAmount<total))return toast("For Part Paid, enter an amount between 0 and the bill total.",false);
  const dueDate=dueAmount>0?($("dueDate").value||null):null;
  const no="CC-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
+ if(!isAdmin){
+   const payload={
+     invoice_no:no,
+     customer_id:$("billingCustomer").value||null,
+     customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+     billing_address:billing,delivery_address:delivery,subtotal,discount,gst_percent:gp,gst_amount:gst,
+     cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,
+     igst_percent:igstPercent,igst_amount:igstAmount,total,profit,payment_status:paymentStatus,
+     paid_amount:paidAmount,due_amount:dueAmount,due_date:dueDate,payment_method:paymentMethod,
+     items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q}))
+   };
+   const ok=await submitChange("billing","invoice_create","invoices",null,payload,"Employee bill submitted for manager approval");
+   if(ok){$("billForm").reset();$("lines").innerHTML="";rebuildLines();}
+   return;
+ }
  let c=customers.find(x=>x.id===$("billingCustomer").value)||customers.find(x=>x.phone===phone);
  const customerData={name, business_name:business, phone,email,gstin,billing_address:billing,delivery_address:delivery};
  if(!c){const q=await db.from("customers").insert(customerData).select().single();if(q.error)return toast(q.error.message,false);c=q.data}
