@@ -65,7 +65,10 @@ async function refreshPageData(btn){
 }
 document.addEventListener("click",e=>{
  const btn=e.target.closest?.("[data-page-refresh]");
- if(btn)refreshPageData(btn);
+ if(!btn)return;
+ e.preventDefault();
+ e.stopPropagation();
+ refreshPageData(btn);
 });
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
@@ -1207,13 +1210,18 @@ function numberToWordsIndian(n){
 }
 $("closeInvoice").onclick=()=>$("invoiceDialog").close();
 $("printInvoice").onclick=()=>{
- const w=window.open("","_blank","width=900,height=1100");
- if(!w)return toast("Allow pop-ups to print the bill.",false);
- const body=$("invoicePreview").innerHTML;
- w.document.write("<html><head><title>CleanCore Tax Invoice</title><style>"+
- "@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;font-size:11px;margin:0}.invoice-preview{width:100%;padding:0}.inv-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}.inv-brand{font-size:22px;font-weight:800}.inv-sub{font-weight:700;margin:3px 0 6px}.inv-title{text-align:right;font-size:20px}.inv-title span{display:block;font-size:9px;margin-top:4px}.inv-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111;padding:8px 0}.inv-parties{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111}.inv-parties>div{padding:8px;border-right:1px solid #111}.inv-parties>div:last-child{border-right:0}.inv-parties p{line-height:1.45;margin:5px 0}.invoice-items{width:100%;border-collapse:collapse;margin-top:10px}.invoice-items th,.invoice-items td{border:1px solid #777;padding:6px;vertical-align:top}.invoice-items th{background:#f1f1f1;text-transform:uppercase;font-size:9px}.invoice-items td:nth-child(1){width:7%}.invoice-items td:nth-child(3){width:14%}.invoice-items td:nth-child(4){width:9%}.invoice-items td:nth-child(5){width:14%}.invoice-items td:nth-child(6){width:18%;text-align:right}.tax-label{text-align:right}.subtotal-row td,.grand-total td{font-weight:700}.grand-total{font-size:13px}.amount-words{border:1px solid #777;padding:8px;margin-top:8px}.inv-bottom{display:grid;grid-template-columns:1fr 1fr;border:1px solid #777;margin-top:8px;min-height:110px}.inv-bottom>div{padding:8px;border-right:1px solid #777}.inv-bottom>div:last-child{border-right:0}.inv-bottom p{line-height:1.45}.signature{text-align:center;padding-top:55px!important}.signature span{font-weight:700}.invoice-preview b{font-weight:700}"+
- "</style></head><body>"+body+"</body></html>");
- w.document.close(); w.focus(); setTimeout(()=>w.print(),250);
+ e.preventDefault();
+ if(!$("invoicePreview")?.innerHTML.trim())return toast("Open a bill before printing.",false);
+ const title=document.title;
+ document.title="CleanCore Invoice";
+ document.body.classList.add("printing-invoice");
+ const cleanup=()=>{
+   document.body.classList.remove("printing-invoice");
+   document.title=title;
+   window.removeEventListener("afterprint",cleanup);
+ };
+ window.addEventListener("afterprint",cleanup,{once:true});
+ requestAnimationFrame(()=>window.print());
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
