@@ -612,14 +612,14 @@ begin
    values(r.payload->>'name',nullif(r.payload->>'phone',''),coalesce(r.payload->>'business',''),coalesce(r.payload->>'message',''),coalesce(r.payload->>'status','New'),'manager',nullif(r.payload->>'product_name',''),
           case when coalesce(r.payload->>'quantity','')='' then null else (r.payload->>'quantity')::numeric end,coalesce(r.payload->>'email','')) returning id into v_id;
  elsif r.action='payment_create' then
-   v_invoice_id=r.target_id;
-   v_payment_amount=coalesce((r.payload->>'amount')::numeric,0);
+   v_invoice_id:=r.target_id;
+   v_payment_amount:=coalesce((r.payload->>'amount')::numeric,0);
    select total-coalesce(paid_amount,0) into v_new_due from public.invoices where id=v_invoice_id for update;
    if v_new_due is null or v_payment_amount<=0 or v_payment_amount>v_new_due then raise exception 'Payment exceeds outstanding credit'; end if;
    insert into public.payments(invoice_id,customer_id,amount,payment_date,payment_method,notes)
    values(v_invoice_id,nullif(r.payload->>'customer_id','')::uuid,v_payment_amount,coalesce((r.payload->>'payment_date')::date,current_date),coalesce(r.payload->>'payment_method','Cash'),coalesce(r.payload->>'notes',''));
-   v_new_paid=least((select total from public.invoices where id=v_invoice_id),coalesce((select paid_amount from public.invoices where id=v_invoice_id),0)+v_payment_amount);
-   v_new_due=greatest((select total from public.invoices where id=v_invoice_id)-v_new_paid,0);
+   v_new_paid:=least((select total from public.invoices where id=v_invoice_id),coalesce((select paid_amount from public.invoices where id=v_invoice_id),0)+v_payment_amount);
+   v_new_due:=greatest((select total from public.invoices where id=v_invoice_id)-v_new_paid,0);
    update public.invoices set paid_amount=v_new_paid,due_amount=v_new_due,payment_status=case when v_new_due=0 then 'Paid' else 'Part Paid' end,due_date=case when v_new_due=0 then null else due_date end where id=v_invoice_id returning id into v_id;
  elsif r.action='website_order_status' then
    update public.website_orders set status=r.payload->>'status',updated_at=now() where id=r.target_id returning id into v_id;
@@ -654,7 +654,7 @@ begin
    if coalesce((r.payload->>'paid_amount')::numeric,0)>0 then
      insert into public.payments(invoice_id,customer_id,amount,payment_date,payment_method,notes) values(v_invoice_id,v_customer_id,(r.payload->>'paid_amount')::numeric,current_date,coalesce(r.payload->>'payment_method','Cash'),'Initial payment');
    end if;
-   v_id=v_invoice_id;
+   v_id:=v_invoice_id;
  else raise exception 'Unsupported change request action: %',r.action;
  end if;
 
