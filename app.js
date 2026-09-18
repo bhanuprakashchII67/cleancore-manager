@@ -236,18 +236,27 @@ $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
 
-// Clean session policy: a browser reload/new page starts logged out.
-// While the tab is open, inactivity for 30 minutes also signs out.
-const INACTIVITY_MS=30*60*1000;
+// Clean session policy: stay signed in across screen changes / tab switches.
+// Automatic lock happens after 20 minutes with no user activity.
+// A normal browser reload starts at the login screen because the local session is cleared on load.
+const INACTIVITY_MS=20*60*1000;
 let inactivityTimer;
-async function forceLogout(){try{await db.auth.signOut({scope:"local"})}finally{sessionStorage.removeItem("cleancore_session");location.reload()}}
+function clearInactivity(){clearTimeout(inactivityTimer)}
+async function forceLogout(){
+  clearInactivity();
+  try{await db.auth.signOut({scope:"local"})}finally{
+    sessionStorage.removeItem("cleancore_session");
+    user=null;
+    location.reload();
+  }
+}
 function armInactivity(){
-  clearTimeout(inactivityTimer);
+  clearInactivity();
+  if(!user)return;
   inactivityTimer=setTimeout(forceLogout,INACTIVITY_MS);
 }
-["click","keydown","pointerdown","mousemove","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{if(user)armInactivity()},{passive:true}));
-window.addEventListener("pagehide",()=>{try{db.auth.signOut({scope:"local"})}catch(e){}});
-document.addEventListener("visibilitychange",()=>{if(user){if(document.visibilityState==="hidden"){try{db.auth.signOut({scope:"local"})}catch(e){}}else{forceLogout()}}});
-sessionStorage.removeItem("cleancore_session");
+["click","keydown","pointerdown","mousemove","touchstart","scroll"].forEach(ev=>{
+  document.addEventListener(ev,()=>{if(user)armInactivity()},{passive:true});
+});
+window.addEventListener("beforeunload",()=>{sessionStorage.removeItem("cleancore_session")});
 user=null;
-
