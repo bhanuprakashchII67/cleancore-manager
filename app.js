@@ -6,7 +6,12 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const phoneRE=/^[6-9]\d{9}$/;
 const gstRE=/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-let user=null,products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[];
+const ADMIN_EMAIL="bhanuprakashchadalawada10@gmail.com";
+const STAFF_AUTH_DOMAIN="@staff.cleancore.local";
+const ALL_MODULES=["dashboard","products","billing","sales","customers","enquiries","website_orders","expenses"];
+const MODULE_LABELS={dashboard:"Dashboard",products:"Products & Stock",billing:"Billing",sales:"Sales",customers:"Customers",enquiries:"Leads / Enquiries",website_orders:"Website Orders",expenses:"Expenses"};
+const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing",sales:"sales",customers:"customers",enquiries:"enquiries",expenses:"expenses",settings:"settings"};
+let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
@@ -18,34 +23,97 @@ function isoDate(d){return new Date(d).toLocaleDateString("en-IN")}
 function dateKey(d=new Date()){const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")}
 function mediaUrls(p,key){const v=p?.[key];return Array.isArray(v)?v:[]}
 
-async function adminCheck(){const {data,error}=await db.from("profiles").select("role").eq("id",user.id).single();if(error||data?.role!=="admin")throw new Error("This account is not authorized as a CleanCore admin.")}
-async function enter(){try{await adminCheck();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("profileEmail").textContent=user.email;await loadAll()}catch(e){await db.auth.signOut({scope:"local"});toast(e.message,false)}}
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();const password=$("loginPassword").value;if(!password)return toast("Enter your admin password.",false);try{await bootSignout; const {data,error}=await db.auth.signInWithPassword({email:"bhanuprakashchadalawada10@gmail.com",password});if(error)return toast("Login failed: "+error.message,false);if(!data?.session)return toast("Login failed: No session returned.",false);user=data.user;await enter()}catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}});
+function syntheticStaffEmail(username){return String(username||"").trim().toLowerCase()+STAFF_AUTH_DOMAIN}
+function canAccess(module){return isAdmin||employeePermissions.has(module)}
+async function loadAccess(){
+  isAdmin=false;employee=null;employeePermissions=new Set();
+  const {data:profile}=await db.from("profiles").select("role").eq("id",user.id).maybeSingle();
+  if(profile?.role==="admin"){isAdmin=true;employeePermissions=new Set(ALL_MODULES);return;}
+  const {data:emp,error}=await db.from("employees").select("*").eq("auth_user_id",user.id).maybeSingle();
+  if(error||!emp)throw new Error("Employee account not found.");
+  const now=Date.now(),start=emp.starts_at?new Date(emp.starts_at).getTime():-Infinity,end=emp.ends_at?new Date(emp.ends_at).getTime():Infinity;
+  if(!emp.active||now<start||now>end)throw new Error("Your employee access is inactive or outside the allowed date/time.");
+  const {data:perms,error:perr}=await db.from("employee_permissions").select("module").eq("employee_id",emp.id).eq("enabled",true);
+  if(perr)throw new Error(perr.message);
+  employee=emp;employeePermissions=new Set((perms||[]).map(x=>x.module));
+  if(!employeePermissions.has("dashboard"))employeePermissions.add("dashboard");
+}
+function applyAccess(){
+  document.querySelectorAll(".nav[data-section]").forEach(b=>{
+    const module=SECTION_MODULE[b.dataset.section];
+    b.classList.toggle("hidden",!isAdmin && module!=="settings" && !canAccess(module));
+    if(b.dataset.section==="settings")b.classList.toggle("hidden",!isAdmin);
+  });
+}
+async function logUnauthorized(module,action,reason=""){
+  if(isAdmin)return;
+  try{await db.rpc("log_employee_access_attempt",{p_module:module,p_action:action,p_reason:reason})}catch(e){}
+}
+async function submitChange(module,action,targetTable,targetId,payload,reason=""){
+  if(isAdmin)return false;
+  if(!canAccess(module)){await logUnauthorized(module,"CHANGE_REQUEST",reason||"Change attempted without permission");toast("Access denied. This action has been logged.",false);return false;}
+  const {data,error}=await db.rpc("submit_change_request",{p_module:module,p_action:action,p_target_table:targetTable,p_target_id:targetId||null,p_payload:payload||{},p_reason:reason||""});
+  if(error){toast(error.message,false);return false;}
+  toast("Change submitted to Manager for approval. Request "+String(data||"").slice(0,8));
+  return true;
+}
+async function enter(){
+ try{
+   await loadAccess();
+   $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
+   $("profileEmail").textContent=isAdmin?user.email:(employee.full_name+" • "+employee.username);
+   applyAccess();
+   await loadAll();
+   const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
+   await go(first);
+ }catch(e){await db.auth.signOut({scope:"local"});location.reload();}
+}
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const identifier=$("loginIdentifier").value.trim(),password=$("loginPassword").value;
+ if(!identifier||!password)return toast("Enter username and password.",false);
+ try{
+   await bootSignout;
+   const email=identifier.includes("@")?identifier.toLowerCase():syntheticStaffEmail(identifier);
+   const {data,error}=await db.auth.signInWithPassword({email,password});
+   if(error)return toast("Login failed: "+error.message,false);
+   if(!data?.session)return toast("Login failed: No session returned.",false);
+   user=data.user;await enter();
+ }catch(err){console.error("CleanCore login error",err);return toast("Supabase connection failed. Please refresh and try again.",false)}
+});
 $("logout").onclick=async()=>{await db.auth.signOut({scope:"local"});location.reload()};
 document.querySelectorAll(".nav[data-section]").forEach(b=>b.onclick=()=>go(b.dataset.section));
 document.querySelectorAll(".goto").forEach(b=>b.onclick=()=>go(b.dataset.goto));
-function go(id){document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));$("title").textContent=document.querySelector(`.nav[data-section="${id}"]`)?.textContent||id}
-
+async function go(id){
+ const module=SECTION_MODULE[id];
+ if(!isAdmin&&(!module||!canAccess(module))){await logUnauthorized(module||id,"NAVIGATION","Attempted to open restricted Manager section");toast("Access denied. The Manager has been notified.",false);return;}
+ document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));
+ document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
+ $("title").textContent=document.querySelector('.nav[data-section="'+id+'"]')?.textContent||id;
+}
 async function loadAll(){
- const [p,i,c,e,r,x,pm,wo]=await Promise.all([
-  db.from("products").select("*").order("name"),
-  db.from("invoices").select("*").order("created_at",{ascending:false}),
-  db.from("customers").select("*").order("name"),
-  db.from("enquiries").select("*").order("created_at",{ascending:false}),
-  db.from("raw_materials").select("*").order("name"),
-  db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}),
-  db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false}),
-  db.from("website_orders").select("*").order("created_at",{ascending:false})
- ]);
- if(p.error)return toast(p.error.message,false);
- if(i.error)return toast(i.error.message,false);
- if(c.error)return toast(c.error.message,false);
- if(e.error)return toast(e.error.message,false);
- if(r.error)return toast(r.error.message,false);
- if(x.error)return toast(x.error.message,false);
- if(pm.error)return toast(pm.error.message,false);
- if(wo.error)return toast(wo.error.message,false);
- products=p.data||[];invoices=i.data||[];customers=c.data||[];enquiries=e.data||[];rawMaterials=r.data||[];expenses=x.data||[];payments=pm.data||[];websiteOrders=wo.data||[];
+ const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("*").order("name"):null;
+ const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("*").order("created_at",{ascending:false}):null;
+ const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("*").order("name"):null;
+ const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("*").order("created_at",{ascending:false}):null;
+ const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("*").order("name"):null;
+ const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}):null;
+ const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false}):null;
+ const qWO=(isAdmin||canAccess("website_orders"))?db.from("website_orders").select("*").order("created_at",{ascending:false}):null;
+ const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qWO]);
+ const [p,i,cu,e,r,x,pm,wo]=qs;
+ for(const q of qs)if(q?.error)return toast(q.error.message,false);
+ products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
+ if(isAdmin){
+   const [er,cr,ar,nr]=await Promise.all([
+     db.from("employees").select("*").order("created_at",{ascending:false}),
+     db.from("change_requests").select("*").order("requested_at",{ascending:false}),
+     db.from("access_requests").select("*").order("created_at",{ascending:false}),
+     db.from("manager_notifications").select("*").order("created_at",{ascending:false})
+   ]);
+   for(const q of [er,cr,ar,nr])if(q?.error)return toast(q.error.message,false);
+   employees=er.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];
+ }
  renderAll();
 }
 function renderAll(){
