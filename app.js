@@ -727,10 +727,22 @@ $("rawForm").addEventListener("submit",async e=>{
 });
 
 function addLine(){
- const r=document.createElement("div");r.className="line";
- r.innerHTML=`<select class="lp">${products.map(p=>`<option value="${p.id}">${esc(p.name)} — ₹${p.selling_price} (${p.stock} in stock)</option>`).join("")}</select><input class="lq" type="number" min="1" value="1"><span class="lv">₹0</span><button type="button" class="remove">×</button>`;
+ const r=document.createElement("div");
+ r.className="line modern-line";
+ r.innerHTML=`<select class="lp">${products.map(p=>`<option value="${p.id}">${esc(p.name)} — ${money(p.selling_price)} (${p.stock} in stock)</option>`).join("")}</select>
+   <input class="lq" type="number" min="1" step="1" value="1" aria-label="Quantity">
+   <input class="lr" type="number" min="0" step="0.01" value="${products[0]?.selling_price||0}" aria-label="Bill price">
+   <span class="lv">₹0</span>
+   <button type="button" class="remove" aria-label="Remove item">×</button>`;
  $("lines").appendChild(r);
- r.querySelectorAll("select,input").forEach(x=>x.oninput=calc);
+ const select=r.querySelector(".lp");
+ const rate=r.querySelector(".lr");
+ select.onchange=()=>{
+   const p=products.find(x=>x.id===select.value);
+   if(p)rate.value=Number(p.selling_price||0).toFixed(2);
+   calc();
+ };
+ r.querySelectorAll("input,select").forEach(x=>x.oninput=calc);
  r.querySelector(".remove").onclick=()=>{r.remove();calc()};
  calc();
 }
@@ -738,19 +750,16 @@ function rebuildLines(){if(!$("lines").children.length&&products.length)addLine(
 
 $("addLine").onclick=addLine;
 $("discount").oninput=calc;
-$("gstRateWrap")?.classList.add("hidden");
 $("gstPercent").oninput=calc;
 $("billType").onchange=calc;
-$("paymentType").onchange=updatePaymentFields;
+$("paymentType").onchange=()=>{syncPaymentInput();calc()};
+$("payingNowInput").oninput=calc;
+$("dueDate").oninput=updatePaymentFields;
 
 $("billingCustomer").onchange=()=>{
  const c=customers.find(x=>x.id===$("billingCustomer").value);
  if(!c){
-   $("billCustomerName").textContent="—";
-   $("billCustomerBusiness").textContent="—";
-   $("billCustomerPhone").textContent="—";
-   $("billCustomerEmail").textContent="—";
-   $("billCustomerGstin").textContent="—";
+   ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin"].forEach(id=>$(id).textContent="—");
    $("selectedCustomerCard").classList.add("hidden");
    calc();
    return;
@@ -769,36 +778,59 @@ function currentBillCustomer(){
 }
 function paymentState(total){
  const type=$("paymentType")?.value||"CASH";
- if(type==="CASH"||type==="ONLINE")return {type,method:type==="CASH"?"Cash":"Online",status:"Paid",paid:Number(total||0),due:0,dueDate:null};
- if(type==="HALF")return {type,method:"Half Payment",status:"Part Paid",paid:Math.round(Number(total||0)*50)/100,due:Number(total||0)-Math.round(Number(total||0)*50)/100,dueDate:$("dueDate").value||null};
- return {type,method:"Credit",status:"Credit",paid:0,due:Number(total||0),dueDate:$("dueDate").value||null};
+ const bill=Number(total||0);
+ if(type==="CASH"||type==="ONLINE")return {type,method:type==="CASH"?"Cash":"Online",status:"Paid",paid:bill,due:0,dueDate:null};
+ if(type==="CREDIT")return {type,method:"Credit",status:"Credit",paid:0,due:bill,dueDate:$("dueDate").value||null};
+ let paid=Math.min(bill,Math.max(0,Number($("payingNowInput").value||0)));
+ return {type,method:"Half / Part Payment",status:paid>=bill?"Paid":paid>0?"Part Paid":"Credit",paid,due:Math.max(0,bill-paid),dueDate:$("dueDate").value||null};
+}
+function syncPaymentInput(){
+ const type=$("paymentType")?.value||"CASH";
+ const input=$("payingNowInput");
+ if(!input)return;
+ if(type==="HALF"){
+   input.classList.remove("hidden");
+   if(!Number.isFinite(Number(input.value))||Number(input.value)<=0)input.value=(billTotal/2).toFixed(2);
+   input.removeAttribute("readonly");
+ }else{
+   input.classList.add("hidden");
+   input.setAttribute("readonly","readonly");
+   const state=paymentState(billTotal);
+   input.value=state.paid.toFixed(2);
+ }
 }
 function updatePaymentFields(){
- const type=$("paymentType")?.value||"CASH";
- const dueWrap=$("billDueDateWrap"),due=$("dueDate"),preview=$("paymentPreview");
  const state=paymentState(billTotal);
- const needsDue=type==="CREDIT"||type==="HALF";
- if(dueWrap)dueWrap.classList.toggle("hidden",!needsDue);
- if(due)!needsDue&&(due.value="");
- if(preview){
-   preview.textContent=billTotal
-    ?"Paid "+money(state.paid)+" • Credit due "+money(state.due)+(needsDue&&state.dueDate?" • Due "+new Date(state.dueDate).toLocaleDateString("en-IN"):"")
-    :"Select payment type after adding items";
+ const needsDue=state.due>0;
+ $("billDueDateWrap").classList.toggle("hidden",!needsDue);
+ if(!needsDue)$("dueDate").value="";
+ $("payingNowShow").textContent=money(state.paid);
+ $("creditAmountShow").textContent=money(state.due);
+ if($("payingNowInput")&&!$("payingNowInput").classList.contains("hidden")){
+   const max=billTotal;
+   let v=Math.min(max,Math.max(0,Number($("payingNowInput").value||0)));
+   $("payingNowInput").value=v.toFixed(2);
  }
+ $("paymentPreview").textContent=billTotal
+   ?state.status+" • Paying now "+money(state.paid)+" • Credit "+money(state.due)
+   :"Add items to calculate payment";
 }
 function calc(){
  let subtotal=0;
  document.querySelectorAll(".line").forEach(r=>{
-   const p=products.find(x=>x.id===r.querySelector(".lp").value),q=+r.querySelector(".lq").value||0,v=(p?.selling_price||0)*q;
+   const p=products.find(x=>x.id===r.querySelector(".lp").value);
+   const q=Math.max(0,Number(r.querySelector(".lq").value)||0);
+   const rate=Math.max(0,Number(r.querySelector(".lr").value)||0);
+   const v=rate*q;
    subtotal+=v;
    r.querySelector(".lv").textContent=money(v);
  });
- const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
+ const discount=Math.min(subtotal,Math.max(0,Number($("discount").value)||0));
  const taxable=Math.max(0,subtotal-discount);
  const customer=currentBillCustomer();
  const isGst=$("billType").value==="GST";
  const gstin=isGst?String(customer?.gstin||"").trim().toUpperCase():"";
- const gp=isGst?(+$("gstPercent").value||0):0;
+ const gp=isGst?(Number($("gstPercent").value)||0):0;
  const gst=taxable*gp/100,total=taxable+gst;
  const intraState=gstin?gstin.slice(0,2)==="36":false;
  const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
@@ -818,6 +850,7 @@ function calc(){
  }else if(isGst){
    $("taxBreakdown").innerHTML='<div class="tax-warning">GST Bill selected — customer GSTIN is required.</div>';
  }else $("taxBreakdown").innerHTML="";
+ syncPaymentInput();
  updatePaymentFields();
 }
 $("clearBill").onclick=()=>{
@@ -849,12 +882,12 @@ $("billForm").addEventListener("submit",async e=>{
 
  const items=[...document.querySelectorAll(".line")].map(r=>{
    const p=products.find(x=>x.id===r.querySelector(".lp").value);
-   return {p,q:+r.querySelector(".lq").value||0};
+   return {p,q:+r.querySelector(".lq").value||0,rate:Math.max(0,+r.querySelector(".lr").value||0)};
  }).filter(x=>x.p&&x.q>0);
  if(!items.length)return toast("Add an item",false);
  for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
 
- const subtotal=items.reduce((a,x)=>a+x.p.selling_price*x.q,0);
+ const subtotal=items.reduce((a,x)=>a+x.rate*x.q,0);
  const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
  const taxable=subtotal-discount;
  const gst=taxable*gp/100,total=taxable+gst;
@@ -862,7 +895,7 @@ $("billForm").addEventListener("submit",async e=>{
  const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
  const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
  const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
- const profit=items.reduce((a,x)=>a+(x.p.selling_price-x.p.cost_price)*x.q,0)-discount;
+ const profit=items.reduce((a,x)=>a+(x.rate-x.p.cost_price)*x.q,0)-discount;
  const pay=paymentState(total);
  const no="CC-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
 
@@ -872,7 +905,7 @@ $("billForm").addEventListener("submit",async e=>{
      billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
      subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit,
      payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,
-     items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q}))
+     items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:(x.rate-x.p.cost_price)*x.q}))
    };
    const ok=await submitChange("billing","invoice_create","invoices",null,payload,"Employee bill submitted for manager approval");
    if(ok){$("billForm").reset();$("lines").innerHTML="";rebuildLines();}
@@ -891,7 +924,7 @@ $("billForm").addEventListener("submit",async e=>{
    if(payRow.error)return toast(payRow.error.message,false);
  }
  for(const x of items){
-   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.p.selling_price,cost_price:x.p.cost_price,line_total:x.p.selling_price*x.q,line_profit:(x.p.selling_price-x.p.cost_price)*x.q});
+   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:(x.rate-x.p.cost_price)*x.q});
    if(a.error)return toast(a.error.message,false);
    const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);
    if(b.error)return toast(b.error.message,false);
