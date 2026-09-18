@@ -829,3 +829,54 @@ $$;
 revoke all on function public.archive_customer_admin(uuid) from public;
 revoke execute on function public.archive_customer_admin(uuid) from anon;
 grant execute on function public.archive_customer_admin(uuid) to authenticated;
+
+
+-- Structured customer address fields.
+alter table public.customers
+  add column if not exists billing_shop_no text,
+  add column if not exists billing_colony text,
+  add column if not exists billing_city text,
+  add column if not exists billing_state text,
+  add column if not exists billing_pincode text,
+  add column if not exists delivery_shop_no text,
+  add column if not exists delivery_colony text,
+  add column if not exists delivery_city text,
+  add column if not exists delivery_state text,
+  add column if not exists delivery_pincode text;
+
+create or replace function public.review_customer_change_request(p_request_id uuid,p_approve boolean,p_note text default '')
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare r public.change_requests%rowtype; v_id uuid; v_bill text; v_delivery text;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  select * into r from public.change_requests where id=p_request_id for update;
+  if r.id is null then raise exception 'Approval request not found'; end if;
+  if r.status<>'Pending' then raise exception 'Approval request is already reviewed'; end if;
+  if r.action not in ('customer_create','customer_update') then raise exception 'Invalid customer change request'; end if;
+  if not p_approve then
+    update public.change_requests set status='Rejected',reviewed_at=now(),reviewed_by=auth.uid(),review_note=coalesce(p_note,'') where id=r.id;
+    return jsonb_build_object('status','Rejected','request_id',r.id);
+  end if;
+  v_bill:=trim(both ', ' from concat_ws(', ',nullif(trim(r.payload->>'billing_shop_no'),''),nullif(trim(r.payload->>'billing_colony'),''),nullif(trim(r.payload->>'billing_city'),''),nullif(trim(r.payload->>'billing_state'),''),nullif(trim(r.payload->>'billing_pincode'),'')));
+  v_delivery:=trim(both ', ' from concat_ws(', ',nullif(trim(r.payload->>'delivery_shop_no'),''),nullif(trim(r.payload->>'delivery_colony'),''),nullif(trim(r.payload->>'delivery_city'),''),nullif(trim(r.payload->>'delivery_state'),''),nullif(trim(r.payload->>'delivery_pincode'),'') ));
+  if r.action='customer_create' then
+    insert into public.customers(name,phone,gstin,business_name,email,billing_address,delivery_address,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode)
+    values(r.payload->>'name',nullif(r.payload->>'phone',''),nullif(r.payload->>'gstin',''),coalesce(r.payload->>'business_name',''),coalesce(r.payload->>'email',''),v_bill,v_delivery,
+      coalesce(r.payload->>'billing_shop_no',''),coalesce(r.payload->>'billing_colony',''),coalesce(r.payload->>'billing_city',''),coalesce(r.payload->>'billing_state',''),coalesce(r.payload->>'billing_pincode',''),
+      coalesce(r.payload->>'delivery_shop_no',''),coalesce(r.payload->>'delivery_colony',''),coalesce(r.payload->>'delivery_city',''),coalesce(r.payload->>'delivery_state',''),coalesce(r.payload->>'delivery_pincode','')) returning id into v_id;
+  else
+    update public.customers set name=coalesce(r.payload->>'name',name),phone=coalesce(nullif(r.payload->>'phone',''),phone),gstin=coalesce(nullif(r.payload->>'gstin',''),gstin),business_name=coalesce(r.payload->>'business_name',business_name),email=coalesce(r.payload->>'email',email),
+      billing_address=case when r.payload ? 'billing_shop_no' then v_bill else coalesce(r.payload->>'billing_address',billing_address) end,
+      delivery_address=case when r.payload ? 'delivery_shop_no' then v_delivery else coalesce(r.payload->>'delivery_address',delivery_address) end,
+      billing_shop_no=coalesce(r.payload->>'billing_shop_no',billing_shop_no),billing_colony=coalesce(r.payload->>'billing_colony',billing_colony),billing_city=coalesce(r.payload->>'billing_city',billing_city),billing_state=coalesce(r.payload->>'billing_state',billing_state),billing_pincode=coalesce(r.payload->>'billing_pincode',billing_pincode),
+      delivery_shop_no=coalesce(r.payload->>'delivery_shop_no',delivery_shop_no),delivery_colony=coalesce(r.payload->>'delivery_colony',delivery_colony),delivery_city=coalesce(r.payload->>'delivery_city',delivery_city),delivery_state=coalesce(r.payload->>'delivery_state',delivery_state),delivery_pincode=coalesce(r.payload->>'delivery_pincode',delivery_pincode),updated_at=now()
+    where id=r.target_id returning id into v_id;
+  end if;
+  if v_id is null then raise exception 'Customer not found or could not be created'; end if;
+  update public.change_requests set status='Approved',reviewed_at=now(),reviewed_by=auth.uid(),review_note=coalesce(p_note,'') where id=r.id;
+  return jsonb_build_object('status','Approved','request_id',r.id,'created_id',v_id);
+end;
+$$;
+revoke all on function public.review_customer_change_request(uuid,boolean,text) from public;
+grant execute on function public.review_customer_change_request(uuid,boolean,text) to authenticated;
