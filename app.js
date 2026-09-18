@@ -121,6 +121,7 @@ async function loadAll(){
    ]);
    for(const q of [er,ep,cr,ar,nr])if(q?.error)return toast(q.error.message,false);
    employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];
+   renderEmployeeData();
  }
  renderAll();
 }
