@@ -521,18 +521,12 @@ function renderWebsiteOrders(){
    const cust=customers.find(c=>c.id===o.customer_id);
    const statuses=["New","Confirmed","Processing","Out for Delivery","Delivered","Cancelled"];
    const opts=statuses.map(s=>"<option value=\""+s+"\""+(s===o.status?" selected":"")+">"+s+"</option>").join("");
-   return [
-     esc(o.order_no),
-     esc(cust?.name||"—"),
-     esc(cust?.business_name||"—"),
-     esc(cust?.phone||"—"),
-     money(o.total),
+   return [esc(o.order_no),esc(cust?.name||"—"),esc(cust?.business_name||"—"),esc(cust?.phone||"—"),money(o.total),
      "<select class=\"order-status\" aria-label=\"Order status\" onchange=\"updateWebsiteOrderStatus('"+o.id+"',this.value)\">"+opts+"</select>",
-     new Date(o.created_at).toLocaleString("en-IN"),
-     "<button class=\"link\" onclick=\"viewWebsiteOrder('"+o.id+"')\">View</button>"
-   ];
+     formatAccessDate(o.created_at),"<button class=\"link\" onclick=\"viewWebsiteOrder('"+o.id+"')\">View</button>"];
  }));
 }
+
 window.updateWebsiteOrderStatus=async function(id,status){
  const allowed=["New","Confirmed","Processing","Out for Delivery","Delivered","Cancelled"];
  if(!allowed.includes(status))return;
@@ -546,16 +540,38 @@ window.updateWebsiteOrderStatus=async function(id,status){
 };
 window.viewWebsiteOrder=async function(id){
  const o=websiteOrders.find(x=>x.id===id);if(!o)return;
- const cust=customers.find(c=>c.id===o.customer_id);
- const {data,error}=await db.from("website_order_items").select("*").eq("order_id",id).order("created_at");
+ let cust=customers.find(c=>c.id===o.customer_id)||null;
+ if(!cust){
+   const cr=await db.from("customers").select("*").eq("id",o.customer_id).maybeSingle();
+   if(!cr.error)cust=cr.data;
+ }
+ const {data:items,error}=await db.from("website_order_items").select("*").eq("order_id",id).order("created_at");
  if(error)return toast(error.message,false);
+ const invoice=o.invoice_id?(invoices.find(x=>x.id===o.invoice_id)||null):null;
+ const invoiceNo=o.invoice_no||invoice?.invoice_no||"—";
  $("websiteOrderTitle").textContent=o.order_no+" — "+(cust?.business_name||cust?.name||"Customer");
- $("websiteOrderSummary").innerHTML="<div class=\"history-cards\"><div><span>Customer</span><b>"+esc(cust?.name||"—")+"</b></div><div><span>Phone</span><b>"+esc(cust?.phone||"—")+"</b></div><div><span>Status</span><b>"+esc(o.status)+"</b></div><div><span>Total</span><b>"+money(o.total)+"</b></div></div>";
- $("websiteOrderCustomer").innerHTML="<p><b>Business:</b> "+esc(cust?.business_name||"—")+"<br><b>Email:</b> "+esc(cust?.email||"—")+"<br><b>Delivery address:</b> "+esc(cust?.delivery_address||"—")+"</p>";
- $("websiteOrderItems").innerHTML=table(["Product","Unit","Qty","Rate","Line total"],(data||[]).map(it=>[esc(it.product_name),esc(it.unit),it.qty,money(it.unit_price),money(it.line_total)]));
+ $("websiteOrderSummary").innerHTML="<div class=\"history-cards\">"+
+   "<div><span>Customer</span><b>"+esc(cust?.name||"—")+"</b></div>"+
+   "<div><span>Phone</span><b>"+esc(cust?.phone||"—")+"</b></div>"+
+   "<div><span>Status</span><b>"+esc(o.status)+"</b></div>"+
+   "<div><span>Total</span><b>"+money(o.total)+"</b></div>"+
+   "<div><span>Order date & time</span><b>"+formatAccessDate(o.created_at)+"</b></div>"+
+   "<div><span>Invoice</span><b>"+esc(invoiceNo)+"</b></div>"+
+   "</div>";
+ const gstText=Number(o.gst_amount||0)>0
+   ? "GST: "+money(o.gst_amount)+" • "+(Number(o.igst_amount||0)>0?"IGST "+money(o.igst_amount):"CGST "+money(o.cgst_amount)+" + SGST "+money(o.sgst_amount))
+   : "GST: Not charged";
+ $("websiteOrderCustomer").innerHTML="<p><b>Business:</b> "+esc(cust?.business_name||"—")+"<br><b>Email:</b> "+esc(cust?.email||"—")+"<br><b>GSTIN:</b> "+esc(o.customer_gstin||cust?.gstin||"—")+"<br><b>Place of supply:</b> "+esc(o.place_of_supply||cust?.delivery_state||"—")+"<br><b>Delivery address:</b> "+esc(cust?.delivery_address||"—")+"<br><b>Placed:</b> "+esc(formatAccessDate(o.created_at))+"<br><b>"+gstText+"</b></p>";
+ $("websiteOrderItems").innerHTML=table(["Product","Unit","Qty","Rate","Line total"],(items||[]).map(it=>[esc(it.product_name),esc(it.unit),it.qty,money(it.unit_price),money(it.line_total)]));
  $("websiteOrderNotes").textContent=o.notes||"No order note.";
+ const invBtn=$("viewWebsiteInvoice");
+ if(invBtn){
+   invBtn.classList.toggle("hidden",!o.invoice_id);
+   invBtn.onclick=()=>{if(o.invoice_id)window.viewInvoice(o.invoice_id);};
+ }
  $("websiteOrderDialog").showModal();
 };
+
 $("closeWebsiteOrder").onclick=function(){$("websiteOrderDialog").close()};
 function renderCustomers(){
  $("customersTable").innerHTML=table(["Customer","Business","Phone","Website account","Total purchases","Paid","Credit due","Last purchase","Action"],customers.map(x=>{
