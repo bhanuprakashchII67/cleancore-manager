@@ -1222,8 +1222,9 @@ function formatErrorForCopy(x){
  return ["CleanCore Error Report","Time: "+new Date(x.created_at).toLocaleString("en-IN"),"App: "+(x.app_name||"—"),"Version: "+(x.app_version||"—"),"Page: "+(x.page||"—"),"Action: "+(x.action||"—"),"Error: "+(x.error_name||"Error"),"Message: "+(x.message||"—"),"URL: "+(x.url||"—"),"Stack: "+(x.stack||"—"),"Context: "+JSON.stringify(x.context||{})].join("\n");
 }
 document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-status");if(s)updateErrorStatus(s.dataset.errorId,s.value);});
-$("testErrorFinder")?.addEventListener("click",async()=>{reportClientError(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await new Promise(r=>setTimeout(r,500));await loadErrorLogs();toast("Test error sent.");});
-$("testErrorFinder")?.addEventListener("click",async()=>{reportClientError(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await new Promise(r=>setTimeout(r,500));await loadErrorLogs();toast("Test error sent.");});
+$("testErrorFinder")?.addEventListener("click",async()=>{await reportClientErrorAndWait(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await loadErrorLogs();toast("Test error sent.");});
+$("refreshErrorLogs")?.addEventListener("click",()=>loadErrorLogs());
+async function reportClientErrorAndWait(err,meta={}){const e=err instanceof Error?err:new Error(String(err||"Unknown error"));const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"unhandled_error",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:{...(meta.context||{}),last_user_action:lastUserAction},p_user_agent:navigator.userAgent};return sendClientError(payload);}
 $("clearErrorLogs")?.addEventListener("click",async()=>{
  if(!isAdmin)return;
  if(!confirm("Clear all Error Finder history? This permanently removes the current error records."))return;
