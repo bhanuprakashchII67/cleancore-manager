@@ -349,3 +349,19 @@ dialog .dialog{padding-top:52px}
 
 .recovery-note{padding:12px 14px;border:1px solid #f0dfad;background:#fff9e8;border-radius:12px;margin-bottom:14px;color:#6d5517}
 #recoveryTable .link{white-space:nowrap}
+
+.notification-wrap{position:relative;display:flex;align-items:center}
+.notification-btn{cursor:pointer;position:relative;display:inline-flex;align-items:center;gap:7px}
+.notification-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#c62828;color:#fff;font-size:11px;font-weight:900}
+.notification-menu{position:absolute;top:48px;right:0;width:380px;max-width:min(92vw,380px);background:#fff;border:1px solid #dbe5ec;border-radius:16px;box-shadow:0 18px 50px rgba(10,28,45,.18);overflow:hidden;z-index:1000}
+.notification-menu-head{display:flex;align-items:center;justify-content:space-between;padding:14px 15px;border-bottom:1px solid #e7edf2;background:#f8fafb}
+.notification-list{max-height:430px;overflow:auto}
+.notification-item{display:grid;grid-template-columns:34px 1fr;gap:10px;width:100%;padding:13px 15px;border:0;border-bottom:1px solid #edf1f4;background:#fff;text-align:left;cursor:pointer}
+.notification-item:hover{background:#f7fbfc}
+.notification-item.unread{background:#f0fbfa}
+.notification-icon{font-size:20px;line-height:1.3}
+.notification-copy{display:grid;gap:3px;min-width:0}
+.notification-copy strong{font-size:13px;color:#14283a}
+.notification-copy small{font-size:12px;line-height:1.35;color:#647587}
+.notification-copy em{font-size:10px;font-style:normal;color:#8291a0}
+@media(max-width:700px){.notification-btn span:nth-child(2){display:none}.notification-menu{right:-65px;width:340px}}
