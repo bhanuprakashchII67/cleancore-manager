@@ -347,7 +347,11 @@
     <div class="panel-head"><div><h3>Notification Controls</h3><p class="muted">Choose which business events should alert you in the Manager.</p></div></div>
     <div class="notification-settings-grid">
       <label class="switch-row"><input id="notifEnabled" type="checkbox"><span><b>Notifications enabled</b><small>Turn Manager alerts on or off.</small></span></label>
-      <label class="switch-row"><input id="notifSound" type="checkbox"><span><b>Sound</b><small>Play sound/vibration for alerts.</small></span></label>
+      <label class="switch-row"><input id="notifSound" type="checkbox"><span><b>Sound</b><small>Play a loud Manager-only alert. This does not change your device volume.</small></span></label>
+      <div class="notification-volume-card">
+        <div class="notification-volume-head"><div><b>Manager alert volume</b><small>Controls only CleanCore Manager notification sounds.</small></div><output id="notifVolumeValue">100%</output></div>
+        <input id="notifVolume" type="range" min="20" max="100" step="5" value="100" aria-label="Manager notification volume">
+      </div>
       <label class="switch-row"><input id="notifDesktop" type="checkbox"><span><b>Desktop notifications</b><small>Browser/app notifications when supported.</small></span></label>
     </div>
     <div class="notification-event-title">Notify me about</div>
