@@ -1806,12 +1806,23 @@ function sendBillToCustomer(inv,customer,items){
    }
    return;
  }
- const wa="https://web.whatsapp.com/send?phone=91"+phone+"&text="+encodeURIComponent(msg);
- const w=window.open(wa,"_blank","noopener,noreferrer");
+ const encoded=encodeURIComponent(msg);
+ const isAndroid=/Android/i.test(navigator.userAgent);
+ const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+ let targetUrl;
+ if(isAndroid){
+   targetUrl="intent://send?phone=91"+phone+"&text="+encoded+"#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end";
+ }else if(isMobile){
+   targetUrl="https://wa.me/91"+phone+"?text="+encoded;
+ }else{
+   targetUrl="https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
+ }
+ const w=window.open(targetUrl,"_blank","noopener,noreferrer");
  const n=$("billSendNotice");
  if(n){
    n.classList.remove("hidden");
-   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> WhatsApp Web opened for customer <b>+91 "+esc(phone)+"</b>. The bill message is ready. The invoice PDF can be opened from Sales → View → Print / Save PDF and attached in that WhatsApp chat.";
+   const destination=isAndroid?"WhatsApp Business app":isMobile?"WhatsApp app":"WhatsApp Web";
+   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destination+" opened for customer <b>+91 "+esc(phone)+"</b>. The bill message is ready. The invoice PDF can be opened from Sales → View → Print / Save PDF and attached in that chat.";
  }
  if(!w)toast("Bill saved, but your browser blocked WhatsApp. Allow pop-ups for CleanCore Manager.",false);
 }
