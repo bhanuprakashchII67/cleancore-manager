@@ -446,9 +446,9 @@
   </div>
 
   <div class="panel error-finder-panel">
-    <div class="panel-head"><div><h3>Error Finder</h3><p class="muted">Errors from CleanCore Manager, website and connected apps are collected here.</p></div><div class="actions"><button type="button" id="testErrorFinder" class="btn small">Test Error Finder</button><button type="button" id="refreshErrorLogs" class="btn small">↻ Refresh</button><button type="button" id="clearErrorLogs" class="btn small danger">Clear Error History</button></div></div>
+    <div class="panel-head"><div><h3>Error Finder</h3><p class="muted">Errors from CleanCore Manager, customer website and connected apps are collected here.</p></div><div class="actions"><button type="button" id="analyzeErrorsWithAI" class="btn small primary">🤖 Analyze with AI</button><button type="button" id="testErrorFinder" class="btn small">Test Error Finder</button><button type="button" id="refreshErrorLogs" class="btn small">↻ Refresh</button><button type="button" id="clearErrorLogs" class="btn small danger">Clear History</button></div></div>
     <div class="error-finder-tools">
-      <label>Status<select id="errorLogStatusFilter"><option value="">All</option><option value="New">New</option><option value="Investigating">Investigating</option><option value="Fixed">Fixed</option><option value="Ignored">Ignored</option></select></label>
+      <label>Status<select id="errorLogStatusFilter"><option value="">All</option><option value="New">New</option><option value="Investigating">Investigating</option><option value="Fixed">Fixed</option><option value="Ignored">Ignored / Disabled</option></select></label>
       <label>App<select id="errorLogAppFilter"><option value="">All apps</option></select></label>
       <span id="errorLogSummary" class="muted tiny"></span>
     </div>
