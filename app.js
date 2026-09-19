@@ -1278,14 +1278,16 @@ window.viewWebsiteOrder=async function(id){
 
 $("closeWebsiteOrder").onclick=function(){$("websiteOrderDialog").close()};
 function renderCustomers(){
- $("customersTable").innerHTML=table(["Customer","Business","Phone","Website account","Total purchases","Paid","Amount due","Last purchase","Action"],customers.map(x=>{
-  const account=x.auth_user_id?"<span class='badge ok'>Website</span>":"—";
+ $("customersTable").innerHTML=table(["Customer","Business","Phone","Customer source","Total purchases","Paid","Amount due","Last purchase","Action"],customers.map(x=>{
+  const source=String(x.customer_source||"").trim() || (x.auth_user_id?"Website":"Manager");
+  const sourceBadge=source==="Website"?"<span class='badge ok'>Website</span>":"<span class='badge'>"+esc(source)+"</span>";
   const s=customerStats(x.id);
-  return [esc(x.name),esc(x.business_name),esc(x.phone),account,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
-   "<button class=\"link\" onclick=\"viewCustomerHistory(\'"+x.id+"\')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer(\'"+x.id+"\')\">Edit</button> <button class=\"link danger\" onclick=\"deleteCustomer(\'"+x.id+"\')\">Remove</button>"];
+  return [esc(x.name),esc(x.business_name),esc(x.phone),sourceBadge,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
+   "<button class=\"link\" onclick=\"viewCustomerHistory('"+x.id+"')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer('"+x.id+"')\">Edit</button> <button class=\"link danger\" onclick=\"deleteCustomer('"+x.id+"')\">Remove</button>"];
  }));
  $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone)+")</option>").join("");
 }
+
 window.deleteCustomer=async function(id){
  const customer=customers.find(x=>x.id===id);if(!customer)return;
  const s=customerStats(id);
