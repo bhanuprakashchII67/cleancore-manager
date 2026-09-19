@@ -369,7 +369,7 @@
   </div>
 
   <div class="panel error-finder-panel">
-    <div class="panel-head"><div><h3>Error Finder</h3><p class="muted">Errors from CleanCore Manager, website and connected apps are collected here.</p></div><button type="button" id="refreshErrorLogs" class="btn small">↻ Refresh</button></div>
+    <div class="panel-head"><div><h3>Error Finder</h3><p class="muted">Errors from CleanCore Manager, website and connected apps are collected here.</p></div><div class="actions"><button type="button" id="testErrorFinder" class="btn small">Test Error Finder</button><button type="button" id="refreshErrorLogs" class="btn small">↻ Refresh</button></div></div>
     <div class="error-finder-tools">
       <label>Status<select id="errorLogStatusFilter"><option value="">All</option><option value="New">New</option><option value="Investigating">Investigating</option><option value="Fixed">Fixed</option><option value="Ignored">Ignored</option></select></label>
       <label>App<select id="errorLogAppFilter"><option value="">All apps</option></select></label>
@@ -583,8 +583,8 @@
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.0",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.1",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=3.7.5"></script>
+<script src="app.js?v=3.7.6"></script>
 </body>
 </html>
