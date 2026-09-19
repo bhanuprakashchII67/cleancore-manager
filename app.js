@@ -1232,8 +1232,9 @@ $("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
    if(box){box.innerHTML="<strong>AI Error Analysis</strong><pre>"+esc(data?.analysis||"No analysis returned.")+"</pre>";}
  }catch(err){
    console.error("Error Finder AI analysis:",err);
-   if(box)box.textContent="AI analysis failed: "+(err?.message||"Unknown error");
-   toast("AI analysis failed. Check the OpenAI key/configuration.",false,{action:"error_finder_ai"});
+   const detail=err?.context?.error_description||err?.message||"Unknown error";
+   if(box)box.textContent="AI analysis failed: "+detail;
+   toast("AI analysis failed: "+detail,false,{action:"error_finder_ai",context:{detail}});
  }
 });
 $("clearErrorLogs")?.addEventListener("click",async()=>{
