@@ -59,6 +59,7 @@ create table if not exists public.invoices(
   due_amount numeric(12,2) not null default 0,
   due_date date,
   payment_method text not null default 'Cash',
+ source text not null default 'Offline' check(source in ('Website','WhatsApp','Offline')),
  total numeric(12,2) not null default 0, profit numeric(12,2) not null default 0,
  created_at timestamptz not null default now()
 );
@@ -73,6 +74,7 @@ alter table public.invoices add column if not exists paid_amount numeric(12,2) n
 alter table public.invoices add column if not exists due_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_date date;
 alter table public.invoices add column if not exists payment_method text not null default 'Cash';
+alter table public.invoices add column if not exists source text not null default 'Offline';
 
 create table if not exists public.invoice_items(
  id uuid primary key default gen_random_uuid(), invoice_id uuid not null references public.invoices(id) on delete cascade,
