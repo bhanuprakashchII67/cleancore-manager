@@ -1364,7 +1364,24 @@ function customerPurchaseDate(id){
  if(stats.lastPurchase)return stats.lastPurchase;
  const webDates=(websiteOrders||[]).filter(x=>x.customer_id===id&&x.created_at).map(x=>x.created_at);
  if(webDates.length)return webDates.sort((a,b)=>new Date(b)-new Date(a))[0];
- return null;
+ const recoveryDates=(deletedRecords||[]).flatMap(r=>{
+   if(r.entity_type==="customer" && r.original_id===id){
+     const snap=r.snapshot||{};
+     const row=snap.row||{};
+     const dates=[];
+     if(row.created_at)dates.push(row.created_at);
+     (snap.invoices||[]).forEach(x=>{if(x.created_at)dates.push(x.created_at);});
+     (snap.website_orders||[]).forEach(x=>{if(x.created_at)dates.push(x.created_at);});
+     return dates;
+   }
+   if(r.entity_type==="invoice"){
+     const snap=r.snapshot||{};
+     const row=snap.invoice||snap.row||{};
+     return row.customer_id===id&&row.created_at?[row.created_at]:[];
+   }
+   return [];
+ });
+ return recoveryDates.length?recoveryDates.sort((a,b)=>new Date(b)-new Date(a))[0]:null;
 }
 
 function renderWebsiteOrders(){
@@ -1436,7 +1453,9 @@ function renderCustomers(){
   const sourceBadge=source==="Website"?"<span class='badge ok'>Website</span>":"<span class='badge'>"+esc(source)+"</span>";
   const s=customerStats(x.id);
   const purchaseDate=customerPurchaseDate(x.id);
-  return [esc(x.name),esc(x.business_name),esc(x.phone),esc(x.email),sourceBadge,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),purchaseDate?isoDate(purchaseDate):"—",
+  const recovered=!!((deletedRecords||[]).some(r=>r.entity_type==="customer"&&r.original_id===x.id)||(deletedRecords||[]).some(r=>r.entity_type==="invoice"&&((r.snapshot?.invoice||r.snapshot?.row||{}).customer_id===x.id)));
+  const purchaseLabel=purchaseDate?isoDate(purchaseDate)+(s.lastPurchase?"":" *"):"—";
+  return [esc(x.name),esc(x.business_name),esc(x.phone),esc(x.email),sourceBadge,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),purchaseLabel,
    "<button class=\"link\" onclick=\"viewCustomerHistory('"+x.id+"')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer('"+x.id+"')\">Edit</button> <button class=\"link danger\" onclick=\"deleteCustomer('"+x.id+"')\">Remove</button>"];
  }));
  $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone||x.email||"")+")</option>").join("");
