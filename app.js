@@ -1794,37 +1794,69 @@ function buildCustomerBillMessage(inv,customer,items=[]){
   "cleancorehyd@gmail.com"
  ].join("\n");
 }
-function sendBillToCustomer(inv,customer,items){
+async function sendBillToCustomer(inv,customer,items){
  const phone=normalizePhone(inv?.customer_phone||customer?.phone||"");
- const msg=buildCustomerBillMessage(inv,customer,items);
  if(!phone){
-   toast("Bill saved, but this customer has no valid WhatsApp phone number.",false);
-   const n=$("billSendNotice");
-   if(n){
-     n.classList.remove("hidden");
-     n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Add a valid customer phone number to open WhatsApp for this bill.";
-   }
+   toast("Bill saved, but this customer has no valid phone number.",false);
    return;
  }
- const encoded=encodeURIComponent(msg);
- const isAndroid=/Android/i.test(navigator.userAgent);
- const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
- let targetUrl;
- if(isAndroid){
-   targetUrl="intent://send?phone=91"+phone+"&text="+encoded+"#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end";
- }else if(isMobile){
-   targetUrl="https://wa.me/91"+phone+"?text="+encoded;
- }else{
-   targetUrl="https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
+ if(typeof html2pdf!=="function"){
+   toast("PDF engine did not load. Open Sales → View → Print / Save PDF.",false);
+   reportClientError(new Error("html2pdf library unavailable"),{action:"share_bill_pdf",context:{invoice_id:inv.id}});
+   return;
  }
- const w=window.open(targetUrl,"_blank","noopener,noreferrer");
- const n=$("billSendNotice");
- if(n){
-   n.classList.remove("hidden");
-   const destination=isAndroid?"WhatsApp Business app":isMobile?"WhatsApp app":"WhatsApp Web";
-   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destination+" opened for customer <b>+91 "+esc(phone)+"</b>. The bill message is ready. The invoice PDF can be opened from Sales → View → Print / Save PDF and attached in that chat.";
+ try{
+   await window.viewInvoice(inv.id);
+   const source=$("invoicePreview")?.querySelector(".invoice-preview");
+   if(!source)throw new Error("Invoice preview was not ready for PDF generation.");
+   const clone=source.cloneNode(true);
+   clone.style.width="794px";
+   clone.style.maxWidth="794px";
+   clone.style.margin="0";
+   clone.style.background="#fff";
+   clone.style.boxShadow="none";
+   clone.style.position="fixed";
+   clone.style.left="-10000px";
+   clone.style.top="0";
+   clone.style.zIndex="-1";
+   document.body.appendChild(clone);
+   const filename=(inv.invoice_no||"CleanCore-Invoice")+".pdf";
+   const blob=await html2pdf().set({
+     margin:[8,8,8,8],
+     filename,
+     image:{type:"jpeg",quality:0.98},
+     html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
+     jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}
+   }).from(clone).outputPdf("blob");
+   clone.remove();
+   const file=new File([blob],filename,{type:"application/pdf"});
+   const shareData={
+     files:[file],
+     title:"CleanCore Invoice "+(inv.invoice_no||""),
+     text:"CleanCore Chemical & Cleaning — Invoice "+(inv.invoice_no||"")+" for "+(inv.customer_name||customer?.name||"Customer")+"."
+   };
+   if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+     await navigator.share(shareData);
+     toast("Invoice PDF ready to share.");
+     const n=$("billSendNotice");
+     if(n){
+       n.classList.remove("hidden");
+       n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" PDF is ready.</strong> Choose <b>WhatsApp Business</b> in the share sheet, then select customer <b>+91 "+esc(phone)+"</b> and send the PDF.";
+     }
+   }else{
+     const a=document.createElement("a");
+     a.href=URL.createObjectURL(blob);
+     a.download=filename;
+     a.click();
+     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+     toast("Invoice PDF downloaded. Open WhatsApp Business and attach it to +91 "+phone+".");
+   }
+ }catch(err){
+   if(err?.name==="AbortError")return;
+   console.error("CleanCore PDF sharing error",err);
+   reportClientError(err,{action:"share_bill_pdf",context:{invoice_id:inv.id,customer_phone:phone}});
+   toast(err?.message||"Unable to create/share invoice PDF.",false);
  }
- if(!w)toast("Bill saved, but your browser blocked WhatsApp. Allow pop-ups for CleanCore Manager.",false);
 }
 function numberToWordsIndian(n){
  n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
