@@ -54,7 +54,7 @@ create table if not exists public.invoices(
   sgst_amount numeric(12,2) not null default 0,
   igst_percent numeric(6,2) not null default 0,
   igst_amount numeric(12,2) not null default 0,
-  payment_status text not null default 'Credit',
+  payment_status text not null default 'Unpaid',
   paid_amount numeric(12,2) not null default 0,
   due_amount numeric(12,2) not null default 0,
   due_date date,
@@ -68,7 +68,7 @@ alter table public.invoices add column if not exists billing_address text not nu
 alter table public.invoices add column if not exists delivery_address text not null default '';
 alter table public.invoices add column if not exists gst_percent numeric(6,2) not null default 0;
 alter table public.invoices add column if not exists gst_amount numeric(12,2) not null default 0;
-alter table public.invoices add column if not exists payment_status text not null default 'Credit';
+alter table public.invoices add column if not exists payment_status text not null default 'Unpaid';
 alter table public.invoices add column if not exists paid_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_date date;
@@ -88,6 +88,7 @@ create table if not exists public.payments(
  amount numeric(12,2) not null check(amount>0),
  payment_date date not null default current_date,
  payment_method text not null default 'Cash',
+ reference text,
  notes text not null default '',
  created_at timestamptz not null default now()
 );
@@ -620,7 +621,7 @@ begin
    values(v_invoice_id,nullif(r.payload->>'customer_id','')::uuid,v_payment_amount,coalesce((r.payload->>'payment_date')::date,current_date),coalesce(r.payload->>'payment_method','Cash'),coalesce(r.payload->>'notes',''));
    v_new_paid:=least((select total from public.invoices where id=v_invoice_id),coalesce((select paid_amount from public.invoices where id=v_invoice_id),0)+v_payment_amount);
    v_new_due:=greatest((select total from public.invoices where id=v_invoice_id)-v_new_paid,0);
-   update public.invoices set paid_amount=v_new_paid,due_amount=v_new_due,payment_status=case when v_new_due=0 then 'Paid' else 'Part Paid' end,due_date=case when v_new_due=0 then null else due_date end where id=v_invoice_id returning id into v_id;
+   update public.invoices set paid_amount=v_new_paid,due_amount=v_new_due,payment_status=case when v_new_due=0 then 'Paid' else 'Partially Paid' end,due_date=case when v_new_due=0 then null else due_date end where id=v_invoice_id returning id into v_id;
  elsif r.action='website_order_status' then
    update public.website_orders set status=r.payload->>'status',updated_at=now() where id=r.target_id returning id into v_id;
  elsif r.action='invoice_create' then
@@ -645,7 +646,7 @@ begin
      coalesce(r.payload->>'billing_address',''),coalesce(r.payload->>'delivery_address',''),coalesce((r.payload->>'subtotal')::numeric,0),coalesce((r.payload->>'discount')::numeric,0),
      coalesce((r.payload->>'gst_percent')::numeric,0),coalesce((r.payload->>'gst_amount')::numeric,0),coalesce((r.payload->>'cgst_percent')::numeric,0),coalesce((r.payload->>'cgst_amount')::numeric,0),
      coalesce((r.payload->>'sgst_percent')::numeric,0),coalesce((r.payload->>'sgst_amount')::numeric,0),coalesce((r.payload->>'igst_percent')::numeric,0),coalesce((r.payload->>'igst_amount')::numeric,0),
-     coalesce(r.payload->>'payment_status','Credit'),coalesce((r.payload->>'paid_amount')::numeric,0),coalesce((r.payload->>'due_amount')::numeric,0),nullif(r.payload->>'due_date','')::date,
+     coalesce(r.payload->>'payment_status','Unpaid'),coalesce((r.payload->>'paid_amount')::numeric,0),coalesce((r.payload->>'due_amount')::numeric,0),nullif(r.payload->>'due_date','')::date,
      coalesce(r.payload->>'payment_method','Credit'),coalesce((r.payload->>'total')::numeric,0),coalesce((r.payload->>'profit')::numeric,0)) returning id into v_invoice_id;
    insert into public.invoice_items(invoice_id,product_id,product_name,qty,unit_price,cost_price,line_total,line_profit)
    select v_invoice_id,(item->>'product_id')::uuid,item->>'product_name',(item->>'qty')::integer,(item->>'unit_price')::numeric,(item->>'cost_price')::numeric,(item->>'line_total')::numeric,(item->>'line_profit')::numeric
@@ -1219,7 +1220,7 @@ alter table public.invoices add constraint invoices_delivery_status_check
 
 alter table public.invoices drop constraint if exists invoices_payment_status_check;
 alter table public.invoices add constraint invoices_payment_status_check
-  check(payment_status in ('Unpaid','Partially Paid','Paid','Not Applicable','Credit','Part Paid'));
+  check(payment_status in ('Unpaid','Partially Paid','Paid','Not Applicable','Credit'));
 
 create index if not exists invoices_customer_created_idx on public.invoices(customer_id,created_at desc);
 create index if not exists invoices_bill_status_idx on public.invoices(bill_status,created_at desc);
