@@ -1515,6 +1515,16 @@ $("documentType").onchange=()=>{
 $("billForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const saveButton=e.submitter||$("saveBillButton");
+ // Open a blank tab while the click is still a user gesture. After the async
+ // Supabase bill creation finishes, we reuse this window for WhatsApp instead
+ // of triggering a browser popup blocker.
+ let preopenedWhatsAppWindow=null;
+ if($("documentType")?.value==="SALE"){
+   try{
+     preopenedWhatsAppWindow=window.open("about:blank","_blank","noopener,noreferrer");
+     if(preopenedWhatsAppWindow)window.__cleancoreBillWhatsAppWindow=preopenedWhatsAppWindow;
+   }catch(_){}
+ }
  if(saveButton){saveButton.disabled=true;saveButton.dataset.originalText=saveButton.textContent;saveButton.textContent="Generating…";}
  try{
    const customer=currentBillCustomer();
@@ -1578,8 +1588,19 @@ $("billForm").addEventListener("submit",async e=>{
    if(error){const rpcError=new Error(error.message||"Bill could not be generated.");rpcError.name="SupabaseRpcError";rpcError.code=error.code||"";rpcError.details=error.details||"";rpcError.hint=error.hint||"";throw rpcError;}
    const billId=data?.id;
    if(!billId)throw new Error("Bill was not returned by the server. Nothing was marked as generated.");
-   await loadAll();
-   const savedInv=invoices.find(x=>x.id===billId)||null;
+   // Refresh only the records affected by this bill. The previous full
+   // Manager reload made bill generation unnecessarily heavy and could leave
+   // the UI waiting on unrelated admin queries.
+   const [savedResult,productResult]=await Promise.all([
+     db.from("invoices").select("id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source").eq("id",billId).single(),
+     db.from("products").select("id,name,unit,selling_price,cost_price,stock,low_stock_threshold,description,additional_details,image_urls,video_urls,hsn_code").order("name")
+   ]);
+   if(savedResult.error)throw savedResult.error;
+   if(productResult.error)throw productResult.error;
+   const savedInv=savedResult.data||null;
+   if(savedInv)invoices=[savedInv,...invoices.filter(x=>x.id!==savedInv.id)];
+   products=productResult.data||products;
+   renderAll("billing");
    $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
    toast((isQuotation?"Quotation ":"Bill ")+(data.invoice_no||no)+" generated successfully.");
    if(savedInv){
@@ -1587,6 +1608,10 @@ $("billForm").addEventListener("submit",async e=>{
      else sendBillToCustomer(savedInv,customer,items);
    }
  }catch(err){
+   if(preopenedWhatsAppWindow){
+     try{if(!preopenedWhatsAppWindow.closed)preopenedWhatsAppWindow.close();}catch(_){}
+     if(window.__cleancoreBillWhatsAppWindow===preopenedWhatsAppWindow)window.__cleancoreBillWhatsAppWindow=null;
+   }
    const detail=err?.message||"Bill could not be generated.";
    const billError=err instanceof Error?err:new Error(String(detail));
    if(err?.code)billError.code=err.code;
@@ -1804,27 +1829,29 @@ function sendBillToCustomer(inv,customer,items){
      n.classList.remove("hidden");
      n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Add a valid customer phone number to open WhatsApp for this bill.";
    }
+   const pending=window.__cleancoreBillWhatsAppWindow;
+   window.__cleancoreBillWhatsAppWindow=null;
+   try{if(pending&&!pending.closed)pending.close();}catch(_){}
    return;
  }
  const encoded=encodeURIComponent(msg);
- const isAndroid=/Android/i.test(navigator.userAgent);
  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
- let targetUrl;
- if(isAndroid){
-   targetUrl="intent://send?phone=91"+phone+"&text="+encoded+"#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end";
- }else if(isMobile){
-   targetUrl="https://wa.me/91"+phone+"?text="+encoded;
- }else{
-   targetUrl="https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
+ const targetUrl=isMobile
+   ?"https://wa.me/91"+phone+"?text="+encoded
+   :"https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
+ let w=window.__cleancoreBillWhatsAppWindow;
+ window.__cleancoreBillWhatsAppWindow=null;
+ if(!w||w.closed)w=window.open(targetUrl,"_blank","noopener,noreferrer");
+ else{
+   try{w.location.href=targetUrl;w.focus?.();}catch(_){}
  }
- const w=window.open(targetUrl,"_blank","noopener,noreferrer");
  const n=$("billSendNotice");
  if(n){
    n.classList.remove("hidden");
-   const destination=isAndroid?"WhatsApp Business app":isMobile?"WhatsApp app":"WhatsApp Web";
+   const destination=isMobile?"WhatsApp":"WhatsApp Web";
    n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destination+" opened for customer <b>+91 "+esc(phone)+"</b>. The bill message is ready. The invoice PDF can be opened from Sales → View → Print / Save PDF and attached in that chat.";
  }
- if(!w)toast("Bill saved, but your browser blocked WhatsApp. Allow pop-ups for CleanCore Manager.",false);
+ if(!w)toast("Bill saved, but your browser blocked WhatsApp. Please allow pop-ups for CleanCore Manager.",false);
 }
 function numberToWordsIndian(n){
  n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
