@@ -1707,16 +1707,25 @@ function buildCustomerBillMessage(inv,customer,items=[]){
  ].join("\n");
 }
 function sendBillToCustomer(inv,customer,items){
- const businessPhone="919182725773";
+ const phone=normalizePhone(inv?.customer_phone||customer?.phone||"");
  const msg=buildCustomerBillMessage(inv,customer,items);
- const wa="https://web.whatsapp.com/send?phone="+businessPhone+"&text="+encodeURIComponent(msg);
+ if(!phone){
+   toast("Bill saved, but this customer has no valid WhatsApp phone number.",false);
+   const n=$("billSendNotice");
+   if(n){
+     n.classList.remove("hidden");
+     n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Add a valid customer phone number to open WhatsApp for this bill.";
+   }
+   return;
+ }
+ const wa="https://web.whatsapp.com/send?phone=91"+phone+"&text="+encodeURIComponent(msg);
  const w=window.open(wa,"_blank","noopener,noreferrer");
  const n=$("billSendNotice");
  if(n){
    n.classList.remove("hidden");
-   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> WhatsApp Web opened for CleanCore ("+businessPhone+"). Review the bill details and press Send.";
+   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> WhatsApp Web opened for customer <b>+91 "+esc(phone)+"</b>. The bill message is ready. The invoice PDF can be opened from Sales → View → Print / Save PDF and attached in that WhatsApp chat.";
  }
- if(!w)toast("Bill saved, but your browser blocked the WhatsApp window. Allow pop-ups for CleanCore Manager.",false);
+ if(!w)toast("Bill saved, but your browser blocked WhatsApp. Allow pop-ups for CleanCore Manager.",false);
 }
 function numberToWordsIndian(n){
  n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
