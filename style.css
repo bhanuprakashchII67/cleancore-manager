@@ -436,3 +436,5 @@ dialog .dialog{padding-top:52px}
 .section-toolbar .page-refresh{margin-left:auto}
 
 .brand.brand-logo{background:transparent;object-fit:cover;border-radius:14px;overflow:hidden}.brand.small.brand-logo{border-radius:10px}
+
+.invoice-logo{width:58px;height:58px;border-radius:14px;display:block;object-fit:cover;margin-bottom:7px}.inv-header{gap:18px}
