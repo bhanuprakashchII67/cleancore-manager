@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.8.18";
+const MANAGER_VERSION="3.8.16";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -50,7 +50,48 @@ function renderNotificationSettings(){
  Object.entries(map).forEach(([id,key])=>{const el=$(id);if(el)el.checked=notificationPreferences[key]!==false;});
  const st=$("notificationSettingsStatus");if(st)st.textContent=notificationPreferences.desktop_enabled?"Desktop notifications enabled.":"Desktop notifications off.";
 }
-async function loadNotificationPreferences(){
+async const PUSH_VAPID_PUBLIC="BOewbJgHGXAiPPKrk83r9_cLBs1IS2DL1mWL-ggEINf304g_pAAhQOy8FtJjRlmGgljZihfN4Om-Fcn-DCMHWsU";
+function pushBase64ToBytes(base64){
+ const pad="=".repeat((4-base64.length%4)%4);
+ const raw=atob((base64+pad).replace(/-/g,"+").replace(/_/g,"/"));
+ return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function registerManagerPush(){
+ if(!isAdmin||!user?.id)return false;
+ if(!("serviceWorker" in navigator)||!("PushManager" in window)){toast("Push notifications are not supported on this device/browser.",false);return false;}
+ try{
+   const permission=await Notification.requestPermission();
+   if(permission!=="granted"){toast("Push notification permission was not granted.",false);return false;}
+   const reg=await navigator.serviceWorker.ready;
+   let sub=await reg.pushManager.getSubscription();
+   if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushBase64ToBytes(PUSH_VAPID_PUBLIC)});
+   const {data:{session}}=await db.auth.getSession();
+   if(!session?.access_token)throw new Error("Manager session is not available.");
+   const {error}=await db.functions.invoke("manager-push",{body:{action:"subscribe",subscription:sub.toJSON(),user_agent:navigator.userAgent}});
+   if(error)throw error;
+   const st=$("notificationSettingsStatus");if(st)st.textContent="Push notifications enabled on this device.";
+   toast("Push notifications enabled.");
+   return true;
+ }catch(err){
+   console.error("Push subscription error",err);
+   reportClientError(err,{action:"enable_push_notifications"});
+   toast(err?.message||"Unable to enable push notifications.",false);
+   return false;
+ }
+}
+async function testManagerPush(){
+ try{
+   const {error}=await db.functions.invoke("manager-push",{body:{action:"test"}});
+   if(error)throw error;
+   toast("Test push requested.");
+ }catch(err){
+   console.error("Push test error",err);
+   reportClientError(err,{action:"test_push_notification"});
+   toast(err?.message||"Push test failed.",false);
+ }
+}
+
+function loadNotificationPreferences(){
  if(!isAdmin||!user?.id)return;
  const {data,error}=await db.from("manager_notification_preferences").select("*").eq("manager_user_id",user.id).maybeSingle();
  if(error){console.warn("Notification preferences:",error.message);return;}
@@ -79,6 +120,8 @@ function bindNotificationSettings(){
    renderNotificationVolume();
  });
  ["notifEnabled","notifSound","notifDesktop","notifWebsiteOrders","notifWebsiteEnquiries","notifEmployeeAccess","notifEmployeeChanges","notifRestrictedAccess","notifLowStock","notifPayments","notifCreditDue"].forEach(id=>$(id)?.addEventListener("change",saveNotificationPreferences));
+ $("enablePushNotifications")?.addEventListener("click",registerManagerPush);
+ $("testPushNotification")?.addEventListener("click",testManagerPush);
  $("enableDesktopNotifications")?.addEventListener("click",async()=>{
    if(!("Notification" in window)){toast("Desktop notifications are not supported by this browser.",false);return;}
    const p=await Notification.requestPermission();
