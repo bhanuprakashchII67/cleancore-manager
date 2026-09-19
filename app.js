@@ -125,6 +125,11 @@ async function startWebsiteNotifications(){
    .subscribe();
  notificationPollTimer=setInterval(()=>loadWebsiteNotifications(false),10000);
 }
+document.getElementById("testNotificationSound")?.addEventListener("click",async e=>{
+  e.stopPropagation();
+  await playNotificationSound();
+  toast("Notification sound tested");
+});
 function markWebsiteNotificationsRead(){
  const latest=websiteNotifications.reduce((max,n)=>Math.max(max,new Date(n.created_at).getTime()),0);
  if(latest)setNotificationTimestamp("read",latest);
