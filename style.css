@@ -346,3 +346,6 @@ dialog .dialog{padding-top:52px}
   body.printing-invoice #invoiceDialog .actions{display:none!important}
   body.printing-invoice #invoicePreview{display:block!important;width:100%!important}
 }
+
+.recovery-note{padding:12px 14px;border:1px solid #f0dfad;background:#fff9e8;border-radius:12px;margin-bottom:14px;color:#6d5517}
+#recoveryTable .link{white-space:nowrap}
