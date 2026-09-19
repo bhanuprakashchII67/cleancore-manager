@@ -9,14 +9,20 @@ self.addEventListener("push",event=>{
  const title=data.title||"CleanCore Manager";
  const options={
    body:data.body||"New Manager notification",
-   icon:"icon-192.svg",
-   badge:"icon-192.svg",
    tag:data.notification_id||"cleancore-manager-push",
    data:{url:data.url||"/",notification_id:data.notification_id||""},
    vibrate:[200,100,200],
    requireInteraction:true
  };
- event.waitUntil(self.registration.showNotification(title,options));
+ event.waitUntil((async()=>{
+   try{
+     await self.registration.showNotification(title,options);
+   }catch(err){
+     try{
+       await self.registration.showNotification(title,{body:options.body,tag:options.tag,data:options.data,vibrate:options.vibrate});
+     }catch(_){}
+   }
+ })());
 });
 self.addEventListener("notificationclick",event=>{
  event.notification.close();
