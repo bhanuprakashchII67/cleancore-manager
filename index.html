@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=4.2.0">
+<link rel="stylesheet" href="style.css?v=3.7.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -316,6 +316,31 @@
     </div>
   </div>
 
+  <div class="panel notification-settings-panel">
+    <div class="panel-head"><div><h3>Notification Controls</h3><p class="muted">Choose which business events should alert you in the Manager.</p></div></div>
+    <div class="notification-settings-grid">
+      <label class="switch-row"><input id="notifEnabled" type="checkbox"><span><b>Notifications enabled</b><small>Turn Manager alerts on or off.</small></span></label>
+      <label class="switch-row"><input id="notifSound" type="checkbox"><span><b>Sound</b><small>Play sound/vibration for alerts.</small></span></label>
+      <label class="switch-row"><input id="notifDesktop" type="checkbox"><span><b>Desktop notifications</b><small>Browser/app notifications when supported.</small></span></label>
+    </div>
+    <div class="notification-event-title">Notify me about</div>
+    <div class="notification-event-grid">
+      <label class="switch-row"><input id="notifWebsiteOrders" type="checkbox"><span><b>New website orders</b><small>Customer orders from the website.</small></span></label>
+      <label class="switch-row"><input id="notifWebsiteEnquiries" type="checkbox"><span><b>New website enquiries</b><small>New leads and enquiries.</small></span></label>
+      <label class="switch-row"><input id="notifEmployeeAccess" type="checkbox"><span><b>Employee access requests</b><small>Requests for additional sections.</small></span></label>
+      <label class="switch-row"><input id="notifEmployeeChanges" type="checkbox"><span><b>Employee change approvals</b><small>Changes waiting for Manager approval.</small></span></label>
+      <label class="switch-row"><input id="notifRestrictedAccess" type="checkbox"><span><b>Restricted access attempts</b><small>Employees trying blocked sections.</small></span></label>
+      <label class="switch-row"><input id="notifLowStock" type="checkbox"><span><b>Low stock alerts</b><small>Finished products/raw materials below alert level.</small></span></label>
+      <label class="switch-row"><input id="notifPayments" type="checkbox"><span><b>Payments received</b><small>Payments recorded against customer credit.</small></span></label>
+      <label class="switch-row"><input id="notifCreditDue" type="checkbox"><span><b>Credit / due alerts</b><small>Outstanding customer credit and due dates.</small></span></label>
+    </div>
+    <div class="notification-settings-actions">
+      <button type="button" id="enableDesktopNotifications" class="btn secondary">Enable desktop notifications</button>
+      <button type="button" id="testNotificationSoundSettings" class="btn">Test sound</button>
+      <span id="notificationSettingsStatus" class="muted tiny"></span>
+    </div>
+  </div>
+
   <div class="panel">
     <div class="panel-head">
       <div><h3>Employees & Access</h3><p class="muted">Create employee usernames/passwords, assign sections, and set start/end date and time.</p></div>
@@ -523,6 +548,6 @@
 <script>
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=4.2.0"></script>
+<script src="app.js?v=3.7.0"></script>
 </body>
 </html>
