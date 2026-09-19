@@ -513,7 +513,18 @@ async function createEmployee(e){
  try{result=await db.functions.invoke("employee-admin",{body:{action:"create",username,full_name,team,alert_email,password,starts_at,ends_at,modules}})}
  catch(err){return status.textContent="Could not reach the employee service. Please refresh and try again."}
  const {data,error}=result;
- if(error)return status.textContent=(error.message||"Could not create employee.")+" Please try again.";
+ if(error){
+   let detail="";
+   try{
+     const response=error.context;
+     if(response?.clone){
+       const body=await response.clone().json().catch(()=>null);
+       detail=body?.error||body?.message||"";
+     }
+   }catch(_){}
+   status.textContent=(detail||error.message||"Could not create employee.")+" Please try again.";
+   return;
+ }
  if(data?.error)return status.textContent=data.error;
  if(data?.portal_url){
    $("employeePortalLink").value=data.portal_url;
