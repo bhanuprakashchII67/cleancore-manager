@@ -916,6 +916,7 @@ function renderDashboardPeriods(startValue="",endValue=""){
    link.href=url;link.download="cleancore-detailed-business-report"+suffix+".csv";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
    toast("Detailed CSV exported with sales, customers, products and expenses.");
  };
+}
 function renderAll(section){
  const active=section||document.querySelector(".section.active")?.id||"dashboard";
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
