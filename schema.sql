@@ -1306,3 +1306,61 @@ begin
 end; $$;
 revoke all on function public.approve_invoice_status_change_request(uuid,boolean,text) from public;
 grant execute on function public.approve_invoice_status_change_request(uuid,boolean,text) to authenticated;
+
+-- Performance: cover foreign keys and make auth.uid() an initplan in RLS policies.
+create index if not exists access_requests_employee_idx on public.access_requests(employee_id);
+create index if not exists access_requests_reviewed_by_idx on public.access_requests(reviewed_by);
+create index if not exists audit_logs_actor_user_idx on public.audit_logs(actor_user_id);
+create index if not exists audit_logs_employee_idx on public.audit_logs(employee_id);
+create index if not exists change_requests_employee_idx on public.change_requests(employee_id);
+create index if not exists change_requests_reviewed_by_idx on public.change_requests(reviewed_by);
+create index if not exists deleted_records_restored_by_idx on public.deleted_records(restored_by);
+create index if not exists expenses_raw_material_idx on public.expenses(raw_material_id);
+create index if not exists invoice_items_invoice_idx on public.invoice_items(invoice_id);
+create index if not exists outlets_restaurant_idx on public.outlets(restaurant_id);
+create index if not exists platform_order_deductions_order_idx on public.platform_order_deductions(order_id);
+create index if not exists platform_order_items_order_idx on public.platform_order_items(order_id);
+create index if not exists platform_settlement_items_order_idx on public.platform_settlement_items(order_id);
+create index if not exists platform_settlement_items_settlement_idx on public.platform_settlement_items(settlement_id);
+
+drop policy if exists profiles_self on public.profiles;
+create policy profiles_self on public.profiles for select to authenticated
+using ((id=(select auth.uid())) and role='admin');
+
+drop policy if exists website_orders_customer_select on public.website_orders;
+create policy website_orders_customer_select on public.website_orders for select to authenticated
+using (exists(select 1 from public.customers c where c.id=website_orders.customer_id and c.auth_user_id=(select auth.uid())));
+
+drop policy if exists website_order_items_customer_select on public.website_order_items;
+create policy website_order_items_customer_select on public.website_order_items for select to authenticated
+using (exists(select 1 from public.website_orders o join public.customers c on c.id=o.customer_id where o.id=website_order_items.order_id and c.auth_user_id=(select auth.uid())));
+
+drop policy if exists customers_website_self_select on public.customers;
+create policy customers_website_self_select on public.customers for select to authenticated
+using (auth_user_id=(select auth.uid()));
+
+drop policy if exists customers_website_self_update on public.customers;
+create policy customers_website_self_update on public.customers for update to authenticated
+using (auth_user_id=(select auth.uid()))
+with check (auth_user_id=(select auth.uid()));
+
+drop policy if exists employee_self_select on public.employees;
+create policy employee_self_select on public.employees for select to authenticated
+using (auth_user_id=(select auth.uid()));
+
+drop policy if exists employee_permissions_self_select on public.employee_permissions;
+create policy employee_permissions_self_select on public.employee_permissions for select to authenticated
+using (exists(select 1 from public.employees e where e.id=employee_permissions.employee_id and e.auth_user_id=(select auth.uid())));
+
+drop policy if exists change_requests_employee_own on public.change_requests;
+create policy change_requests_employee_own on public.change_requests for select to authenticated
+using (exists(select 1 from public.employees e where e.id=change_requests.employee_id and e.auth_user_id=(select auth.uid())));
+
+drop policy if exists access_requests_employee_own on public.access_requests;
+create policy access_requests_employee_own on public.access_requests for select to authenticated
+using (exists(select 1 from public.employees e where e.id=access_requests.employee_id and e.auth_user_id=(select auth.uid())));
+
+drop policy if exists manager_notification_preferences_own on public.manager_notification_preferences;
+create policy manager_notification_preferences_own on public.manager_notification_preferences for all to authenticated
+using (manager_user_id=(select auth.uid()))
+with check (manager_user_id=(select auth.uid()));
