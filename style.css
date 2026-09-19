@@ -447,3 +447,11 @@ dialog .dialog{padding-top:52px}
 .switch-row small{color:#6e8091;line-height:1.35}
 .notification-settings-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
 @media(max-width:700px){.notification-settings-grid,.notification-event-grid{grid-template-columns:1fr}}
+
+.error-finder-tools{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.error-finder-tools label{margin:0;min-width:150px}
+.error-log-message{display:block;max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.error-log-status{min-height:36px;padding:7px 9px;border:1px solid #dce5ee;border-radius:8px;background:#fff;font:inherit}
+.error-finder-panel #errorLogsTable{overflow-x:auto}
+.error-finder-panel #errorLogsTable table{min-width:1050px}
+@media(max-width:600px){.error-finder-tools{display:grid;grid-template-columns:1fr 1fr}.error-finder-tools label{min-width:0}.error-log-message{max-width:220px}}
