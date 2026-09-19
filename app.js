@@ -1,7 +1,9 @@
 const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com";
 const {createClient}=window.supabase||{};
 if(typeof createClient!=="function")throw new Error("Supabase client library did not load. Please check your internet connection and reload.");
-const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storage:window.localStorage}
+});
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(n||0));
@@ -1484,78 +1486,91 @@ $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,pass
 // Manager login policy:
 // - Installed Manager app (PWA): stay signed in for 7 days.
 // - Normal browser/web link: require login again after every page reload.
-const MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
-const MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
+// - The PWA launch URL carries app=1 so the rule is reliable even when display-mode
+//   is temporarily unavailable during startup.
+var MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
+var MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
+var MANAGER_APP_FLAG="cleancore_manager_app";
 var managerExpiryTimer=null;
 
 function isStandaloneManagerApp(){
-  return !!(window.matchMedia?.("(display-mode: standalone)")?.matches ||
-             window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches ||
-             window.navigator.standalone===true);
+ const params=new URLSearchParams(location.search);
+ return params.get("app")==="1" ||
+   localStorage.getItem(MANAGER_APP_FLAG)==="1" ||
+   !!(window.matchMedia?.("(display-mode: standalone)")?.matches ||
+      window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches ||
+      window.navigator.standalone===true);
 }
 function clearManagerLoginWindow(){
-  clearTimeout(managerExpiryTimer);
-  managerExpiryTimer=null;
-  localStorage.removeItem(MANAGER_LOGIN_EXPIRY_KEY);
+ clearTimeout(managerExpiryTimer);
+ managerExpiryTimer=null;
+ localStorage.removeItem(MANAGER_LOGIN_EXPIRY_KEY);
 }
 function startManagerLoginWindow(){
-  if(!isStandaloneManagerApp()){
-    clearManagerLoginWindow();
-    return;
-  }
-  const expiresAt=Date.now()+MANAGER_LOGIN_TTL_MS;
-  localStorage.setItem(MANAGER_LOGIN_EXPIRY_KEY,String(expiresAt));
-  armManagerExpiryTimer();
+ if(!isStandaloneManagerApp()){
+   clearManagerLoginWindow();
+   return;
+ }
+ localStorage.setItem(MANAGER_APP_FLAG,"1");
+ const expiresAt=Date.now()+MANAGER_LOGIN_TTL_MS;
+ localStorage.setItem(MANAGER_LOGIN_EXPIRY_KEY,String(expiresAt));
+ armManagerExpiryTimer();
 }
 function armManagerExpiryTimer(){
-  clearTimeout(managerExpiryTimer);
-  if(!isStandaloneManagerApp())return;
-  const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
-  if(!expiresAt)return;
-  const remaining=expiresAt-Date.now();
-  if(remaining<=0){forceManagerExpiry();return;}
-  managerExpiryTimer=setTimeout(forceManagerExpiry,remaining);
+ clearTimeout(managerExpiryTimer);
+ if(!isStandaloneManagerApp())return;
+ const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
+ if(!expiresAt)return;
+ const remaining=expiresAt-Date.now();
+ if(remaining<=0){forceManagerExpiry();return;}
+ managerExpiryTimer=setTimeout(forceManagerExpiry,remaining);
 }
 async function forceManagerExpiry(){
-  clearManagerLoginWindow();
-  try{await db.auth.signOut({scope:"local"})}finally{
-    user=null;
-    location.reload();
-  }
+ clearManagerLoginWindow();
+ try{await db.auth.signOut({scope:"local"})}finally{
+   user=null;
+   $("loginView").classList.remove("hidden");
+   $("appView").classList.add("hidden");
+ }
 }
 async function restoreManagerSession(){
-  if(!isStandaloneManagerApp()){
-    clearManagerLoginWindow();
-    try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Web session cleanup:",err)}
-    $("loginView").classList.remove("hidden");
-    $("appView").classList.add("hidden");
-    return;
-  }
-  const {data,error}=await db.auth.getSession();
-  if(error||!data?.session)return;
-  const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
-  if(!expiresAt||Date.now()>=expiresAt){
-    clearManagerLoginWindow();
-    await db.auth.signOut({scope:"local"});
-    return;
-  }
-  user=data.session.user;
-  try{
-    await enter();
-    armManagerExpiryTimer();
-  }catch(err){
-    console.error("Manager session restore failed",err);
-    clearManagerLoginWindow();
-    await db.auth.signOut({scope:"local"});
-  }
-}
-async function bootstrapManagerSession(){
-  $("loginView").classList.remove("hidden");
-  $("appView").classList.add("hidden");
-  await restoreManagerSession();
+ const app=isStandaloneManagerApp();
+ if(!app){
+   clearManagerLoginWindow();
+   localStorage.removeItem(MANAGER_APP_FLAG);
+   try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Web session cleanup:",err)}
+   $("loginView").classList.remove("hidden");
+   $("appView").classList.add("hidden");
+   return;
+ }
+
+ const {data,error}=await db.auth.getSession();
+ if(error){console.warn("Manager session check:",error.message);return;}
+ if(!data?.session)return;
+
+ let expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
+ if(!expiresAt){
+   // A valid Supabase session existed before this 7-day marker was introduced.
+   // Start a fresh 7-day app window once, rather than forcing a logout.
+   startManagerLoginWindow();
+   expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
+ }
+ if(!expiresAt||Date.now()>=expiresAt){
+   await forceManagerExpiry();
+   return;
+ }
+
+ user=data.session.user;
+ try{
+   await enter();
+   armManagerExpiryTimer();
+ }catch(err){
+   console.error("Manager session restore failed",err);
+   toast(err?.message||"Unable to restore the Manager session.",false);
+ }
 }
 window.addEventListener("storage",e=>{
-  if(e.key===MANAGER_LOGIN_EXPIRY_KEY)armManagerExpiryTimer();
+ if(e.key===MANAGER_LOGIN_EXPIRY_KEY||e.key===MANAGER_APP_FLAG)armManagerExpiryTimer();
 });
 bindRefreshControls();
 bindWebsiteNotificationUi();
