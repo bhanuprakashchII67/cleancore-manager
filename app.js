@@ -21,18 +21,32 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.7.4";
-let errorReportBusy=false;
+const MANAGER_VERSION="3.7.5";
+let lastUserAction=null;
+function captureUserAction(type,target){
+ const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;
+ lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};
+}
+document.addEventListener("click",e=>captureUserAction("click",e.target),true);
+document.addEventListener("change",e=>captureUserAction("change",e.target),true);
+document.addEventListener("submit",e=>captureUserAction("submit",e.target),true);
 function reportClientError(err,meta={}){
  const e=err instanceof Error?err:new Error(String(err||"Unknown error"));
- const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:meta.context||{},p_user_agent:navigator.userAgent};
- if(errorReportBusy)return;
- errorReportBusy=true;db.rpc("log_client_error",payload).catch(()=>{}).finally(()=>{errorReportBusy=false});
+ const context={...(meta.context||{}),last_user_action:lastUserAction};
+ const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"unhandled_error",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:context,p_user_agent:navigator.userAgent};
+ db.rpc("log_client_error",payload).catch(logErr=>console.warn("CleanCore Error Finder logging failed:",logErr));
 }
 function toast(m,ok=true,meta={}){
  const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200);
  if(!ok)reportClientError(new Error(String(m)),{action:meta.action||"toast_error",context:meta.context||{}});
 }
+const nativeConsoleError=console.error.bind(console);
+console.error=(...args)=>{
+ nativeConsoleError(...args);
+ const first=args.find(x=>x instanceof Error);
+ const message=args.map(x=>x instanceof Error?x.message:(typeof x==="string"?x:JSON.stringify(x))).join(" ").slice(0,4000);
+ reportClientError(first||new Error(message),{action:"console_error",context:{console_arguments:message}});
+};
 window.addEventListener("error",e=>reportClientError(e.error||new Error(e.message||"Unhandled browser error"),{action:"window_error",context:{source:e.filename||"",line:e.lineno||0,column:e.colno||0}}));
 window.addEventListener("unhandledrejection",e=>reportClientError(e.reason||new Error("Unhandled promise rejection"),{action:"unhandled_rejection"}));
 const NOTIFICATION_DEFAULTS={notifications_enabled:true,sound_enabled:true,desktop_enabled:false,website_orders:true,website_enquiries:true,employee_access_requests:true,employee_change_requests:true,restricted_access_attempts:true,low_stock_alerts:true,payments_received:true,credit_due_alerts:true};
@@ -1481,6 +1495,13 @@ $("billForm").addEventListener("submit",async e=>{
    }
  }catch(err){
    console.error("CleanCore bill generation error",err);
+   reportClientError(err,{action:"generate_bill",context:{
+     document_type:$("documentType")?.value||"",
+     customer_id:$("billingCustomer")?.value||"",
+     bill_type:$("billType")?.value||"",
+     payment_type:$("paymentType")?.value||"",
+     line_count:document.querySelectorAll(".line").length
+   }});
    toast(err?.message||"Bill could not be generated. Nothing was saved.",false);
  }finally{
    if(saveButton){saveButton.disabled=false;saveButton.textContent=saveButton.dataset.originalText||"Generate Bill";}
