@@ -1692,35 +1692,16 @@ function buildCustomerBillMessage(inv,customer,items=[]){
  ].join("\n");
 }
 function sendBillToCustomer(inv,customer,items){
- const phone=normalizePhone(customer?.phone||inv?.customer_phone||"");
- const email=String(customer?.email||inv?.customer_email||"").trim();
+ const businessPhone="919182725773";
  const msg=buildCustomerBillMessage(inv,customer,items);
- const hasPhone=phoneRE.test(phone),hasEmail=!!email;
- let opened=0;
-
- if(hasPhone){
-   const wa="https://wa.me/91"+phone+"?text="+encodeURIComponent(msg);
-   const w=window.open(wa,"_blank","noopener,noreferrer");
-   if(w)opened++;
- }
- if(hasEmail){
-   const subject="CleanCore Invoice "+inv.invoice_no;
-   const mail="mailto:"+email+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(msg);
-   const m=window.open(mail,"_blank");
-   if(m)opened++;
- }
-
- const destinations=[];
- if(hasPhone)destinations.push("WhatsApp");
- if(hasEmail)destinations.push("Email");
+ const wa="https://web.whatsapp.com/send?phone="+businessPhone+"&text="+encodeURIComponent(msg);
+ const w=window.open(wa,"_blank","noopener,noreferrer");
  const n=$("billSendNotice");
  if(n){
    n.classList.remove("hidden");
-   n.innerHTML=destinations.length
-     ? "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destinations.join(" + ")+" opened with the bill details. Review and press Send in the opened app."
-     : "<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> No customer WhatsApp number or email was provided.";
+   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> WhatsApp Web opened for CleanCore ("+businessPhone+"). Review the bill details and press Send.";
  }
- if(opened===0&&destinations.length)toast("Bill saved, but your browser blocked the WhatsApp/email window.",false);
+ if(!w)toast("Bill saved, but your browser blocked the WhatsApp window. Allow pop-ups for CleanCore Manager.",false);
 }
 function numberToWordsIndian(n){
  n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
