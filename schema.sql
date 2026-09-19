@@ -1419,3 +1419,45 @@ begin
 end; $$;
 revoke all on function public.create_manager_bill(jsonb,jsonb) from public;
 grant execute on function public.create_manager_bill(jsonb,jsonb) to authenticated;
+
+-- Central Error Finder: browser/app errors from Manager, Website and Employee Portal.
+create table if not exists public.error_logs (
+ id uuid primary key default gen_random_uuid(),
+ created_at timestamptz not null default now(),
+ app_name text not null default 'Unknown',
+ app_version text,
+ environment text,
+ page text,
+ url text,
+ action text,
+ error_name text,
+ message text not null,
+ stack text,
+ context jsonb not null default '{}'::jsonb,
+ user_agent text,
+ user_id uuid references auth.users(id) on delete set null,
+ status text not null default 'New' check(status in ('New','Investigating','Fixed','Ignored')),
+ resolved_at timestamptz,
+ resolved_by uuid references auth.users(id) on delete set null
+);
+create index if not exists error_logs_created_idx on public.error_logs(created_at desc);
+create index if not exists error_logs_status_idx on public.error_logs(status,created_at desc);
+create index if not exists error_logs_app_idx on public.error_logs(app_name,created_at desc);
+alter table public.error_logs enable row level security;
+drop policy if exists error_logs_admin_select on public.error_logs;
+create policy error_logs_admin_select on public.error_logs for select to authenticated using (public.is_admin());
+drop policy if exists error_logs_admin_update on public.error_logs;
+create policy error_logs_admin_update on public.error_logs for update to authenticated using (public.is_admin()) with check (public.is_admin());
+create or replace function public.log_client_error(p_app_name text,p_app_version text,p_page text,p_url text,p_action text,p_error_name text,p_message text,p_stack text,p_context jsonb,p_user_agent text)
+returns uuid language plpgsql security definer set search_path=public
+as $$
+declare v_id uuid;
+begin
+ if length(coalesce(p_message,''))=0 then return null; end if;
+ insert into public.error_logs(app_name,app_version,environment,page,url,action,error_name,message,stack,context,user_agent,user_id)
+ values(left(coalesce(p_app_name,'Unknown'),80),left(coalesce(p_app_version,''),40),'',left(coalesce(p_page,''),300),left(coalesce(p_url,''),1000),left(coalesce(p_action,''),200),left(coalesce(p_error_name,''),120),left(p_message,4000),left(coalesce(p_stack,''),12000),coalesce(p_context,'{}'::jsonb),left(coalesce(p_user_agent,''),1000),auth.uid())
+ returning id into v_id;
+ return v_id;
+end; $$;
+revoke all on function public.log_client_error(text,text,text,text,text,text,text,text,jsonb,text) from public;
+grant execute on function public.log_client_error(text,text,text,text,text,text,text,text,jsonb,text) to anon,authenticated;
