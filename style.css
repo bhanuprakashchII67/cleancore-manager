@@ -438,3 +438,12 @@ dialog .dialog{padding-top:52px}
 .brand.brand-logo{background:transparent;object-fit:cover;border-radius:14px;overflow:hidden}.brand.small.brand-logo{border-radius:10px}
 
 .invoice-logo{width:58px;height:58px;border-radius:14px;display:block;object-fit:cover;margin-bottom:7px}.inv-header{gap:18px}
+
+.notification-settings-grid,.notification-event-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.notification-event-title{margin:18px 0 9px;font-weight:900}
+.switch-row{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #dbe6ee;border-radius:12px;background:#fbfdff;cursor:pointer}
+.switch-row input{margin-top:3px}
+.switch-row span{display:grid;gap:3px}
+.switch-row small{color:#6e8091;line-height:1.35}
+.notification-settings-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:700px){.notification-settings-grid,.notification-event-grid{grid-template-columns:1fr}}
