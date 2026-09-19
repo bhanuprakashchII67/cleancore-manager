@@ -411,6 +411,7 @@ async function go(id){
  const titleEl=$("title");
  if(titleEl)titleEl.textContent=navLabel;
  document.title="CleanCore Manager • "+navLabel;
+ renderAll(id);
 }
 
 let operationalNotificationReady=false;
@@ -734,41 +735,48 @@ function renderQuotations(){
    '<button type="button" class="link view-quotation" data-invoice-id="'+esc(x.id)+'">View / Print</button>'
  ]));
 }
-function renderAll(){
+function renderAll(section){
+ const active=section||document.querySelector(".section.active")?.id||"dashboard";
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
  const todayKey=dateKey(now),monthKey=todayKey.slice(0,7);
  const saleInvoices=invoices.filter(isSaleDocument);
  const td=saleInvoices.filter(x=>new Date(x.created_at)>=day),mo=saleInvoices.filter(x=>new Date(x.created_at)>=mon);
  const grossMonth=mo.reduce((a,x)=>a+Number(x.profit||0),0);
  const monthExpenses=expenses.filter(x=>String(x.expense_date||"").startsWith(monthKey)).reduce((a,x)=>a+Number(x.amount||0),0);
- $("today").textContent=money(td.reduce((a,x)=>a+Number(x.total),0));
- $("month").textContent=money(mo.reduce((a,x)=>a+Number(x.total),0));
- $("grossProfit").textContent=money(grossMonth);
- $("monthlyExpenses").textContent=money(monthExpenses);
- $("netProfit").textContent=money(grossMonth-monthExpenses);
- $("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
+ if($("today"))$("today").textContent=money(td.reduce((a,x)=>a+Number(x.total),0));
+ if($("month"))$("month").textContent=money(mo.reduce((a,x)=>a+Number(x.total),0));
+ if($("grossProfit"))$("grossProfit").textContent=money(grossMonth);
+ if($("monthlyExpenses"))$("monthlyExpenses").textContent=money(monthExpenses);
+ if($("netProfit"))$("netProfit").textContent=money(grossMonth-monthExpenses);
+ if($("low"))$("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
- $("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],saleInvoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
- $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
-  esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
-  Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
-  '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
- ]));
- $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
-  esc(r.name),esc(r.unit),money(r.cost_per_unit),r.stock,
-  Number(r.stock)<=Number(r.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
-  '<button class="link" onclick="editRawMaterial(\''+r.id+'\')">Edit</button> <button class="link danger" onclick="deleteRawMaterial(\''+r.id+'\')">Delete</button>'
- ]));
- renderSales();
- renderExpenses();
- renderCustomers();
- renderWebsiteOrders();
- renderQuotations();
- $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+
+ if(active==="dashboard"){
+   if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],saleInvoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
+ }
+ if(active==="products"){
+   $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
+     esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
+     Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
+     '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
+   ]));
+   $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
+     esc(r.name),esc(r.unit),money(r.cost_per_unit),r.stock,
+     Number(r.stock)<=Number(r.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
+     '<button class="link" onclick="editRawMaterial(\''+r.id+'\')">Edit</button> <button class="link danger" onclick="deleteRawMaterial(\''+r.id+'\')">Delete</button>'
+   ]));
+ }
+ if(active==="sales")renderSales();
+ if(active==="billing"){renderQuotations();rebuildLines();}
+ if(active==="expenses")renderExpenses();
+ if(active==="customers")renderCustomers();
+ if(active==="website_orders")renderWebsiteOrders();
+ if(active==="enquiries"){
+   $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+ }
  if($("websiteOrdersPanel"))$("websiteOrdersPanel").style.display=(isAdmin||canAccess("website_orders"))?"":"none";
  if($("enquiriesPanel"))$("enquiriesPanel").style.display=(isAdmin||canAccess("enquiries"))?"":"none";
  if($("addEnquiry"))$("addEnquiry").disabled=(!isAdmin&&!canAccess("enquiries"));
- rebuildLines();
 }
 window.deleteInvoice=async function(id){
  if(!isAdmin){toast("Only the Manager can delete invoices.",false);return;}
