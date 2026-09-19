@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.30";
+const MANAGER_VERSION="3.8.31";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1711,17 +1711,11 @@ $("billForm").addEventListener("submit",async e=>{
    $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
    toast((isQuotation?"Quotation ":"Bill ")+(data.invoice_no||no)+" generated successfully.");
    if(savedInv){
-     if(isQuotation){
-       await window.viewInvoice(savedInv.id);
-     }else{
-       try{ await sendBillToCustomer(savedInv,customer,items); }
-       catch(sendErr){
-         console.error("Post-bill customer delivery action failed",sendErr);
-         const notice=$("billSendNotice");
-         if(notice){notice.classList.remove("hidden");notice.innerHTML="<strong>Invoice "+esc(savedInv.invoice_no||no)+" saved in Manager.</strong> WhatsApp/PDF delivery could not be started. Use View / Print / Save PDF from Sales."}
-         toast("Bill saved, but customer delivery action failed.",false,{action:"bill_delivery_action"});
-       }
-     }
+     // Bill generation is intentionally kept inside Manager. Do not open
+     // WhatsApp, create/download a PDF, or call external delivery services
+     // automatically after saving. The user can open/print the invoice from
+     // the Manager Sales table when needed.
+     await window.viewInvoice(savedInv.id);
    }
  }catch(err){
    if(preopenedWhatsAppWindow){
