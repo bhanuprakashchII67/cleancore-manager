@@ -648,7 +648,7 @@ begin
      coalesce(r.payload->>'payment_status','Credit'),coalesce((r.payload->>'paid_amount')::numeric,0),coalesce((r.payload->>'due_amount')::numeric,0),nullif(r.payload->>'due_date','')::date,
      coalesce(r.payload->>'payment_method','Credit'),coalesce((r.payload->>'total')::numeric,0),coalesce((r.payload->>'profit')::numeric,0)) returning id into v_invoice_id;
    insert into public.invoice_items(invoice_id,product_id,product_name,qty,unit_price,cost_price,line_total,line_profit)
-   select v_invoice_id,(item->>'product_id')::uuid,item->>'product_name',(item->>'qty')::integer,(item->>'unit_price')::numeric,(item->>'cost_price')::numeric,(item->>'line_total')::numeric,(item->>'line_profit')::numeric)
+   select v_invoice_id,(item->>'product_id')::uuid,item->>'product_name',(item->>'qty')::integer,(item->>'unit_price')::numeric,(item->>'cost_price')::numeric,(item->>'line_total')::numeric,(item->>'line_profit')::numeric
    from jsonb_array_elements(coalesce(r.payload->'items','[]'::jsonb)) item;
    update public.products p set stock=p.stock-q.qty from (select (item->>'product_id')::uuid product_id,sum((item->>'qty')::integer) qty from jsonb_array_elements(coalesce(r.payload->'items','[]'::jsonb)) item group by (item->>'product_id')::uuid) q where p.id=q.product_id;
    if coalesce((r.payload->>'paid_amount')::numeric,0)>0 then
@@ -1186,3 +1186,95 @@ for all to authenticated using(manager_user_id=auth.uid()) with check(manager_us
 
 -- Leads / Enquiries are separate from customer orders.
 -- Website orders belong to website_orders/invoices and must never create enquiry rows.
+
+
+-- Universal bill lifecycle: payment and delivery are independent states for every bill.
+alter table public.invoices
+  add column if not exists bill_status text not null default 'Confirmed',
+  add column if not exists delivery_status text not null default 'Pending',
+  add column if not exists source text not null default 'Manager';
+
+update public.invoices
+set payment_status=case
+  when coalesce(document_type,'SALE')='QUOTATION' then 'Not Applicable'
+  when coalesce(due_amount,0)<=0 and coalesce(total,0)>0 then 'Paid'
+  when coalesce(paid_amount,0)>0 then 'Partially Paid'
+  else 'Unpaid'
+end;
+
+update public.invoices
+set bill_status=case when coalesce(document_type,'SALE')='QUOTATION' then 'Draft' else 'Confirmed' end
+where bill_status is null or bill_status='';
+
+update public.invoices set delivery_status='Pending'
+where delivery_status is null or delivery_status='';
+
+alter table public.invoices drop constraint if exists invoices_bill_status_check;
+alter table public.invoices add constraint invoices_bill_status_check
+  check(bill_status in ('Draft','Confirmed','Cancelled','Completed'));
+
+alter table public.invoices drop constraint if exists invoices_delivery_status_check;
+alter table public.invoices add constraint invoices_delivery_status_check
+  check(delivery_status in ('Pending','Out for Delivery','Delivered','Failed','Not Applicable'));
+
+alter table public.invoices drop constraint if exists invoices_payment_status_check;
+alter table public.invoices add constraint invoices_payment_status_check
+  check(payment_status in ('Unpaid','Partially Paid','Paid','Not Applicable','Credit','Part Paid'));
+
+create index if not exists invoices_customer_created_idx on public.invoices(customer_id,created_at desc);
+create index if not exists invoices_bill_status_idx on public.invoices(bill_status,created_at desc);
+create index if not exists invoices_delivery_status_idx on public.invoices(delivery_status,created_at desc);
+create index if not exists invoice_items_product_idx on public.invoice_items(product_id);
+create index if not exists website_order_items_product_idx on public.website_order_items(product_id);
+
+create or replace function public.update_invoice_fulfillment(
+  p_invoice_id uuid,
+  p_bill_status text default null,
+  p_delivery_status text default null
+)
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare v_invoice public.invoices%rowtype;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  if p_bill_status is not null and p_bill_status not in ('Draft','Confirmed','Cancelled','Completed') then raise exception 'Invalid bill status'; end if;
+  if p_delivery_status is not null and p_delivery_status not in ('Pending','Out for Delivery','Delivered','Failed','Not Applicable') then raise exception 'Invalid delivery status'; end if;
+  update public.invoices
+  set bill_status=coalesce(p_bill_status,bill_status),delivery_status=coalesce(p_delivery_status,delivery_status)
+  where id=p_invoice_id returning * into v_invoice;
+  if v_invoice.id is null then raise exception 'Invoice not found'; end if;
+  insert into public.audit_logs(actor_user_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+  values(auth.uid(),'admin','BILL_STATUS_UPDATED','billing','invoice_status_update','invoices',v_invoice.id,
+    jsonb_build_object('bill_status',v_invoice.bill_status,'delivery_status',v_invoice.delivery_status));
+  return jsonb_build_object('id',v_invoice.id,'bill_status',v_invoice.bill_status,'delivery_status',v_invoice.delivery_status);
+end; $$;
+revoke all on function public.update_invoice_fulfillment(uuid,text,text) from public;
+grant execute on function public.update_invoice_fulfillment(uuid,text,text) to authenticated;
+
+drop trigger if exists website_order_sync_invoice_status on public.website_orders;
+create or replace function public.sync_website_order_invoice_status()
+returns trigger language plpgsql security definer set search_path=public
+as $$
+declare v_delivery text;
+begin
+  if new.invoice_id is null then return new; end if;
+  v_delivery:=case new.status
+    when 'Delivered' then 'Delivered'
+    when 'Out for Delivery' then 'Out for Delivery'
+    when 'Cancelled' then 'Failed'
+    else 'Pending'
+  end;
+  update public.invoices
+  set delivery_status=v_delivery,
+      bill_status=case when new.status='Cancelled' then 'Cancelled'
+                       when new.status='Delivered' then 'Completed'
+                       else bill_status end
+  where id=new.invoice_id;
+  return new;
+end; $$;
+create trigger website_order_sync_invoice_status
+after update of status on public.website_orders
+for each row execute function public.sync_website_order_invoice_status();
+
+-- Fixed + extended approval function is defined below so employee bill-status changes
+-- use the same Manager approval queue as all other employee changes.
