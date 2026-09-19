@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.32";
+const MANAGER_VERSION="3.8.33";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1895,7 +1895,12 @@ window.viewInvoice=async id=>{
     "<div class='amount-words'><b>Total in words:</b> "+esc(numberToWordsIndian(Number(inv.total||0)))+" ONLY</div>"+
     "<div class='inv-bottom'><div>"+terms+"</div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
     "</div>";
-   $("invoiceDialog").showModal();
+   const dialog=$("invoiceDialog");
+   if(dialog){
+     try{if(dialog.open)dialog.close();}catch(_){}
+     dialog.showModal();
+     dialog.setAttribute("data-invoice-open","1");
+   }
  }catch(err){console.error("Invoice viewer error",err);toast(err?.message||"Unable to open invoice.",false);}
 };
 function buildCustomerBillMessage(inv,customer,items=[]){
@@ -2011,7 +2016,12 @@ function numberToWordsIndian(n){
  if(n)s+=two(n);
  return s.trim()+" RUPEES";
 }
-$("closeInvoice").onclick=()=>$("invoiceDialog").close();
+$("closeInvoice").onclick=()=>{
+ const d=$("invoiceDialog");
+ try{if(d?.open)d.close();}catch(_){}
+ document.body.classList.remove("invoice-open");
+ document.documentElement.classList.remove("invoice-open");
+};
 function getPrintableInvoiceHtml(){
  const body=$("invoicePreview")?.innerHTML?.trim();
  if(!body)throw new Error("Open a bill before printing.");
