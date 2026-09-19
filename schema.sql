@@ -54,11 +54,11 @@ create table if not exists public.invoices(
   sgst_amount numeric(12,2) not null default 0,
   igst_percent numeric(6,2) not null default 0,
   igst_amount numeric(12,2) not null default 0,
-  payment_status text not null default 'Credit',
+  payment_status text not null default 'Unpaid',
   paid_amount numeric(12,2) not null default 0,
   due_amount numeric(12,2) not null default 0,
   due_date date,
-  payment_method text not null default 'Credit',
+  payment_method text not null default 'Cash',
  total numeric(12,2) not null default 0, profit numeric(12,2) not null default 0,
  created_at timestamptz not null default now()
 );
@@ -68,11 +68,11 @@ alter table public.invoices add column if not exists billing_address text not nu
 alter table public.invoices add column if not exists delivery_address text not null default '';
 alter table public.invoices add column if not exists gst_percent numeric(6,2) not null default 0;
 alter table public.invoices add column if not exists gst_amount numeric(12,2) not null default 0;
-alter table public.invoices add column if not exists payment_status text not null default 'Credit';
+alter table public.invoices add column if not exists payment_status text not null default 'Unpaid';
 alter table public.invoices add column if not exists paid_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_date date;
-alter table public.invoices add column if not exists payment_method text not null default 'Credit';
+alter table public.invoices add column if not exists payment_method text not null default 'Cash';
 
 create table if not exists public.invoice_items(
  id uuid primary key default gen_random_uuid(), invoice_id uuid not null references public.invoices(id) on delete cascade,
@@ -88,6 +88,7 @@ create table if not exists public.payments(
  amount numeric(12,2) not null check(amount>0),
  payment_date date not null default current_date,
  payment_method text not null default 'Cash',
+ reference text,
  notes text not null default '',
  created_at timestamptz not null default now()
 );
@@ -620,7 +621,7 @@ begin
    values(v_invoice_id,nullif(r.payload->>'customer_id','')::uuid,v_payment_amount,coalesce((r.payload->>'payment_date')::date,current_date),coalesce(r.payload->>'payment_method','Cash'),coalesce(r.payload->>'notes',''));
    v_new_paid:=least((select total from public.invoices where id=v_invoice_id),coalesce((select paid_amount from public.invoices where id=v_invoice_id),0)+v_payment_amount);
    v_new_due:=greatest((select total from public.invoices where id=v_invoice_id)-v_new_paid,0);
-   update public.invoices set paid_amount=v_new_paid,due_amount=v_new_due,payment_status=case when v_new_due=0 then 'Paid' else 'Part Paid' end,due_date=case when v_new_due=0 then null else due_date end where id=v_invoice_id returning id into v_id;
+   update public.invoices set paid_amount=v_new_paid,due_amount=v_new_due,payment_status=case when v_new_due=0 then 'Paid' else 'Partially Paid' end,due_date=case when v_new_due=0 then null else due_date end where id=v_invoice_id returning id into v_id;
  elsif r.action='website_order_status' then
    update public.website_orders set status=r.payload->>'status',updated_at=now() where id=r.target_id returning id into v_id;
  elsif r.action='invoice_create' then
@@ -645,8 +646,8 @@ begin
      coalesce(r.payload->>'billing_address',''),coalesce(r.payload->>'delivery_address',''),coalesce((r.payload->>'subtotal')::numeric,0),coalesce((r.payload->>'discount')::numeric,0),
      coalesce((r.payload->>'gst_percent')::numeric,0),coalesce((r.payload->>'gst_amount')::numeric,0),coalesce((r.payload->>'cgst_percent')::numeric,0),coalesce((r.payload->>'cgst_amount')::numeric,0),
      coalesce((r.payload->>'sgst_percent')::numeric,0),coalesce((r.payload->>'sgst_amount')::numeric,0),coalesce((r.payload->>'igst_percent')::numeric,0),coalesce((r.payload->>'igst_amount')::numeric,0),
-     coalesce(r.payload->>'payment_status','Credit'),coalesce((r.payload->>'paid_amount')::numeric,0),coalesce((r.payload->>'due_amount')::numeric,0),nullif(r.payload->>'due_date','')::date,
-     coalesce(r.payload->>'payment_method','Credit'),coalesce((r.payload->>'total')::numeric,0),coalesce((r.payload->>'profit')::numeric,0)) returning id into v_invoice_id;
+     coalesce(r.payload->>'payment_status','Unpaid'),coalesce((r.payload->>'paid_amount')::numeric,0),coalesce((r.payload->>'due_amount')::numeric,0),nullif(r.payload->>'due_date','')::date,
+     coalesce(r.payload->>'payment_method','Cash'),coalesce((r.payload->>'total')::numeric,0),coalesce((r.payload->>'profit')::numeric,0)) returning id into v_invoice_id;
    insert into public.invoice_items(invoice_id,product_id,product_name,qty,unit_price,cost_price,line_total,line_profit)
    select v_invoice_id,(item->>'product_id')::uuid,item->>'product_name',(item->>'qty')::integer,(item->>'unit_price')::numeric,(item->>'cost_price')::numeric,(item->>'line_total')::numeric,(item->>'line_profit')::numeric
    from jsonb_array_elements(coalesce(r.payload->'items','[]'::jsonb)) item;
@@ -1219,7 +1220,7 @@ alter table public.invoices add constraint invoices_delivery_status_check
 
 alter table public.invoices drop constraint if exists invoices_payment_status_check;
 alter table public.invoices add constraint invoices_payment_status_check
-  check(payment_status in ('Unpaid','Partially Paid','Paid','Not Applicable','Credit','Part Paid'));
+  check(payment_status in ('Unpaid','Partially Paid','Paid','Not Applicable','Credit'));
 
 create index if not exists invoices_customer_created_idx on public.invoices(customer_id,created_at desc);
 create index if not exists invoices_bill_status_idx on public.invoices(bill_status,created_at desc);
@@ -1461,3 +1462,54 @@ begin
 end; $$;
 revoke all on function public.log_client_error(text,text,text,text,text,text,text,text,jsonb,text) from public;
 grant execute on function public.log_client_error(text,text,text,text,text,text,text,text,jsonb,text) to anon,authenticated;
+
+
+-- Dedicated employee payment approval workflow.
+create or replace function public.review_payment_change_request(
+  p_request_id uuid,
+  p_approve boolean,
+  p_note text default ''
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  r public.change_requests%rowtype;
+  v_invoice public.invoices%rowtype;
+  v_payment_id uuid;
+  v_paid numeric;
+  v_due numeric;
+  v_methods text[];
+  v_summary_method text;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  select * into r from public.change_requests where id=p_request_id for update;
+  if r.id is null then raise exception 'Approval request not found'; end if;
+  if r.status<>'Pending' then raise exception 'Approval request is already reviewed'; end if;
+  if r.action<>'payment_create' then raise exception 'Invalid payment request'; end if;
+  if not p_approve then
+    update public.change_requests set status='Rejected',reviewed_at=now(),reviewed_by=auth.uid(),review_note=coalesce(p_note,'') where id=r.id;
+    insert into public.audit_logs(actor_user_id,employee_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+    values(auth.uid(),r.employee_id,'admin','CHANGE_REJECTED',r.module,r.action,r.target_table,r.target_id,jsonb_build_object('request_id',r.id,'note',coalesce(p_note,'')));
+    return jsonb_build_object('status','Rejected','request_id',r.id);
+  end if;
+  select * into v_invoice from public.invoices where id=r.target_id for update;
+  if v_invoice.id is null then raise exception 'Invoice not found'; end if;
+  if coalesce((r.payload->>'amount')::numeric,0)<=0 or coalesce((r.payload->>'amount')::numeric,0)>greatest(v_invoice.total-coalesce(v_invoice.paid_amount,0),0) then raise exception 'Payment exceeds outstanding amount'; end if;
+  insert into public.payments(invoice_id,customer_id,amount,payment_date,payment_method,reference,notes)
+  values(v_invoice.id,nullif(r.payload->>'customer_id','')::uuid,(r.payload->>'amount')::numeric,coalesce((r.payload->>'payment_date')::date,current_date),coalesce(r.payload->>'payment_method','Cash'),nullif(trim(r.payload->>'reference'),''),coalesce(r.payload->>'notes',''))
+  returning id into v_payment_id;
+  select coalesce(sum(amount),0) into v_paid from public.payments where invoice_id=v_invoice.id;
+  v_due:=greatest(v_invoice.total-v_paid,0);
+  select array_agg(distinct payment_method order by payment_method) into v_methods from public.payments where invoice_id=v_invoice.id and payment_method is not null;
+  v_summary_method:=case when coalesce(array_length(v_methods,1),0)=1 then v_methods[1] when coalesce(array_length(v_methods,1),0)>1 then 'Multiple' else null end;
+  update public.invoices set paid_amount=v_paid,due_amount=v_due,payment_status=case when v_due=0 then 'Paid' when v_paid>0 then 'Partially Paid' else 'Unpaid' end,due_date=case when v_due=0 then null else due_date end,payment_method=coalesce(v_summary_method,payment_method) where id=v_invoice.id;
+  update public.change_requests set status='Approved',reviewed_at=now(),reviewed_by=auth.uid(),review_note=coalesce(p_note,'') where id=r.id;
+  insert into public.audit_logs(actor_user_id,employee_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+  values(auth.uid(),r.employee_id,'admin','CHANGE_APPROVED',r.module,r.action,r.target_table,v_invoice.id,jsonb_build_object('request_id',r.id,'payment_id',v_payment_id,'amount',(r.payload->>'amount')::numeric,'note',coalesce(p_note,'')));
+  return jsonb_build_object('status','Approved','request_id',r.id,'created_id',v_payment_id,'invoice_id',v_invoice.id,'paid',v_paid,'due',v_due);
+end;
+$function$;
+grant execute on function public.review_payment_change_request(uuid,boolean,text) to authenticated;
