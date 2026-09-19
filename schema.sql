@@ -1020,34 +1020,53 @@ grant execute on function public.delete_invoice_with_recovery(uuid) to authentic
 create or replace function public.delete_record_with_recovery(p_entity_type text,p_original_id uuid)
 returns uuid language plpgsql security definer set search_path=public
 as $$
-declare v_row jsonb;v_name text;v_record_id uuid;
+declare
+ v_row jsonb; v_snapshot jsonb; v_name text; v_record_id uuid; v_auth_user_id uuid;
+ v_invoice_ids uuid[]; v_order_ids uuid[];
 begin
-  if not public.is_admin() then raise exception 'Manager approval required'; end if;
-  if p_entity_type='product' then
-    select to_jsonb(p),coalesce(p.name,'Product') into v_row,v_name from public.products p where p.id=p_original_id;
-  elsif p_entity_type='raw_material' then
-    select to_jsonb(r),coalesce(r.name,'Raw material') into v_row,v_name from public.raw_materials r where r.id=p_original_id;
-  elsif p_entity_type='customer' then
-    select to_jsonb(c),coalesce(c.business_name,nullif(c.name,''),'Customer') into v_row,v_name from public.customers c where c.id=p_original_id;
-  elsif p_entity_type='expense' then
-    select to_jsonb(e),coalesce(e.category,'Expense')||' • '||coalesce(to_char(e.expense_date,'DD-MM-YYYY'),'') into v_row,v_name from public.expenses e where e.id=p_original_id;
-  elsif p_entity_type='enquiry' then
-    select to_jsonb(e),coalesce(nullif(e.business,''),nullif(e.name,''),'Enquiry') into v_row,v_name from public.enquiries e where e.id=p_original_id;
-  else raise exception 'Unsupported recovery entity type'; end if;
-  if v_row is null then raise exception 'Record not found'; end if;
-  v_record_id:=public.archive_deleted_record(p_entity_type,p_original_id,v_name,jsonb_build_object('row',v_row));
-  if p_entity_type='customer' then
-    update public.customers set archived_at=coalesce(archived_at,now()),updated_at=now() where id=p_original_id;
-  elsif p_entity_type='product' then
-    delete from public.products where id=p_original_id;
-  elsif p_entity_type='raw_material' then
-    delete from public.raw_materials where id=p_original_id;
-  elsif p_entity_type='expense' then
-    delete from public.expenses where id=p_original_id;
-  elsif p_entity_type='enquiry' then
-    delete from public.enquiries where id=p_original_id;
-  end if;
-  return v_record_id;
+ if not public.is_admin() then raise exception 'Manager approval required'; end if;
+ if p_entity_type='customer' then
+   select to_jsonb(c),coalesce(c.business_name,nullif(c.name,''),'Customer'),c.auth_user_id into v_row,v_name,v_auth_user_id
+   from public.customers c where c.id=p_original_id;
+   if v_row is null then raise exception 'Customer not found'; end if;
+   select coalesce(array_agg(i.id),'{}'::uuid[]) into v_invoice_ids from public.invoices i where i.customer_id=p_original_id;
+   select coalesce(array_agg(o.id),'{}'::uuid[]) into v_order_ids from public.website_orders o where o.customer_id=p_original_id;
+   v_snapshot:=jsonb_build_object(
+     'row',v_row,
+     'auth_user',(select jsonb_build_object('id',u.id,'email',u.email,'phone',u.phone,'raw_user_meta_data',u.raw_user_meta_data,'raw_app_meta_data',u.raw_app_meta_data,'email_confirmed_at',u.email_confirmed_at,'phone_confirmed_at',u.phone_confirmed_at,'created_at',u.created_at,'updated_at',u.updated_at) from auth.users u where u.id=v_auth_user_id),
+     'invoices',coalesce((select jsonb_agg(to_jsonb(i)) from public.invoices i where i.customer_id=p_original_id),'[]'::jsonb),
+     'invoice_items',coalesce((select jsonb_agg(to_jsonb(ii)) from public.invoice_items ii where ii.invoice_id=any(v_invoice_ids)),'[]'::jsonb),
+     'payments',coalesce((select jsonb_agg(to_jsonb(p)) from public.payments p where p.customer_id=p_original_id or p.invoice_id=any(v_invoice_ids)),'[]'::jsonb),
+     'website_orders',coalesce((select jsonb_agg(to_jsonb(o)) from public.website_orders o where o.customer_id=p_original_id),'[]'::jsonb),
+     'website_order_items',coalesce((select jsonb_agg(to_jsonb(oi)) from public.website_order_items oi where oi.order_id=any(v_order_ids)),'[]'::jsonb),
+     'enquiries',coalesce((select jsonb_agg(to_jsonb(e)) from public.enquiries e where e.website_order_id=any(v_order_ids) or e.invoice_id=any(v_invoice_ids)),'[]'::jsonb)
+   );
+   v_record_id:=public.archive_deleted_record('customer',p_original_id,v_name,v_snapshot);
+   delete from public.enquiries where website_order_id=any(v_order_ids) or invoice_id=any(v_invoice_ids);
+   delete from public.website_order_items where order_id=any(v_order_ids);
+   delete from public.website_orders where id=any(v_order_ids);
+   delete from public.payments where customer_id=p_original_id or invoice_id=any(v_invoice_ids);
+   delete from public.invoice_items where invoice_id=any(v_invoice_ids);
+   delete from public.invoices where id=any(v_invoice_ids);
+   delete from public.customers where id=p_original_id;
+   if v_auth_user_id is not null then delete from auth.sessions where user_id=v_auth_user_id; end if;
+   return v_record_id;
+ elsif p_entity_type='product' then
+   select to_jsonb(p),coalesce(p.name,'Product') into v_row,v_name from public.products p where p.id=p_original_id;
+ elsif p_entity_type='raw_material' then
+   select to_jsonb(r),coalesce(r.name,'Raw material') into v_row,v_name from public.raw_materials r where r.id=p_original_id;
+ elsif p_entity_type='expense' then
+   select to_jsonb(e),coalesce(e.category,'Expense')||' • '||coalesce(to_char(e.expense_date,'DD-MM-YYYY'),'') into v_row,v_name from public.expenses e where e.id=p_original_id;
+ elsif p_entity_type='enquiry' then
+   select to_jsonb(e),coalesce(nullif(e.business,''),nullif(e.name,''),'Enquiry') into v_row,v_name from public.enquiries e where e.id=p_original_id;
+ else raise exception 'Unsupported recovery entity type'; end if;
+ if v_row is null then raise exception 'Record not found'; end if;
+ v_record_id:=public.archive_deleted_record(p_entity_type,p_original_id,v_name,jsonb_build_object('row',v_row));
+ if p_entity_type='product' then delete from public.products where id=p_original_id;
+ elsif p_entity_type='raw_material' then delete from public.raw_materials where id=p_original_id;
+ elsif p_entity_type='expense' then delete from public.expenses where id=p_original_id;
+ elsif p_entity_type='enquiry' then delete from public.enquiries where id=p_original_id; end if;
+ return v_record_id;
 end;
 $$;
 revoke all on function public.delete_record_with_recovery(text,uuid) from public;
@@ -1058,39 +1077,37 @@ returns jsonb language plpgsql security definer set search_path=public
 as $$
 declare r public.deleted_records%rowtype;v_id uuid;
 begin
-  if not public.is_admin() then raise exception 'Manager approval required'; end if;
-  select * into r from public.deleted_records where id=p_deleted_id for update;
-  if r.id is null then raise exception 'Recovery record not found'; end if;
-  if r.status<>'Deleted' then raise exception 'This record has already been restored or purged'; end if;
-  if r.purge_at<=now() then raise exception 'Recovery window has expired'; end if;
-
-  if r.entity_type='invoice' then
-    insert into public.invoices select * from jsonb_populate_record(null::public.invoices,r.snapshot->'invoice') returning id into v_id;
-    insert into public.invoice_items select * from jsonb_populate_recordset(null::public.invoice_items,r.snapshot->'invoice_items');
-    insert into public.payments select * from jsonb_populate_recordset(null::public.payments,r.snapshot->'payments');
-    insert into public.website_orders select * from jsonb_populate_recordset(null::public.website_orders,r.snapshot->'website_orders');
-    insert into public.website_order_items select * from jsonb_populate_recordset(null::public.website_order_items,r.snapshot->'website_order_items');
-    insert into public.enquiries select * from jsonb_populate_recordset(null::public.enquiries,r.snapshot->'enquiries');
-  elsif r.entity_type='product' then
-    insert into public.products select * from jsonb_populate_record(null::public.products,r.snapshot->'row') returning id into v_id;
-  elsif r.entity_type='raw_material' then
-    insert into public.raw_materials select * from jsonb_populate_record(null::public.raw_materials,r.snapshot->'row') returning id into v_id;
-  elsif r.entity_type='customer' then
-    update public.customers set archived_at=null,updated_at=now() where id=(r.snapshot->'row'->>'id')::uuid returning id into v_id;
-    if v_id is null then insert into public.customers select * from jsonb_populate_record(null::public.customers,r.snapshot->'row') returning id into v_id; end if;
-  elsif r.entity_type='expense' then
-    insert into public.expenses select * from jsonb_populate_record(null::public.expenses,r.snapshot->'row') returning id into v_id;
-  elsif r.entity_type='enquiry' then
-    insert into public.enquiries select * from jsonb_populate_record(null::public.enquiries,r.snapshot->'row') returning id into v_id;
-  else raise exception 'Unsupported recovery entity type'; end if;
-
-  update public.deleted_records set status='Restored',restored_at=now(),restored_by=auth.uid() where id=r.id;
-  insert into public.audit_logs(actor_user_id,actor_type,event_type,module,action,target_table,target_id,metadata)
-  values(auth.uid(),'admin','RECOVERY_RESTORED','recovery','restore',r.entity_type,v_id,jsonb_build_object('deleted_record_id',r.id,'display_name',r.display_name));
-  return jsonb_build_object('status','Restored','deleted_record_id',r.id,'created_id',v_id);
-exception when unique_violation then
-  raise exception 'Restore could not complete because a record with the same unique identifier already exists.';
-end;
+ if not public.is_admin() then raise exception 'Manager approval required'; end if;
+ select * into r from public.deleted_records where id=p_deleted_id for update;
+ if r.id is null then raise exception 'Recovery record not found'; end if;
+ if r.status<>'Deleted' then raise exception 'This record has already been restored or purged'; end if;
+ if r.purge_at<=now() then raise exception 'Recovery window has expired'; end if;
+ if r.entity_type='customer' then
+   insert into public.customers select * from jsonb_populate_record(null::public.customers,r.snapshot->'row') returning id into v_id;
+   insert into public.invoices select * from jsonb_populate_recordset(null::public.invoices,r.snapshot->'invoices');
+   insert into public.invoice_items select * from jsonb_populate_recordset(null::public.invoice_items,r.snapshot->'invoice_items');
+   insert into public.payments select * from jsonb_populate_recordset(null::public.payments,r.snapshot->'payments');
+   insert into public.website_orders select * from jsonb_populate_recordset(null::public.website_orders,r.snapshot->'website_orders');
+   insert into public.website_order_items select * from jsonb_populate_recordset(null::public.website_order_items,r.snapshot->'website_order_items');
+   insert into public.enquiries select * from jsonb_populate_recordset(null::public.enquiries,r.snapshot->'enquiries');
+   if r.snapshot->'auth_user' is not null and r.snapshot->'auth_user' <> 'null'::jsonb then delete from auth.sessions where user_id=(r.snapshot->'auth_user'->>'id')::uuid; end if;
+ elsif r.entity_type='invoice' then
+   insert into public.invoices select * from jsonb_populate_record(null::public.invoices,r.snapshot->'invoice') returning id into v_id;
+   insert into public.invoice_items select * from jsonb_populate_recordset(null::public.invoice_items,r.snapshot->'invoice_items');
+   insert into public.payments select * from jsonb_populate_recordset(null::public.payments,r.snapshot->'payments');
+   insert into public.website_orders select * from jsonb_populate_recordset(null::public.website_orders,r.snapshot->'website_orders');
+   insert into public.website_order_items select * from jsonb_populate_recordset(null::public.website_order_items,r.snapshot->'website_order_items');
+   insert into public.enquiries select * from jsonb_populate_recordset(null::public.enquiries,r.snapshot->'enquiries');
+ elsif r.entity_type='product' then insert into public.products select * from jsonb_populate_record(null::public.products,r.snapshot->'row') returning id into v_id;
+ elsif r.entity_type='raw_material' then insert into public.raw_materials select * from jsonb_populate_record(null::public.raw_materials,r.snapshot->'row') returning id into v_id;
+ elsif r.entity_type='expense' then insert into public.expenses select * from jsonb_populate_record(null::public.expenses,r.snapshot->'row') returning id into v_id;
+ elsif r.entity_type='enquiry' then insert into public.enquiries select * from jsonb_populate_record(null::public.enquiries,r.snapshot->'row') returning id into v_id;
+ else raise exception 'Unsupported recovery entity type'; end if;
+ update public.deleted_records set status='Restored',restored_at=now(),restored_by=auth.uid() where id=r.id;
+ insert into public.audit_logs(actor_user_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+ values(auth.uid(),'admin','RECOVERY_RESTORED','recovery','restore',r.entity_type,v_id,jsonb_build_object('deleted_record_id',r.id,'display_name',r.display_name));
+ return jsonb_build_object('status','Restored','deleted_record_id',r.id,'created_id',v_id);
+exception when unique_violation then raise exception 'Restore could not complete because a record with the same unique identifier already exists.'; end;
 $$;
 revoke all on function public.restore_deleted_record(uuid) from public;
 grant execute on function public.restore_deleted_record(uuid) to authenticated;
