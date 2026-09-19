@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.7.1">
+<link rel="stylesheet" href="style.css?v=3.7.2">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v3.7.1</p>
+    <p class="version">CleanCore Manager v3.7.2</p>
   </div>
 </section>
 
@@ -250,6 +250,33 @@
     <label>Notes<textarea id="paymentNotes" rows="3"></textarea></label>
     <div class="actions"><button type="button" id="closePayment" class="btn">Cancel</button><button class="btn primary" value="default">Save Payment</button></div>
   </form>
+</dialog>
+
+<dialog id="invoiceStatusDialog">
+<form method="dialog" id="invoiceStatusForm" class="dialog">
+  <h3>Update Bill Status</h3>
+  <input id="statusInvoiceId" type="hidden">
+  <p><b>Bill:</b> <span id="statusInvoiceNo"></span></p>
+  <label>Bill status
+    <select id="statusBill">
+      <option value="Draft">Draft</option>
+      <option value="Confirmed">Confirmed</option>
+      <option value="Cancelled">Cancelled</option>
+      <option value="Completed">Completed</option>
+    </select>
+  </label>
+  <label>Delivery status
+    <select id="statusDelivery">
+      <option value="Pending">Pending</option>
+      <option value="Out for Delivery">Out for Delivery</option>
+      <option value="Delivered">Delivered</option>
+      <option value="Failed">Failed</option>
+      <option value="Not Applicable">Not Applicable</option>
+    </select>
+  </label>
+  <p class="muted tiny">Payment status is controlled separately by recorded payments. Updating delivery does not mark the bill as paid.</p>
+  <div class="actions"><button type="button" id="closeInvoiceStatus" class="btn">Cancel</button><button class="btn primary">Save Status</button></div>
+</form>
 </dialog>
 
 <section id="enquiries" class="section">
@@ -548,6 +575,6 @@
 <script>
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=3.7.1"></script>
+<script src="app.js?v=3.7.2"></script>
 </body>
 </html>
