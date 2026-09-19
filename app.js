@@ -14,10 +14,141 @@ const ALL_MODULES=["dashboard","products","billing","sales","customers","enquiri
 const MODULE_LABELS={dashboard:"Dashboard",products:"Products & Stock",billing:"Billing",sales:"Sales",customers:"Customers",enquiries:"Leads / Enquiries",website_orders:"Website Orders",expenses:"Expenses"};
 const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing",sales:"sales",customers:"customers",enquiries:"enquiries",expenses:"expenses",settings:"settings",recovery:"recovery"};
 const EMPLOYEE_PORTAL_BASE="https://bhanuprakashchII67.github.io/cleancore-website/employee.html";
-let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[],deletedRecords=[];
+let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[],deletedRecords=[],websiteNotifications=[];
+let notificationChannel=null,notificationPollTimer=null,notificationAudioContext=null;
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
+function notificationStoreKey(type){return "cleancore_manager_notifications_"+type+"_"+(user?.id||"guest")}
+function isWebsiteManagerNotification(n){return n&&["Website Order","Website Enquiry"].includes(n.notification_type)}
+function notificationTime(v){return v?new Date(v).toLocaleString("en-IN"):"—"}
+function unlockNotificationAudio(){
+ try{
+   if(!notificationAudioContext)notificationAudioContext=new (window.AudioContext||window.webkitAudioContext)();
+   if(notificationAudioContext.state==="suspended")notificationAudioContext.resume().catch(()=>{});
+ }catch(e){}
+}
+function playNotificationSound(){
+ try{
+   unlockNotificationAudio();
+   const ctx=notificationAudioContext;if(!ctx)return;
+   const now=ctx.currentTime;
+   [0,0.18].forEach((offset,i)=>{
+     const o=ctx.createOscillator(),g=ctx.createGain();
+     o.type="sine";
+     o.frequency.setValueAtTime(i===0?880:1175,now+offset);
+     g.gain.setValueAtTime(0.0001,now+offset);
+     g.gain.exponentialRampToValueAtTime(0.18,now+offset+0.02);
+     g.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.16);
+     o.connect(g);g.connect(ctx.destination);
+     o.start(now+offset);o.stop(now+offset+0.18);
+   });
+ }catch(e){}
+}
+function notificationReadAt(){return Number(localStorage.getItem(notificationStoreKey("read"))||0)}
+function notificationAlertedAt(){return Number(localStorage.getItem(notificationStoreKey("alerted"))||0)}
+function setNotificationTimestamp(type,v){localStorage.setItem(notificationStoreKey(type),String(v))}
+function renderWebsiteNotifications(){
+ const list=$("notificationList"),badge=$("notificationBadge");
+ if(!list||!badge)return;
+ const readAt=notificationReadAt();
+ const unread=websiteNotifications.filter(n=>new Date(n.created_at).getTime()>readAt).length;
+ badge.textContent=String(unread);
+ badge.classList.toggle("hidden",unread===0);
+ if(!websiteNotifications.length){
+   list.innerHTML='<div class="empty">No website orders or enquiries yet.</div>';
+   return;
+ }
+ list.innerHTML=websiteNotifications.slice(0,15).map(n=>{
+   const isOrder=n.notification_type==="Website Order";
+   return '<button type="button" class="notification-item '+(new Date(n.created_at).getTime()>readAt?"unread":"")+'" data-notification-id="'+esc(n.related_id||"")+'" data-notification-type="'+esc(n.notification_type)+'">'+
+     '<span class="notification-icon">'+(isOrder?"🛒":"✉️")+'</span>'+
+     '<span class="notification-copy"><strong>'+esc(n.subject||n.notification_type)+'</strong><small>'+esc(n.body||"")+'</small><em>'+esc(notificationTime(n.created_at))+'</em></span>'+
+   '</button>';
+ }).join("");
+}
+function announceWebsiteNotification(n){
+ if(!isWebsiteManagerNotification(n)||websiteNotifications.some(x=>x.id===n.id))return;
+ websiteNotifications.unshift(n);
+ const ts=new Date(n.created_at).getTime();
+ setNotificationTimestamp("alerted",Math.max(notificationAlertedAt(),ts));
+ renderWebsiteNotifications();
+ playNotificationSound();
+ const isOrder=n.notification_type==="Website Order";
+ toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
+}
+async function loadWebsiteNotifications(firstLoad=false){
+ if(!isAdmin)return;
+ const {data,error}=await db.from("manager_notifications").select("*").in("notification_type",["Website Order","Website Enquiry"]).order("created_at",{ascending:false}).limit(50);
+ if(error){console.warn("Website notification load:",error.message);return;}
+ const latest=(data||[]).filter(isWebsiteManagerNotification);
+ const currentIds=new Set(websiteNotifications.map(x=>x.id));
+ const previousAlerted=notificationAlertedAt();
+ if(firstLoad&&previousAlerted===0){
+   const latestTs=latest.length?new Date(latest[0].created_at).getTime():Date.now();
+   setNotificationTimestamp("alerted",latestTs);
+   setNotificationTimestamp("read",latestTs);
+ }
+ for(const n of latest.slice().reverse()){
+   if(currentIds.has(n.id))continue;
+   if(new Date(n.created_at).getTime()>notificationAlertedAt()){
+     announceWebsiteNotification(n);
+   }else{
+     websiteNotifications.push(n);
+   }
+ }
+ websiteNotifications.sort((x,y)=>new Date(y.created_at)-new Date(x.created_at));
+ renderWebsiteNotifications();
+}
+function stopWebsiteNotifications(){
+ if(notificationPollTimer){clearInterval(notificationPollTimer);notificationPollTimer=null;}
+ if(notificationChannel){db.removeChannel(notificationChannel).catch?.(()=>{});notificationChannel=null;}
+}
+async function startWebsiteNotifications(){
+ stopWebsiteNotifications();
+ if(!isAdmin)return;
+ await loadWebsiteNotifications(true);
+ notificationChannel=db.channel("cleancore-manager-website-alerts")
+   .on("postgres_changes",{event:"INSERT",schema:"public",table:"manager_notifications"},payload=>{
+     if(isWebsiteManagerNotification(payload.new))announceWebsiteNotification(payload.new);
+   })
+   .subscribe();
+ notificationPollTimer=setInterval(()=>loadWebsiteNotifications(false),10000);
+}
+function markWebsiteNotificationsRead(){
+ const latest=websiteNotifications.reduce((max,n)=>Math.max(max,new Date(n.created_at).getTime()),0);
+ if(latest)setNotificationTimestamp("read",latest);
+ renderWebsiteNotifications();
+}
+function bindWebsiteNotificationUi(){
+ $("notificationBtn")?.addEventListener("click",e=>{
+   e.stopPropagation();
+   $("notificationMenu")?.classList.toggle("hidden");
+   unlockNotificationAudio();
+ });
+ $("markNotificationsRead")?.addEventListener("click",e=>{
+   e.stopPropagation();
+   markWebsiteNotificationsRead();
+ });
+ $("notificationList")?.addEventListener("click",async e=>{
+   const item=e.target.closest?.(".notification-item");
+   if(!item)return;
+   const type=item.dataset.notificationType,id=item.dataset.notificationId;
+   markWebsiteNotificationsRead();
+   $("notificationMenu")?.classList.add("hidden");
+   if(type==="Website Order"){
+     await go("website_orders");
+     setTimeout(()=>window.viewWebsiteOrder?.(id),80);
+   }else{
+     await go("enquiries");
+   }
+ });
+ document.addEventListener("click",e=>{
+   if(!e.target.closest?.(".notification-wrap"))$("notificationMenu")?.classList.add("hidden");
+ });
+ document.addEventListener("pointerdown",unlockNotificationAudio,{passive:true});
+ document.addEventListener("keydown",unlockNotificationAudio,{passive:true});
+}
 function ensureDialogCloseButtons(){
  document.querySelectorAll("dialog").forEach(d=>{
    if(!d.querySelector("[data-dialog-x]")){
@@ -126,6 +257,7 @@ async function enter(){
  if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
  applyAccess();
  await loadAll();
+ if(isAdmin)startWebsiteNotifications();
  const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
  await go(first);
 }
@@ -165,7 +297,7 @@ $("loginForm").addEventListener("submit",async e=>{
    return toast(err?.message||"Unable to connect to CleanCore.",false);
  }
 });
-$("logout").onclick=async()=>{clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
+$("logout").onclick=async()=>{stopWebsiteNotifications();clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
 $("refreshManager")?.addEventListener("click",refreshManagerData);
 document.addEventListener("click",e=>{
  const nav=e.target.closest?.(".nav[data-section]");
@@ -1333,7 +1465,7 @@ $("printInvoice").onclick=async e=>{
 };
 $("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
-$("profileLogout").onclick=async()=>{clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
+$("profileLogout").onclick=async()=>{stopWebsiteNotifications();clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
 $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
 $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();if(error)return toast(error.message,false);toast("Reauthentication OTP sent to your email.")};
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
@@ -1415,4 +1547,5 @@ window.addEventListener("storage",e=>{
   if(e.key===MANAGER_LOGIN_EXPIRY_KEY)armManagerExpiryTimer();
 });
 bindRefreshControls();
+bindWebsiteNotificationUi();
 bootstrapManagerSession();
