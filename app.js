@@ -977,9 +977,17 @@ function renderErrorLogs(){
  }));
 }
 async function updateErrorStatus(id,status){
- const {error}=await db.from("error_logs").update({status,resolved_at:status==="Fixed"?new Date().toISOString():null,resolved_by:status==="Fixed"?user?.id:null}).eq("id",id);
+ if(status==="Fixed"){
+   const {error}=await db.from("error_logs").delete().eq("id",id);
+   if(error)return toast("Unable to remove fixed error: "+error.message,false,{action:"delete_fixed_error",context:{id}});
+   errorLogs=errorLogs.filter(x=>x.id!==id);
+   renderErrorLogs();
+   toast("Fixed error removed permanently.");
+   return;
+ }
+ const {error}=await db.from("error_logs").update({status,resolved_at:null,resolved_by:null}).eq("id",id);
  if(error)return toast("Unable to update error: "+error.message,false,{action:"update_error_status",context:{id,status}});
- const row=errorLogs.find(x=>x.id===id);if(row){row.status=status;row.resolved_at=status==="Fixed"?new Date().toISOString():null;}
+ const row=errorLogs.find(x=>x.id===id);if(row){row.status=status;row.resolved_at=null;row.resolved_by=null;}
  renderErrorLogs();
 }
 function formatErrorForCopy(x){
