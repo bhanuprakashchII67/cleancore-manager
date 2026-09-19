@@ -1183,15 +1183,37 @@ $("exportExpenses").onclick=()=>{
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-expenses.csv";a.click();
 };
 let errorFinderRefreshTimer=null;
-async function loadErrorLogs(){
- if(!isAdmin)return;
- const {data,error}=await db.from("error_logs").select("id,created_at,app_name,app_version,page,url,action,error_name,message,stack,context,user_agent,status,resolved_at,resolved_by,fingerprint,occurrence_count,first_seen,last_seen").order("last_seen",{ascending:false}).limit(250);
- if(error){console.warn("Error Finder:",error.message);return toast("Unable to load Error Finder: "+error.message,false,{action:"load_error_logs"});}
- errorLogs=data||[];
- const apps=[...new Set(errorLogs.map(x=>x.app_name).filter(Boolean))].sort();
- const appSelect=$("errorLogAppFilter");
- if(appSelect){const current=appSelect.value;appSelect.innerHTML='<option value="">All apps</option>'+apps.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join("");if(apps.includes(current))appSelect.value=current;}
- renderErrorLogs();
+let errorFinderLoading=false;
+async function loadErrorLogs(options={}){
+ if(!isAdmin)return false;
+ if(errorFinderLoading&&!options.force)return false;
+ errorFinderLoading=true;
+ const btn=$("refreshErrorLogs");
+ const originalText=btn?.textContent||"↻ Refresh";
+ if(options.force&&btn){btn.disabled=true;btn.textContent="↻ Refreshing…";}
+ try{
+   const {data,error}=await db.from("error_logs").select("id,created_at,app_name,app_version,page,url,action,error_name,message,stack,context,user_agent,status,resolved_at,resolved_by,fingerprint,occurrence_count,first_seen,last_seen").order("last_seen",{ascending:false}).limit(250);
+   if(error)throw error;
+   errorLogs=Array.isArray(data)?data:[];
+   const apps=[...new Set(errorLogs.map(x=>x.app_name).filter(Boolean))].sort();
+   const appSelect=$("errorLogAppFilter");
+   if(appSelect){
+     const current=appSelect.value;
+     appSelect.innerHTML='<option value="">All apps</option>'+apps.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join("");
+     if(apps.includes(current))appSelect.value=current;
+     else appSelect.value="";
+   }
+   renderErrorLogs();
+   if(options.force)toast("Error Finder refreshed.");
+   return true;
+ }catch(error){
+   console.warn("Error Finder:",error?.message||error);
+   if(options.force)toast("Unable to refresh Error Finder: "+(error?.message||"Unknown error"),false,{action:"load_error_logs"});
+   return false;
+ }finally{
+   errorFinderLoading=false;
+   if(options.force&&btn){btn.disabled=false;btn.textContent=originalText;}
+ }
 }
 function renderErrorLogs(){
  const box=$("errorLogsTable");if(!box)return;
@@ -1222,7 +1244,7 @@ function formatErrorForCopy(x){
 }
 document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-status");if(s)updateErrorStatus(s.dataset.errorId,s.value);});
 $("testErrorFinder")?.addEventListener("click",async()=>{const ok=await reportClientErrorAndWait(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await loadErrorLogs();toast(ok?"Test error saved to Error Finder.":"Test error queued locally — Supabase logging failed. Check your connection/session.",ok);});
-$("refreshErrorLogs")?.addEventListener("click",()=>loadErrorLogs());
+$("refreshErrorLogs")?.addEventListener("click",async e=>{e.preventDefault();e.stopPropagation();await loadErrorLogs({force:true});});
 async function reportClientErrorAndWait(err,meta={}){const e=err instanceof Error?err:new Error(String(err||"Unknown error"));const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"unhandled_error",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:{...(meta.context||{}),last_user_action:lastUserAction},p_user_agent:navigator.userAgent};return sendClientError(payload);}
 $("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
  if(!isAdmin)return;
