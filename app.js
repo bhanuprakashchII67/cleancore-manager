@@ -313,7 +313,9 @@ async function go(id){
  if(!allowed){await logUnauthorized(module||id,"NAVIGATION","Attempted to open restricted Manager section");toast("Access denied. The Manager has been notified.",false);return;}
  document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));
  document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
- document.title="CleanCore Manager • "+(document.querySelector('.nav[data-section="'+id+'"]')?.textContent||id);
+ const navLabel=(document.querySelector('.nav[data-section="'+id+'"]')?.textContent||id).trim();
+ $("title")?.textContent=navLabel;
+ document.title="CleanCore Manager • "+navLabel;
 }
 async function loadAll(){
  const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("*").order("name"):null;
