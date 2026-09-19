@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.8.16";
+const MANAGER_VERSION="3.8.19";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -91,7 +91,7 @@ async function testManagerPush(){
  }
 }
 
-function loadNotificationPreferences(){
+async function loadNotificationPreferences(){
  if(!isAdmin||!user?.id)return;
  const {data,error}=await db.from("manager_notification_preferences").select("*").eq("manager_user_id",user.id).maybeSingle();
  if(error){console.warn("Notification preferences:",error.message);return;}
