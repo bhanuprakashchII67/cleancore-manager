@@ -314,7 +314,8 @@ async function go(id){
  document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===id));
  document.querySelectorAll(".nav[data-section]").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
  const navLabel=(document.querySelector('.nav[data-section="'+id+'"]')?.textContent||id).trim();
- $("title")?.textContent=navLabel;
+ const titleEl=$("title");
+ if(titleEl)titleEl.textContent=navLabel;
  document.title="CleanCore Manager • "+navLabel;
 }
 async function loadAll(){
