@@ -2045,6 +2045,11 @@ window.viewInvoice=async id=>{
    const gstLabel=documentLabel(inv);
    const billingAddress=inv.billing_address||"—";
    const deliveryAddress=inv.delivery_address||"—";
+   const invGstin=String(inv.gstin||"").trim();
+   const isGstBill=Number(inv.gst_percent||0)>0 || Number(inv.gst_amount||0)>0;
+   const customerGstin=isGstBill ? (invGstin && invGstin.toLowerCase()!=="na" ? invGstin : "NA") : "";
+   const businessName=String(inv.customer_business||"").trim();
+   const hasBusiness=businessName && businessName.toLowerCase()!=="na";
    const metaStatus=isQuotation
      ? "<b>Document Type:</b> Quotation Invoice"
      : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana");
