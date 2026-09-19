@@ -50,7 +50,7 @@ function renderNotificationSettings(){
  Object.entries(map).forEach(([id,key])=>{const el=$(id);if(el)el.checked=notificationPreferences[key]!==false;});
  const st=$("notificationSettingsStatus");if(st)st.textContent=notificationPreferences.desktop_enabled?"Desktop notifications enabled.":"Desktop notifications off.";
 }
-const PUSH_VAPID_PUBLIC="BOewbJgHGXAiPPKrk83r9_cLBs1IS2DL1mWL-ggEINf304g_pAAhQOy8FtJjRlmGgljZihfN4Om-Fcn-DCMHWsU";
+const PUSH_VAPID_PUBLIC="BPVwjcyzMJqv8f0xKT0RmAGcIWDcLeARDnBv1_zzqnEOGW2M43pq8WovsPX5dxo8SOKauK0LW4w_WuXdZPbc-zk";
 function pushBase64ToBytes(base64){
  const pad="=".repeat((4-base64.length%4)%4);
  const raw=atob((base64+pad).replace(/-/g,"+").replace(/_/g,"/"));
