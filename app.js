@@ -1184,7 +1184,7 @@ $("exportExpenses").onclick=()=>{
 };
 async function loadErrorLogs(){
  if(!isAdmin)return;
- const {data,error}=await db.from("error_logs").select("id,created_at,app_name,app_version,page,url,action,error_name,message,stack,context,user_agent,status,resolved_at").order("created_at",{ascending:false}).limit(250);
+ const {data,error}=await db.from("error_logs").select("id,created_at,app_name,app_version,page,url,action,error_name,message,stack,context,user_agent,status,resolved_at,resolved_by,fingerprint,occurrence_count,first_seen,last_seen").order("last_seen",{ascending:false}).limit(250);
  if(error){console.warn("Error Finder:",error.message);return toast("Unable to load Error Finder: "+error.message,false,{action:"load_error_logs"});}
  errorLogs=data||[];
  const apps=[...new Set(errorLogs.map(x=>x.app_name).filter(Boolean))].sort();
@@ -1201,7 +1201,7 @@ function renderErrorLogs(){
    const msg=String(x.message||"");
    const status='<select class="error-log-status" data-error-id="'+esc(x.id)+'"><option '+(x.status==="New"?"selected":"")+' >New</option><option '+(x.status==="Investigating"?"selected":"")+'>Investigating</option><option '+(x.status==="Fixed"?"selected":"")+'>Fixed</option><option '+(x.status==="Ignored"?"selected":"")+'>Ignored</option></select>';
    const copy='<button type="button" class="btn small copy-error" data-error-id="'+esc(x.id)+'">Copy Error</button>';
-   return [isoDate(x.created_at),esc(x.app_name),esc(x.page||"—"),esc(x.error_name||"Error"),'<span class="error-log-message">'+esc(msg)+'</span>',status,copy];
+   return [isoDate(x.last_seen||x.created_at),esc(x.app_name),esc(x.page||"—"),esc(x.error_name||"Error"),'<span class="error-log-message">'+esc(msg)+'</span>',status+(Number(x.occurrence_count||1)>1?' <span class="badge warn">×'+Number(x.occurrence_count||1)+'</span>':""),copy];
  }));
 }
 async function updateErrorStatus(id,status){
@@ -1227,8 +1227,19 @@ $("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
  if(!isAdmin)return;
  const box=$("errorAiResult");if(box){box.classList.remove("hidden");box.textContent="Analyzing current Manager + customer website errors…";}
  try{
-   const {data,error}=await db.functions.invoke("error-finder-ai",{body:{limit:60}});
-   if(error)throw error;
+   const result=await db.functions.invoke("error-finder-ai",{body:{limit:60}});
+   if(result.error){
+     let detail=result.error.message||"Edge Function request failed";
+     try{
+       const ctx=result.error.context;
+       if(ctx){
+         const body=typeof ctx.text==="function"?await ctx.text():"";
+         if(body){try{const parsed=JSON.parse(body);detail=parsed?.error||parsed?.message||body;}catch{detail=body;}}
+       }
+     }catch{}
+     throw new Error(detail);
+   }
+   const data=result.data;
    if(box){box.innerHTML="<strong>AI Error Analysis</strong><pre>"+esc(data?.analysis||"No analysis returned.")+"</pre>";}
  }catch(err){
    console.error("Error Finder AI analysis:",err);
