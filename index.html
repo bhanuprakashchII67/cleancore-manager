@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=4.1.0">
+<link rel="stylesheet" href="style.css?v=4.2.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v4.1.0</p>
+    <p class="version">CleanCore Manager v4.2.0</p>
   </div>
 </section>
 
@@ -96,6 +96,7 @@
 </section>
 
 <section id="products" class="section">
+  <div class="section-toolbar"><span>Products & Stock</span><button type="button" class="btn small page-refresh" data-page-refresh="products">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Products & stock data</span></div>
   <div class="panel">
     <div class="panel-head">
@@ -114,6 +115,7 @@
 </section>
 
 <section id="billing" class="section">
+  <div class="section-toolbar"><span>Create Bill</span><button type="button" class="btn small page-refresh" data-page-refresh="billing">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Billing data</span></div>
   <div class="panel">
     <div class="panel-head"><h3>Create Bill</h3><span class="muted">Invoice</span></div>
@@ -208,6 +210,7 @@
 <div id="billSendNotice" class="send-notice hidden"></div>
 
 <section id="sales" class="section">
+  <div class="section-toolbar"><span>Sales</span><button type="button" class="btn small page-refresh" data-page-refresh="sales">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Sales data</span></div>
   <div class="panel">
     <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
@@ -217,6 +220,7 @@
 </section>
 
 <section id="customers" class="section">
+  <div class="section-toolbar"><span>Customers</span><button type="button" class="btn small page-refresh" data-page-refresh="customers">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Customer data</span></div>
   <div class="panel">
     <div class="panel-head"><div><h3>Customers</h3><p class="muted">Add and edit complete customer records.</p></div><button id="addCustomer" class="btn primary small">+ New Customer</button></div>
@@ -249,6 +253,7 @@
 </dialog>
 
 <section id="enquiries" class="section">
+  <div class="section-toolbar"><span>Leads / Enquiries</span><button type="button" class="btn small page-refresh" data-page-refresh="enquiries">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Enquiries & website orders</span></div>
   <div id="websiteOrdersPanel" class="panel">
     <div class="panel-head"><div><h3>Website Orders</h3><p id="websiteOrdersSummary" class="muted"></p></div></div>
@@ -261,6 +266,7 @@
 </section>
 
 <section id="expenses" class="section">
+  <div class="section-toolbar"><span>Expenses</span><button type="button" class="btn small page-refresh" data-page-refresh="expenses">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Expense data</span></div>
   <div class="panel">
     <div class="panel-head">
@@ -280,6 +286,7 @@
 </section>
 
 <section id="recovery" class="section">
+  <div class="section-toolbar"><span>recovery</span><button type="button" class="btn small page-refresh" data-page-refresh="recovery">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Deleted records</span></div>
   <div class="panel">
     <div class="panel-head">
@@ -295,6 +302,7 @@
 </section>
 
 <section id="settings" class="section">
+  <div class="section-toolbar"><span>Settings</span><button type="button" class="btn small page-refresh" data-page-refresh="settings">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Manager settings</span></div>
   <div class="panel">
     <div class="panel-head"><div><h3>Security</h3><p class="muted">Manager account security and employee access control.</p></div></div>
@@ -502,19 +510,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
-  const K="cleancore_manager_cache_reset_390";
+  const K="cleancore_manager_cache_reset_420";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
       "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
       "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
-    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=390"));
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=420"));
   }
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.9.0",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=4.1.1"></script>
+<script src="app.js?v=4.2.0"></script>
 </body>
 </html>
