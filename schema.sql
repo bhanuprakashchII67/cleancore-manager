@@ -58,7 +58,7 @@ create table if not exists public.invoices(
   paid_amount numeric(12,2) not null default 0,
   due_amount numeric(12,2) not null default 0,
   due_date date,
-  payment_method text not null default 'Credit',
+  payment_method text not null default 'Cash',
  total numeric(12,2) not null default 0, profit numeric(12,2) not null default 0,
  created_at timestamptz not null default now()
 );
@@ -72,7 +72,7 @@ alter table public.invoices add column if not exists payment_status text not nul
 alter table public.invoices add column if not exists paid_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_amount numeric(12,2) not null default 0;
 alter table public.invoices add column if not exists due_date date;
-alter table public.invoices add column if not exists payment_method text not null default 'Credit';
+alter table public.invoices add column if not exists payment_method text not null default 'Cash';
 
 create table if not exists public.invoice_items(
  id uuid primary key default gen_random_uuid(), invoice_id uuid not null references public.invoices(id) on delete cascade,
@@ -647,7 +647,7 @@ begin
      coalesce((r.payload->>'gst_percent')::numeric,0),coalesce((r.payload->>'gst_amount')::numeric,0),coalesce((r.payload->>'cgst_percent')::numeric,0),coalesce((r.payload->>'cgst_amount')::numeric,0),
      coalesce((r.payload->>'sgst_percent')::numeric,0),coalesce((r.payload->>'sgst_amount')::numeric,0),coalesce((r.payload->>'igst_percent')::numeric,0),coalesce((r.payload->>'igst_amount')::numeric,0),
      coalesce(r.payload->>'payment_status','Unpaid'),coalesce((r.payload->>'paid_amount')::numeric,0),coalesce((r.payload->>'due_amount')::numeric,0),nullif(r.payload->>'due_date','')::date,
-     coalesce(r.payload->>'payment_method','Credit'),coalesce((r.payload->>'total')::numeric,0),coalesce((r.payload->>'profit')::numeric,0)) returning id into v_invoice_id;
+     coalesce(r.payload->>'payment_method','Cash'),coalesce((r.payload->>'total')::numeric,0),coalesce((r.payload->>'profit')::numeric,0)) returning id into v_invoice_id;
    insert into public.invoice_items(invoice_id,product_id,product_name,qty,unit_price,cost_price,line_total,line_profit)
    select v_invoice_id,(item->>'product_id')::uuid,item->>'product_name',(item->>'qty')::integer,(item->>'unit_price')::numeric,(item->>'cost_price')::numeric,(item->>'line_total')::numeric,(item->>'line_profit')::numeric
    from jsonb_array_elements(coalesce(r.payload->'items','[]'::jsonb)) item;
