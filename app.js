@@ -21,6 +21,54 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
+const NOTIFICATION_DEFAULTS={notifications_enabled:true,sound_enabled:true,desktop_enabled:false,website_orders:true,website_enquiries:true,employee_access_requests:true,employee_change_requests:true,restricted_access_attempts:true,low_stock_alerts:true,payments_received:true,credit_due_alerts:true};
+let notificationPreferences={...NOTIFICATION_DEFAULTS};
+
+function notificationAllowed(type){
+ return notificationPreferences.notifications_enabled!==false && notificationPreferences[type]!==false;
+}
+function renderNotificationSettings(){
+ const map={notifEnabled:"notifications_enabled",notifSound:"sound_enabled",notifDesktop:"desktop_enabled",notifWebsiteOrders:"website_orders",notifWebsiteEnquiries:"website_enquiries",notifEmployeeAccess:"employee_access_requests",notifEmployeeChanges:"employee_change_requests",notifRestrictedAccess:"restricted_access_attempts",notifLowStock:"low_stock_alerts",notifPayments:"payments_received",notifCreditDue:"credit_due_alerts"};
+ Object.entries(map).forEach(([id,key])=>{const el=$(id);if(el)el.checked=notificationPreferences[key]!==false;});
+ const st=$("notificationSettingsStatus");if(st)st.textContent=notificationPreferences.desktop_enabled?"Desktop notifications enabled.":"Desktop notifications off.";
+}
+async function loadNotificationPreferences(){
+ if(!isAdmin||!user?.id)return;
+ const {data,error}=await db.from("manager_notification_preferences").select("*").eq("manager_user_id",user.id).maybeSingle();
+ if(error){console.warn("Notification preferences:",error.message);return;}
+ if(data)notificationPreferences={...NOTIFICATION_DEFAULTS,...data};
+ else{
+   const {data:created,error:ce}=await db.from("manager_notification_preferences").insert({manager_user_id:user.id}).select().single();
+   if(!ce&&created)notificationPreferences={...NOTIFICATION_DEFAULTS,...created};
+ }
+ renderNotificationSettings();
+}
+async function saveNotificationPreferences(){
+ if(!isAdmin||!user?.id)return;
+ const map={notifEnabled:"notifications_enabled",notifSound:"sound_enabled",notifDesktop:"desktop_enabled",notifWebsiteOrders:"website_orders",notifWebsiteEnquiries:"website_enquiries",notifEmployeeAccess:"employee_access_requests",notifEmployeeChanges:"employee_change_requests",notifRestrictedAccess:"restricted_access_attempts",notifLowStock:"low_stock_alerts",notifPayments:"payments_received",notifCreditDue:"credit_due_alerts"};
+ const patch={manager_user_id:user.id};
+ Object.entries(map).forEach(([id,key])=>{const el=$(id);if(el)patch[key]=!!el.checked;});
+ const {data,error}=await db.from("manager_notification_preferences").upsert(patch,{onConflict:"manager_user_id"}).select().single();
+ if(error){toast(error.message,false);return;}
+ notificationPreferences={...NOTIFICATION_DEFAULTS,...data};
+ const st=$("notificationSettingsStatus");if(st)st.textContent="Notification settings saved.";
+}
+function bindNotificationSettings(){
+ ["notifEnabled","notifSound","notifDesktop","notifWebsiteOrders","notifWebsiteEnquiries","notifEmployeeAccess","notifEmployeeChanges","notifRestrictedAccess","notifLowStock","notifPayments","notifCreditDue"].forEach(id=>$(id)?.addEventListener("change",saveNotificationPreferences));
+ $("enableDesktopNotifications")?.addEventListener("click",async()=>{
+   if(!("Notification" in window)){toast("Desktop notifications are not supported by this browser.",false);return;}
+   const p=await Notification.requestPermission();
+   notificationPreferences.desktop_enabled=p==="granted";
+   const el=$("notifDesktop");if(el)el.checked=p==="granted";
+   await saveNotificationPreferences();
+ });
+ $("testNotificationSoundSettings")?.addEventListener("click",async()=>{unlockNotificationAudio();await playNotificationSound();toast("Notification sound tested");});
+}
+async function maybeBrowserNotify(n,pref){
+ if(!notificationAllowed(pref)||notificationPreferences.desktop_enabled!==true)return;
+ if(!("Notification" in window)||Notification.permission!=="granted")return;
+ try{new Notification(n?.subject||"CleanCore Manager alert",{body:n?.body||"",icon:"icon-192.svg",tag:n?.id||pref});}catch(e){}
+}
 function notificationStoreKey(type){return "cleancore_manager_notifications_"+type+"_"+(user?.id||"guest")}
 function isWebsiteManagerNotification(n){return n&&["Website Order","Website Enquiry"].includes(n.notification_type)}
 function notificationTime(v){return v?new Date(v).toLocaleString("en-IN"):"—"}
@@ -81,8 +129,11 @@ function announceWebsiteNotification(n){
  const ts=new Date(n.created_at).getTime();
  setNotificationTimestamp("alerted",Math.max(notificationAlertedAt(),ts));
  renderWebsiteNotifications();
- playNotificationSound();
+ if(notificationPreferences.sound_enabled)playNotificationSound();
  const isOrder=n.notification_type==="Website Order";
+ const pref=isOrder?"website_orders":"website_enquiries";
+ if(!notificationAllowed(pref))return;
+ maybeBrowserNotify(n,pref);
  toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
  // Pull the new order/enquiry into the currently open Manager section immediately.
  loadAll().catch(err=>console.warn("Manager data refresh after alert:",err.message));
@@ -273,6 +324,7 @@ async function submitChange(module,action,targetTable,targetId,payload,reason=""
 }
 async function enter(){
  await loadAccess();
+ if(isAdmin)await loadNotificationPreferences();
  $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
  $("profileEmail").textContent=isAdmin?user.email:(employee.alert_email||("Username: "+employee.username));
  if($("profileName"))$("profileName").textContent=isAdmin?"CleanCore Admin":employee.full_name;
@@ -1581,5 +1633,6 @@ async function restoreManagerSession(){
  }
 }
 bindRefreshControls();
+bindNotificationSettings();
 bindWebsiteNotificationUi();
 restoreManagerSession().catch(err=>console.error('Manager session restore error',err));
