@@ -245,8 +245,8 @@
   <div class="section-toolbar"><span>Sales</span><button type="button" class="btn small page-refresh" data-page-refresh="sales">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Sales data</span></div>
   <div class="panel">
-    <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
-    <div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div>
+    <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div></div>
+    <div class="filters sales-export-filter"><label>From date<input id="salesFrom" type="date"></label><span>to</span><label>To date<input id="salesTo" type="date"></label><button id="applySalesFilter" class="btn small">Apply</button><button id="export" class="btn small primary">Export CSV</button><button id="clearSalesFilter" class="btn small">Clear dates</button></div>
     <div id="salesTable"></div><dialog id="invoiceDialog"><div id="invoicePreview"></div><div class="actions"><button id="printInvoice" class="btn primary">Print / Save PDF</button><button id="closeInvoice" class="btn">Close</button></div></dialog>
   </div>
 </section>
@@ -671,6 +671,6 @@ if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.ser
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.34"></script>
+<script src="app.js?v=3.8.26"></script>
 </body>
 </html>
