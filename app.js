@@ -1067,7 +1067,7 @@ window.viewCustomerHistory=function(id){
  $("customerHistoryTitle").textContent=(c.business_name||c.name)+" — Purchase History";
  $("customerHistorySummary").innerHTML="<div class=\"history-cards\"><div><span>Total purchases</span><b>"+money(s.totalPurchases)+"</b></div><div><span>Total paid</span><b>"+money(s.totalPaid)+"</b></div><div><span>Credit due</span><b>"+money(s.creditDue)+"</b></div><div><span>Last purchase</span><b>"+(s.lastPurchase?isoDate(s.lastPurchase):"—")+"</b></div></div>";
  $("customerHistoryTable").innerHTML=table(["Invoice","Purchase date","Total","Paid","Credit due","Payment status","Due date","Action"],s.bills.map(inv=>[
-   esc(inv.invoice_no),new Date(inv.created_at).toLocaleString("en-IN"),money(inv.total),money(inv.paid_amount),money(inv.due_amount),esc(inv.payment_status||"Credit"),inv.due_date?isoDate(inv.due_date):"—",
+   esc(inv.invoice_no),new Date(inv.created_at).toLocaleString("en-IN"),money(inv.total),money(inv.paid_amount),money(inv.due_amount),esc(inv.payment_status||"Unpaid"),inv.due_date?isoDate(inv.due_date):"—",
    Number(inv.due_amount||0)>0?"<button class=\"link\" onclick=\"recordPayment(\'"+inv.id+"\')\">Record payment</button>":"Paid"
  ]));
  $("customerHistoryDialog").showModal();
@@ -1533,7 +1533,7 @@ $("customerForm").addEventListener("submit",async e=>{
 });
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
 $("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value,source:"manager"};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
-$("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.filter(isSaleDocument).map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
+$("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.filter(isSaleDocument).map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Unpaid",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
 
 document.addEventListener("click",e=>{
  const btn=e.target.closest?.(".view-bill");
@@ -1619,7 +1619,7 @@ function buildCustomerBillMessage(inv,customer,items=[]){
   "Total: "+money(inv.total),
   "Paid: "+money(inv.paid_amount||0),
   "Credit Due: "+money(inv.due_amount||0),
-  "Status: "+(inv.payment_status||"Credit"),
+  "Status: "+(inv.payment_status||"Unpaid"),
   "",
   "CleanCore Chemical & Cleaning",
   "+91 91827 25773",
