@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.26";
+const MANAGER_VERSION="3.8.27";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -862,14 +862,62 @@ function renderDashboardPeriods(startValue="",endValue=""){
  const startValueSafe=startValue||defaultStart,endValueSafe=endValue||todayKey;
  const start=new Date(startValueSafe+"T00:00:00"),end=new Date(endValueSafe+"T00:00:00");end.setDate(end.getDate()+1);
  const fmt=d=>d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
- const calc=(st,en)=>{const sales=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=st&&new Date(x.created_at)<en);const ex=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=st&&d<en});const salesTotal=sales.reduce((z,x)=>z+Number(x.total||0),0);const gross=sales.reduce((z,x)=>z+Number(x.profit||0),0);const expenseTotal=ex.reduce((z,x)=>z+Number(x.amount||0),0);return {sales:salesTotal,expenses:expenseTotal,gross,net:gross-expenseTotal};};
+ const calc=(st,en)=>{
+   const sales=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=st&&new Date(x.created_at)<en);
+   const ex=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=st&&d<en});
+   const salesTotal=sales.reduce((z,x)=>z+Number(x.total||0),0);
+   const gross=sales.reduce((z,x)=>z+Number(x.profit||0),0);
+   const expenseTotal=ex.reduce((z,x)=>z+Number(x.amount||0),0);
+   return {sales:salesTotal,expenses:expenseTotal,gross,net:gross-expenseTotal};
+ };
  const v=calc(start,end);
  const days=Math.ceil((end-start)/86400000);
- const rows=[];
- for(let off=0;off<days;off+=7){const st=new Date(start);st.setDate(st.getDate()+off);const en2=new Date(st);en2.setDate(en2.getDate()+Math.min(7,days-off));const w=calc(st,en2);rows.push([fmt(st)+" – "+fmt(new Date(en2-1)),money(w.sales),money(w.expenses),money(w.gross),money(w.net)]);}
+ const weekly=[];
+ for(let off=0;off<days;off+=7){
+   const st=new Date(start);st.setDate(st.getDate()+off);
+   const en2=new Date(st);en2.setDate(en2.getDate()+Math.min(7,days-off));
+   const w=calc(st,en2);
+   weekly.push({label:fmt(st)+" – "+fmt(new Date(en2-1)),...w});
+ }
+ const rows=weekly.map(w=>[w.label,money(w.sales),money(w.expenses),money(w.gross),money(w.net)]);
  const cards='<div class="profit-cards">'+[['Sales',v.sales],['Expenses',v.expenses],['Gross Profit',v.gross],['Net Profit',v.net]].map(([name,val])=>'<div class="profit-card"><span>'+name+'</span><strong>'+money(val)+'</strong></div>').join('')+'</div>';
- el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit of Month</h3><p class="muted">Select the period you want to analyse.</p></div></div><div class="dashboard-date-filter"><label>From<input id="dashboardFromDate" type="date" value="'+startValueSafe+'"></label><span>to</span><label>To<input id="dashboardToDate" type="date" value="'+endValueSafe+'"></label><button type="button" class="btn primary" id="applyDashboardDates">Apply</button></div>'+cards+'<div class="period-selected-label">'+fmt(start)+' – '+fmt(new Date(end-1))+'</div><div class="profit-weekly"><h4>Weekly breakdown</h4>'+table(["Week","Sales","Expenses","Gross Profit","Net Profit"],rows)+'</div>';
- const apply=$("applyDashboardDates");if(apply)apply.onclick=()=>{const from=$("dashboardFromDate")?.value,to=$("dashboardToDate")?.value;if(!from||!to)return toast("Select both dates.",false);if(from>to)return toast("From date cannot be after To date.",false);renderDashboardPeriods(from,to);};
+ el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit of Month</h3><p class="muted">Select the period you want to analyse.</p></div></div><div class="dashboard-date-filter"><label>From<input id="dashboardFromDate" type="date" value="'+startValueSafe+'"></label><span>to</span><label>To<input id="dashboardToDate" type="date" value="'+endValueSafe+'"></label><button type="button" class="btn primary" id="applyDashboardDates">Apply</button><button type="button" class="btn primary" id="exportDashboardCsv">Export CSV</button></div>'+cards+'<div class="period-selected-label">'+fmt(start)+' – '+fmt(new Date(end-1))+'</div><div class="profit-weekly"><h4>Weekly breakdown</h4>'+table(["Week","Sales","Expenses","Gross Profit","Net Profit"],rows)+'</div>';
+ const apply=$("applyDashboardDates");
+ if(apply)apply.onclick=()=>{
+   const from=$("dashboardFromDate")?.value,to=$("dashboardToDate")?.value;
+   if(!from||!to)return toast("Select both dates.",false);
+   if(from>to)return toast("From date cannot be after To date.",false);
+   renderDashboardPeriods(from,to);
+ };
+ const exportBtn=$("exportDashboardCsv");
+ if(exportBtn)exportBtn.onclick=()=>{
+   const from=$("dashboardFromDate")?.value,to=$("dashboardToDate")?.value;
+   if(!from||!to)return toast("Select both dates.",false);
+   if(from>to)return toast("From date cannot be after To date.",false);
+   const csvRows=[
+     ["CleanCore Sales, Expenses & Profit Report"],
+     ["From",from,"To",to],
+     [],
+     ["Summary","Amount"],
+     ["Sales",v.sales],
+     ["Expenses",v.expenses],
+     ["Gross Profit",v.gross],
+     ["Net Profit",v.net],
+     [],
+     ["Weekly breakdown"],
+     ["Week","Sales","Expenses","Gross Profit","Net Profit"],
+     ...weekly.map(w=>[w.label,w.sales,w.expenses,w.gross,w.net])
+   ];
+   const csv=csvRows.map(r=>r.map(value=>`"${String(value??"").replaceAll('"','""')}"`).join(",")).join("\n");
+   const suffix=`-${from}-to-${to}`;
+   const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+   const url=URL.createObjectURL(blob);
+   const link=document.createElement("a");
+   link.href=url;link.download=`cleancore-financial-report${suffix}.csv`;
+   document.body.appendChild(link);link.click();link.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),1000);
+   toast("Financial report CSV exported.");
+ };
 }
 function renderAll(section){
  const active=section||document.querySelector(".section.active")?.id||"dashboard";
