@@ -30,10 +30,12 @@ function unlockNotificationAudio(){
    if(notificationAudioContext.state==="suspended")notificationAudioContext.resume().catch(()=>{});
  }catch(e){}
 }
-function playNotificationSound(){
+async function playNotificationSound(){
  try{
    unlockNotificationAudio();
    const ctx=notificationAudioContext;if(!ctx)return;
+   if(ctx.state==="suspended")await ctx.resume().catch(()=>{});
+   if(navigator.vibrate)navigator.vibrate([100,60,100]);
    const master=ctx.createGain();
    master.gain.value=0.46;
    master.connect(ctx.destination);
