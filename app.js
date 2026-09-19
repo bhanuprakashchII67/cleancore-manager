@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.26";
+const MANAGER_VERSION="3.8.27";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -622,7 +622,7 @@ async function loadAll(){
  const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qINV,qWO]);
  const [p,i,cu,e,r,x,pm,inv,wo]=qs;
  for(const q of qs)if(q?.error)throw new Error(q.error.message);
- products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
+ products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];investments=inv?.data||[];websiteOrders=wo?.data||[];
  if(isAdmin){
    const [er,ep,cr,ar,nr,dr]=await Promise.all([
      db.from("employees").select("id,auth_user_id,username,full_name,team,alert_email,active,starts_at,ends_at,created_at,updated_at,portal_key").order("created_at",{ascending:false}).limit(100),
