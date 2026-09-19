@@ -76,6 +76,8 @@ function announceWebsiteNotification(n){
  playNotificationSound();
  const isOrder=n.notification_type==="Website Order";
  toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
+ // Pull the new order/enquiry into the currently open Manager section immediately.
+ loadAll().catch(err=>console.warn("Manager data refresh after alert:",err.message));
 }
 async function loadWebsiteNotifications(firstLoad=false){
  if(!isAdmin)return;
@@ -123,6 +125,7 @@ function markWebsiteNotificationsRead(){
 function bindWebsiteNotificationUi(){
  $("notificationBtn")?.addEventListener("click",e=>{
    e.stopPropagation();
+   $("profileMenu")?.classList.add("hidden");
    $("notificationMenu")?.classList.toggle("hidden");
    unlockNotificationAudio();
  });
@@ -1463,7 +1466,11 @@ $("printInvoice").onclick=async e=>{
   printWindow.focus();
  }catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
 };
-$("profileBtn").onclick=()=>{ $("profileEmail").textContent=user?.email||""; $("profileMenu").classList.toggle("hidden"); };
+$("profileBtn").onclick=()=>{
+ $("notificationMenu")?.classList.add("hidden");
+ $("profileEmail").textContent=user?.email||"";
+ $("profileMenu").classList.toggle("hidden");
+};
 $("profileChangePassword").onclick=()=>{ $("profileMenu").classList.add("hidden"); $("passwordBox").classList.remove("hidden"); go("settings"); };
 $("profileLogout").onclick=async()=>{stopWebsiteNotifications();clearManagerLoginWindow();await db.auth.signOut({scope:"local"});location.reload()};
 $("changePassword").onclick=()=>$("passwordBox").classList.toggle("hidden");
