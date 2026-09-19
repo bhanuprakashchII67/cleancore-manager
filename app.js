@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.7.8";
+const MANAGER_VERSION="3.7.9";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -987,6 +987,15 @@ function formatErrorForCopy(x){
 }
 document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-status");if(s)updateErrorStatus(s.dataset.errorId,s.value);});
 $("testErrorFinder")?.addEventListener("click",async()=>{reportClientError(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await new Promise(r=>setTimeout(r,500));await loadErrorLogs();toast("Test error sent.");});
+$("clearErrorLogs")?.addEventListener("click",async()=>{
+ if(!isAdmin)return;
+ if(!confirm("Clear all Error Finder history? This permanently removes the current error records."))return;
+ const {error}=await db.from("error_logs").delete().neq("id","00000000-0000-0000-0000-000000000000");
+ if(error){reportClientError(error,{action:"clear_error_logs"});return toast("Unable to clear Error Finder history: "+error.message,false);}
+ errorLogs=[];
+ renderErrorLogs();
+ toast("Error Finder history cleared.");
+});
 document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-error");if(!b)return;const x=errorLogs.find(r=>r.id===b.dataset.errorId);if(!x)return;try{await navigator.clipboard.writeText(formatErrorForCopy(x));toast("Error copied");}catch(err){toast("Copy failed. Select the error manually.",false,{action:"copy_error"});}});
 function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
 function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":x==="Partially Paid"?"warn":"danger")+"'>"+esc(x)+"</span>"}
