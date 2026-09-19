@@ -853,3 +853,10 @@ input,select,textarea{background:#fff!important;color:#122033!important;border-c
   #settings .switch-row b{font-size:11px!important}
   #settings .switch-row small{font-size:8.5px!important}
 }
+
+.error-ai-result{margin:10px 0;padding:12px 14px;border:1px solid #d8e4eb;border-radius:11px;background:#f7fafc;color:#21364b}
+.error-ai-result strong{font-size:12px}
+.error-ai-result pre{margin:8px 0 0;white-space:pre-wrap;font:12px/1.5 system-ui,sans-serif;color:#405468}
+.error-ai-result.hidden{display:none}
+.error-log-message{display:block}
+@media(max-width:768px){.error-ai-result{padding:10px;font-size:11px}.error-ai-result pre{font-size:10px}.error-finder-panel .panel-head .actions{width:100%;flex-wrap:wrap}.error-finder-panel .panel-head .actions .btn{flex:1 1 120px}}
