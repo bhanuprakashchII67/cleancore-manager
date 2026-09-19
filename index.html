@@ -520,6 +520,15 @@
     <label>Phone number<input id="customerPhone" inputmode="numeric" maxlength="10" required></label>
     <label>Email ID<input id="customerEmail" type="email"></label>
     <label>GSTIN (optional)<input id="customerGstin" maxlength="15" placeholder="15-character GSTIN"></label>
+    <label>Customer source
+      <select id="customerSource" required>
+        <option value="">How did this customer reach us?</option>
+        <option>Walk-in</option><option>Phone Call</option><option>WhatsApp</option>
+        <option>Website</option><option>Google</option><option>Referral</option>
+        <option>Existing Customer</option><option>Other</option>
+      </select>
+      <small class="muted">Where did you get this customer?</small>
+    </label>
   </div>
 
   <fieldset class="address-fieldset">
@@ -662,6 +671,6 @@ if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.ser
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.33"></script>
+<script src="app.js?v=3.8.24"></script>
 </body>
 </html>
