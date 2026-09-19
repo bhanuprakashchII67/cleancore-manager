@@ -112,14 +112,27 @@
     </div>
     <div id="rawTable"></div>
   </div>
-  <div class="panel investment-panel">
-    <div class="panel-head">
-      <div><h3>Investment</h3><p class="muted">Record business investments. The card shows only the total amount.</p></div>
-      <button id="addInvestment" type="button" class="btn primary small">+ Add Investment</button>
-    </div>
-    <div class="investment-summary"><span>Total investment</span><strong id="investmentTotal">₹0.00</strong></div>
-    <div id="investmentTable"></div>
-  </div>
+  <button id="investmentBox" type="button" class="investment-box" aria-label="Open Investment history">
+    <span>Investment</span><strong id="investmentTotal">₹0.00</strong><small>Click to view</small>
+  </button>
+  <dialog id="investmentDialog">
+    <form method="dialog" id="investmentForm" class="dialog">
+      <h3>Investment</h3>
+      <div class="investment-form-grid">
+        <label>Amount ₹<input id="investmentAmount" type="number" min="0.01" step="0.01" required></label>
+        <label>Date<input id="investmentDate" type="date" required></label>
+      </div>
+      <label>Investment name / purpose<input id="investmentNotes" maxlength="200" placeholder="e.g. Initial capital, machine purchase"></label>
+      <div class="actions">
+        <button type="button" id="saveInvestment" class="btn primary">Save Investment</button>
+        <button type="button" id="closeInvestment" class="btn">Close</button>
+      </div>
+      <div class="panel investment-history-panel">
+        <div class="panel-head"><h3>Investment History</h3></div>
+        <div id="investmentTable"></div>
+      </div>
+    </form>
+  </dialog>
 </section>
 
 <section id="billing" class="section">
