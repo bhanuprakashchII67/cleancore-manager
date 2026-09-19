@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.28";
+const MANAGER_VERSION="3.8.29";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1340,35 +1340,18 @@ window.deleteCustomer=async function(id){
  const customer=customers.find(x=>x.id===id);if(!customer)return;
  const s=customerStats(id);
  const warning=s.bills.length
-   ?"PERMANENT DELETE: This removes the customer from the manager and website, deletes the website order history and customer login account, and keeps accounting invoices/payments only without the customer link. This cannot be undone. Continue?"
-   :"PERMANENT DELETE: This removes the customer from the manager and website, deletes website order history and the customer login account, and cannot be undone. Continue?";
+   ?"Move this customer and ALL related website orders, order items, invoices, payments, and enquiries to Recovery? They will disappear from the active app and customer website. The customer login will also be signed out. You can restore everything from Recovery."
+   :"Move this customer and ALL related website account data to Recovery? It will disappear from the active app and customer website and can be restored from Recovery.";
  if(!confirm(warning))return;
  if(!isAdmin){
    const ok=await submitChange("customers","customer_delete","customers",id,{archived_at:new Date().toISOString()},"Employee customer removal");
    if(ok)await loadAll();
    return;
  }
- try{
-   const {data:{session}}=await db.auth.getSession();
-   if(!session?.access_token)return toast("Admin session expired. Please login again.",false);
-   const response=await fetch(SUPABASE_URL+"/functions/v1/customer-auth",{
-     method:"POST",
-     headers:{
-       "Content-Type":"application/json",
-       "apikey":SUPABASE_PUBLISHABLE_KEY,
-       "Authorization":"Bearer "+session.access_token
-     },
-     body:JSON.stringify({action:"admin_delete_customer",customer_id:id})
-   });
-   const raw=await response.text();let data=null;
-   try{data=raw?JSON.parse(raw):null}catch(_){}
-   if(!response.ok)return toast(data?.error||"Unable to permanently delete customer.",false);
-   toast("Customer, website account, and website order history deleted.");
-   await loadAll();
- }catch(err){
-   reportClientError(err,{action:"customer_permanent_delete",context:{customer_id:id}});
-   toast(err?.message||"Unable to permanently delete customer.",false);
- }
+ const {data,error}=await db.rpc("delete_record_with_recovery",{p_entity_type:"customer",p_original_id:id});
+ if(error)return toast(error.message||"Unable to move customer to Recovery.",false);
+ toast("Customer and all related data moved to Recovery");
+ await loadAll();
 };
 window.viewCustomerHistory=function(id){
  const c=customers.find(x=>x.id===id);if(!c)return;
