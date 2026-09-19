@@ -639,7 +639,7 @@ async function loadAll(){
      db.from("change_requests").select("id,employee_id,module,action,target_table,target_id,payload,status,requested_at,reviewed_at,reviewed_by,review_note").order("requested_at",{ascending:false}).limit(250),
      db.from("access_requests").select("id,employee_id,module,action,reason,created_at,status,reviewed_at,reviewed_by").order("created_at",{ascending:false}).limit(250),
      db.from("manager_notifications").select("id,notification_type,subject,body,related_id,email_to,email_status,created_at,sent_at").order("created_at",{ascending:false}).limit(250),
-     db.from("deleted_records").select("id,entity_type,original_id,display_name,deleted_at,purge_at,status").eq("status","Deleted").order("deleted_at",{ascending:false}).limit(250)
+     db.from("deleted_records").select("id,entity_type,original_id,display_name,deleted_at,purge_at,status,snapshot").eq("status","Deleted").order("deleted_at",{ascending:false}).limit(250)
    ]);
    for(const q of [er,ep,cr,ar,nr,dr])if(q?.error)throw new Error(q.error.message);
    employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];deletedRecords=dr.data||[];
@@ -991,26 +991,96 @@ function expenseList(){
  const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
  return expenses.filter(x=>(!from||String(x.expense_date)>=from)&&(!to||String(x.expense_date)<=to));
 }
+$("closeDeletedRecord").onclick=function(){$("deletedRecordDialog").close()};function recoveryRecordLabel(r){
+ const snap=r?.snapshot||{};
+ const row=snap?.row||{};
+ return String(r?.display_name||row?.name||row?.business_name||row?.invoice_no||row?.order_no||row?.phone||row?.email||r?.original_id||"Deleted record").trim();
+}
+function recoverySnapshotSummary(r){
+ const snap=r?.snapshot||{},row=snap?.row||{};
+ const parts=[];
+ const type=String(r?.entity_type||"").toLowerCase();
+ if(type==="customer"){
+   if(row.name)parts.push(row.name);
+   if(row.business_name)parts.push(row.business_name);
+   if(row.phone)parts.push("Mobile: "+row.phone);
+   if(row.email)parts.push("Email: "+row.email);
+   if(Array.isArray(snap.invoices)&&snap.invoices.length)parts.push(snap.invoices.length+" invoice"+(snap.invoices.length===1?"":"s"));
+   if(Array.isArray(snap.website_orders)&&snap.website_orders.length)parts.push(snap.website_orders.length+" website order"+(snap.website_orders.length===1?"":"s"));
+   if(Array.isArray(snap.enquiries)&&snap.enquiries.length)parts.push(snap.enquiries.length+" enquiry"+(snap.enquiries.length===1?"":"ies"));
+ }
+ return parts.join(" • ")||recoveryRecordLabel(r);
+}
 function renderRecovery(){
  if(!isAdmin||!$("recoveryTable"))return;
  const rows=deletedRecords.map(r=>{
    const days=Math.max(0,Math.ceil((new Date(r.purge_at)-new Date())/86400000));
+   const label=recoveryRecordLabel(r);
    return [
      esc(r.entity_type.replaceAll("_"," ")),
-     esc(r.display_name),
+     "<strong>"+esc(label)+"</strong>"+(label!==String(r.display_name||"").trim()?"<div class='muted tiny'>"+esc(recoverySnapshotSummary(r))+"</div>":""),
      formatAccessDate(r.deleted_at),
      formatAccessDate(r.purge_at),
      days+" day"+(days===1?"":"s"),
-     "<button type='button' class='link' onclick=\"restoreDeletedRecord('"+r.id+"')\">Restore</button>"
+     "<button type='button' class='link' onclick=\"viewDeletedRecord('"+r.id+"')\">View Details</button> <button type='button' class='link' onclick=\"restoreDeletedRecord('"+r.id+"')\">Restore</button>"
    ];
  });
  $("recoveryTable").innerHTML=table(["Type","Record","Deleted","Auto-delete","Time left","Action"],rows);
  if($("recoverySummary"))$("recoverySummary").textContent=deletedRecords.length+" deleted record"+(deletedRecords.length===1?"":"s")+" currently recoverable. Records are permanently removed after 30 days.";
 }
+window.viewDeletedRecord=function(id){
+ if(!isAdmin)return;
+ const r=deletedRecords.find(x=>x.id===id);if(!r)return;
+ const snap=r.snapshot||{},row=snap.row||{};
+ const type=String(r.entity_type||"").replaceAll("_"," ");
+ const rows=(value,columns)=>{
+   if(!Array.isArray(value)||!value.length)return "<p class='muted'>None recorded.</p>";
+   return table(columns,value.slice(0,100).map(item=>columns.map(col=>esc(item?.[col]??"—"))));
+ };
+ let html="<div class='history-cards'>"+
+   "<div><span>Type</span><b>"+esc(type)+"</b></div>"+
+   "<div><span>Record</span><b>"+esc(recoveryRecordLabel(r))+"</b></div>"+
+   "<div><span>Deleted</span><b>"+esc(formatAccessDate(r.deleted_at))+"</b></div>"+
+   "<div><span>Auto-delete</span><b>"+esc(formatAccessDate(r.purge_at))+"</b></div>"+
+   "</div>";
+ if(type==="customer"){
+   html+="<h4>Customer</h4><div class='history-cards'>"+
+     "<div><span>Name</span><b>"+esc(row.name||"—")+"</b></div>"+
+     "<div><span>Business</span><b>"+esc(row.business_name||"—")+"</b></div>"+
+     "<div><span>Mobile</span><b>"+esc(row.phone||"—")+"</b></div>"+
+     "<div><span>Email</span><b>"+esc(row.email||"—")+"</b></div>"+
+     "<div><span>GSTIN</span><b>"+esc(row.gstin||"—")+"</b></div>"+
+     "<div><span>Customer source</span><b>"+esc(row.customer_source||"—")+"</b></div>"+
+     "</div>";
+   html+="<h4>Recovery contents</h4><p class='muted'>"+
+     esc((snap.invoices||[]).length)+" invoice"+((snap.invoices||[]).length===1?"":"s")+", "+
+     esc((snap.invoice_items||[]).length)+" invoice item"+((snap.invoice_items||[]).length===1?"":"s")+", "+
+     esc((snap.payments||[]).length)+" payment"+((snap.payments||[]).length===1?"":"s")+", "+
+     esc((snap.website_orders||[]).length)+" website order"+((snap.website_orders||[]).length===1?"":"s")+", "+
+     esc((snap.website_order_items||[]).length)+" website order item"+((snap.website_order_items||[]).length===1?"":"s")+", "+
+     esc((snap.enquiries||[]).length)+" enquiry"+((snap.enquiries||[]).length===1?"":"ies")+".</p>";
+   if((snap.invoices||[]).length)html+="<h4>Invoices</h4>"+rows(snap.invoices,["invoice_no","customer_name","total","payment_status","paid_amount","due_amount","created_at"]);
+   if((snap.website_orders||[]).length)html+="<h4>Website orders</h4>"+rows(snap.website_orders,["order_no","status","total","invoice_no","created_at"]);
+   if((snap.enquiries||[]).length)html+="<h4>Enquiries</h4>"+rows(snap.enquiries,["name","phone","business","message","status","created_at"]);
+ }else{
+   html+="<h4>Record data</h4><pre class='recovery-json'>"+esc(JSON.stringify(row,null,2))+"</pre>";
+   if(Array.isArray(snap.items)&&snap.items.length)html+="<h4>Related items</h4><pre class='recovery-json'>"+esc(JSON.stringify(snap.items,null,2))+"</pre>";
+ }
+ if(snap.auth_user){
+   html+="<h4>Customer login account</h4><pre class='recovery-json'>"+esc(JSON.stringify({
+     id:snap.auth_user.id,email:snap.auth_user.email,phone:snap.auth_user.phone,
+     email_confirmed_at:snap.auth_user.email_confirmed_at,phone_confirmed_at:snap.auth_user.phone_confirmed_at,
+     created_at:snap.auth_user.created_at,updated_at:snap.auth_user.updated_at
+   },null,2))+"</pre>";
+ }
+ $("deletedRecordTitle").textContent=recoveryRecordLabel(r)+" — Recovery Details";
+ $("deletedRecordDetails").innerHTML=html;
+ $("deletedRecordDialog").showModal();
+};
 window.restoreDeletedRecord=async id=>{
  if(!isAdmin)return;
  const rec=deletedRecords.find(x=>x.id===id);if(!rec)return;
- if(!confirm("Restore "+(rec.display_name||rec.entity_type)+"?"))return;
+ if(!confirm("Restore "+recoveryRecordLabel(rec)+"?"))return;
  const {data,error}=await db.rpc("restore_deleted_record",{p_deleted_id:id});
  if(error)return toast(error.message||"Restore failed.",false);
  toast("Record restored");
