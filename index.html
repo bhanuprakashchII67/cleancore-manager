@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=4.1.0">
+<link rel="stylesheet" href="style.css?v=3.7.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v4.1.0</p>
+    <p class="version">CleanCore Manager v3.7.0</p>
   </div>
 </section>
 
@@ -44,6 +44,7 @@
     <button class="nav" data-section="enquiries">Enquiries</button>
     <button class="nav" data-section="expenses">Expenses</button>
     <button class="nav" data-section="settings">Settings</button>
+    <button class="nav" data-section="recovery">Recovery</button>
   </nav>
   <button id="logout" class="nav logout">Sign out</button>
 </aside>
@@ -268,6 +269,21 @@
   </div>
 </section>
 
+<section id="recovery" class="section">
+  <div class="section-toolbar"><span>Deleted records</span><button type="button" class="btn small page-refresh" data-page-refresh="recovery">↻ Refresh</button></div>
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h3>Recovery</h3>
+        <p id="recoverySummary" class="muted">Deleted Manager records are kept here for 30 days.</p>
+      </div>
+      <span class="badge warn">30 days</span>
+    </div>
+    <div class="recovery-note">Restore a deleted record before its auto-delete date. After 30 days it is permanently purged.</div>
+    <div id="recoveryTable"></div>
+  </div>
+</section>
+
 <section id="settings" class="section">
   <div class="section-toolbar"><span>Manager settings</span><button type="button" class="btn small page-refresh" data-page-refresh="settings">↻ Refresh</button></div>
   <div class="panel">
@@ -489,6 +505,6 @@
 <script>
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.1.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=4.1.0"></script>
+<script src="app.js?v=3.7.0"></script>
 </body>
 </html>
