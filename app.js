@@ -1307,11 +1307,14 @@ function renderSales(){
  let list=invoices.filter(isSaleDocument);
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
+ const websiteInvoiceIds=new Set(websiteOrders.map(o=>o.invoice_id).filter(Boolean));
+ const formatSaleSource=x=>websiteInvoiceIds.has(x.id)||x.source==="Website"?"Website":(x.source||"Offline");
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
- $("salesTable").innerHTML=table(["Invoice","Customer","Total","Payment","Due","Payment Method","Sale From","Delivery","Date","Action"],list.map(x=>[
+ $("salesTable").innerHTML=table(["Invoice","Customer","Total","Payment","Due","Payment Method","Sale From","Bill Status","Delivery","Date","Action"],list.map(x=>[
   esc(x.invoice_no),esc(x.customer_name),money(x.total),
   paymentStatusBadge(x.payment_status),money(x.due_amount),x.payment_method?esc(x.payment_method):"<span class=\"muted\">Pending</span>",
-  "<span class=\"badge "+(x.source==="Website"?"ok":"")+"\">"+esc(x.source||"Offline")+"</span>",
+  "<span class=\"badge ok\">"+esc(formatSaleSource(x))+"</span>",
+  "<span class=\"badge "+(x.bill_status==="Confirmed"?"ok":x.bill_status==="Completed"?"ok":x.bill_status==="Cancelled"?"danger":"")+"\">"+esc(x.bill_status||"Confirmed")+"</span>",
   deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
   '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> <button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
