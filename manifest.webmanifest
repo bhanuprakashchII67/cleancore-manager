@@ -7,8 +7,8 @@
   "display":"standalone",
   "display_override":["window-controls-overlay","standalone"],
   "orientation":"portrait-primary",
-  "background_color":"#f5f7f8",
-  "theme_color":"#0b1f33",
+  "background_color":"#F3F8FC",
+  "theme_color":"#0F4C81",
   "description":"Private CleanCore business manager for billing, stock, sales, customers and expenses.",
   "categories":["business","productivity"],
   "icons":[
