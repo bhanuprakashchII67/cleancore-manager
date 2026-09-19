@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.34";
+const MANAGER_VERSION="3.8.23";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -158,6 +158,10 @@ async function ensureManagerNotificationPermission(){
  if(Notification.permission==="denied")return false;
  try{return (await Notification.requestPermission())==="granted";}catch(e){return false;}
 }
+async function registerManagerPushForCurrentUser(){
+ if(!isAdmin||!user?.id)return false;
+ return registerManagerPush();
+}
 function notificationStoreKey(type){return "cleancore_manager_notifications_"+type+"_"+(user?.id||"guest")}
 function isWebsiteManagerNotification(n){return n&&["Website Order","Website Enquiry"].includes(n.notification_type)}
 function notificationTime(v){return v?new Date(v).toLocaleString("en-IN"):"—"}
@@ -246,6 +250,7 @@ function announceWebsiteNotification(n){
  if(!notificationAllowed(pref))return;
  if(notificationPreferences.sound_enabled)playNotificationSound();
  maybeBrowserNotify(n,pref);
+ showInPageNotification(n);
  toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
  // Pull only the affected data instead of rebuilding every Manager table.
  const refresh=async()=>{
@@ -297,6 +302,10 @@ function stopWebsiteNotifications(){
 async function startWebsiteNotifications(){
  stopWebsiteNotifications();
  if(!isAdmin)return;
+ await ensureManagerNotificationPermission();
+ if(Notification.permission==="granted" && notificationPreferences.notifications_enabled!==false){
+   await registerManagerPushForCurrentUser().catch(()=>false);
+ }
  await loadWebsiteNotifications(true);
  notificationChannel=db.channel("cleancore-manager-website-alerts")
    .on("postgres_changes",{event:"INSERT",schema:"public",table:"manager_notifications"},payload=>{
