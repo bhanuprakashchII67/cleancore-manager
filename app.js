@@ -1625,15 +1625,6 @@ $("documentType").onchange=()=>{
 $("billForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const saveButton=e.submitter||$("saveBillButton");
- // Reserve the WhatsApp tab during the original user click so the browser
- // does not block it after the asynchronous bill save finishes.
- let preopenedWhatsAppWindow=null;
- if($("documentType")?.value==="SALE"){
-   try{
-     preopenedWhatsAppWindow=window.open("about:blank","_blank","noopener,noreferrer");
-     if(preopenedWhatsAppWindow)window.__cleancoreBillWhatsAppWindow=preopenedWhatsAppWindow;
-   }catch(_){}
- }
  if(saveButton){saveButton.disabled=true;saveButton.dataset.originalText=saveButton.textContent;saveButton.textContent="Generating…";}
  try{
    const customer=currentBillCustomer();
