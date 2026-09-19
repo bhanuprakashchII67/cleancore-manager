@@ -2046,8 +2046,8 @@ window.viewInvoice=async id=>{
    const billingAddress=inv.billing_address||"—";
    const deliveryAddress=inv.delivery_address||"—";
    const metaStatus=isQuotation
-     ? "<b>Document Type:</b> Quotation Invoice<br><b>Bill Status:</b> "+esc(inv.bill_status||"Draft")+"<br><b>Delivery:</b> Not applicable<br><b>Payment Status:</b> Not applicable"
-     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Bill Status:</b> "+esc(inv.bill_status||"Confirmed")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Unpaid")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Amount Due:</b> "+money(inv.due_amount)+"<br><b>Delivery:</b> "+esc(inv.delivery_status||"Pending")+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"");
+     ? "<b>Document Type:</b> Quotation Invoice"
+     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana");
    const quoteNote=isQuotation
      ? "<div class='quote-note'><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document is a price quotation and does not record a sale, payment, or stock movement.</div>"
      : "";
@@ -2058,7 +2058,7 @@ window.viewInvoice=async id=>{
    $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
     "<div class='inv-header'><div><img class='invoice-logo' src='logo.svg' alt='CleanCore logo'><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Srinivasa Colony, Manikonda, Hyderabad, Telangana, India, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+gstLabel+"</b><span>"+footerMark+"</span></div></div>"+
     "<div class='inv-meta'><div><b>Document No:</b> "+esc(inv.invoice_no)+"<br><b>Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div>"+metaStatus+"</div></div>"+
-    "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Srinivasa Colony, Manikonda, Hyderabad, Telangana, India, India<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"<br>GSTIN: —</p></div><div><b>BILL TO</b><p><strong>"+esc(inv.customer_business||inv.customer_name||"—")+"</strong><br>"+esc(inv.customer_name||"—")+"<br>Phone: "+esc(inv.customer_phone||"—")+"<br>Email: "+esc(inv.customer_email||"—")+"<br>GSTIN: "+esc(inv.gstin||"—")+"<br>Billing: "+esc(billingAddress)+"<br>Delivery: "+esc(deliveryAddress)+"</p></div></div>"+
+    "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Srinivasa Colony, Manikonda, Hyderabad, Telangana, India<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"</p></div><div><b>BILL TO</b><p>"+(inv.customer_business? "<strong>"+esc(inv.customer_business)+"</strong><br>":"")+(inv.customer_name?esc(inv.customer_name)+"<br>":"")+"Phone: "+esc(inv.customer_phone||"—")+"<br>"+(inv.customer_email?"Email: "+esc(inv.customer_email)+"<br>":"")+"GSTIN: "+esc(inv.gstin||"—")+"<br>"+(billingAddress!=="—"?"Billing address: "+esc(billingAddress)+"<br>":"")+"Delivery address: "+esc(deliveryAddress)+"</p></div></div>"+
     "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
     "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
     "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
