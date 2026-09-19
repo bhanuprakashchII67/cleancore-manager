@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.32";
+const MANAGER_VERSION="3.8.36";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -842,6 +842,15 @@ async function createEmployee(e){
    $("employeeDialog").close();toast("Employee "+username+" created.");await loadAll();
  }
 }
+
+function bindDashboardMetricLinks(){
+ const ids=["today","month","grossProfit","monthlyExpenses","netProfit","low","websiteOrdersNew","investmentBox"];
+ ids.forEach(id=>{const el=$(id);if(!el)return;el.classList.add("dashboard-link-card");el.setAttribute("role","link");el.tabIndex=0;
+   const goTarget=()=>{const target=id==="low"?"products":id==="websiteOrdersNew"?"enquiries":id==="investmentBox"?"products":id==="monthlyExpenses"?"expenses":id==="grossProfit"||id==="netProfit"||id==="today"||id==="month"?"sales":"dashboard";go(target);};
+   el.onclick=goTarget;el.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();goTarget();}};
+ });
+}
+
 function isSaleDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="SALE";}
 function isQuotationDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="QUOTATION";}
 function documentLabel(inv){return isQuotationDocument(inv)?"QUOTATION INVOICE":(Number(inv?.gst_amount||0)>0?"TAX INVOICE":"INVOICE");}
@@ -931,7 +940,7 @@ function renderAll(section){
  if($("low"))$("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
 
- if(active==="dashboard"){ renderDashboardPeriods();
+ if(active==="dashboard"){ bindDashboardMetricLinks(); renderDashboardPeriods();
    if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],paidSales.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.paid_amount||0),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  }
  if($("investmentFrontTotal"))$("investmentFrontTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
