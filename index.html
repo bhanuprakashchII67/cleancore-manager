@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=4.0.1">
+<link rel="stylesheet" href="style.css?v=4.1.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v4.0.1</p>
+    <p class="version">CleanCore Manager v4.1.0</p>
   </div>
 </section>
 
@@ -51,31 +51,34 @@
 
 <main class="main">
 <header class="top">
-  <div>
-    <p class="eyebrow">CLEANCORЕ CHEMICAL & CLEANING</p>
+  <div class="top-title">
+    <p class="eyebrow">CLEANCORE CHEMICAL & CLEANING</p>
     <h2 id="title">Dashboard</h2>
   </div>
-  <div class="notification-wrap">
-<button id="notificationBtn" class="chip notification-btn" type="button" title="Notifications" aria-label="Notifications">🔔 <span>Notifications</span><span id="notificationBadge" class="notification-badge hidden">0</span></button>
-<div id="notificationMenu" class="notification-menu hidden"><button type="button" id="testNotificationSound" class="notification-test-sound">Test notification sound</button>
-  <div class="notification-menu-head"><strong>Notifications</strong><button id="markNotificationsRead" type="button" class="link">Mark all read</button></div>
-  <div id="notificationList" class="notification-list"><div class="empty">No new website orders or enquiries.</div></div>
-</div>
-</div>
-<div class="profile-wrap">
-<button type="button" id="refreshManager" class="chip refresh-btn" title="Refresh data" aria-label="Refresh data">↻ Refresh</button>
-
-<button id="profileBtn" class="chip profile-btn" type="button">👤 Profile</button>
-<div id="profileMenu" class="profile-menu hidden">
-<div class="profile-photo">CC</div>
-<h3 id="profileName">CleanCore Admin</h3>
-<p id="profileEmail" class="muted"></p><p><b>Business email:</b> cleancorehyd@gmail.com</p>
-<p><b>Phone:</b> <span id="profilePhone">+91 91827 25773</span></p>
-<p><b>Business:</b> CleanCore Chemical & Cleaning</p>
-<p><b>Role:</b> <span id="profileRole">Administrator</span></p>
-<button id="profileChangePassword" class="btn small">Change Password</button>
-<button id="profileLogout" class="btn small">Lock / Sign out</button>
-</div></div>
+  <div class="top-actions">
+    <div class="notification-wrap">
+      <button id="notificationBtn" class="chip notification-btn" type="button" title="Notifications" aria-label="Notifications">🔔 <span>Notifications</span><span id="notificationBadge" class="notification-badge hidden">0</span></button>
+      <div id="notificationMenu" class="notification-menu hidden">
+        <button type="button" id="testNotificationSound" class="notification-test-sound">Test notification sound</button>
+        <div class="notification-menu-head"><strong>Notifications</strong><button id="markNotificationsRead" type="button" class="link">Mark all read</button></div>
+        <div id="notificationList" class="notification-list"><div class="empty">No new website orders or enquiries.</div></div>
+      </div>
+    </div>
+    <div class="profile-wrap">
+      <button type="button" id="refreshManager" class="chip refresh-btn" title="Refresh data" aria-label="Refresh data">↻ Refresh</button>
+      <button id="profileBtn" class="chip profile-btn" type="button">👤 Profile</button>
+      <div id="profileMenu" class="profile-menu hidden">
+        <div class="profile-photo">CC</div>
+        <h3 id="profileName">CleanCore Admin</h3>
+        <p id="profileEmail" class="muted"></p><p><b>Business email:</b> cleancorehyd@gmail.com</p>
+        <p><b>Phone:</b> <span id="profilePhone">+91 91827 25773</span></p>
+        <p><b>Business:</b> CleanCore Chemical & Cleaning</p>
+        <p><b>Role:</b> <span id="profileRole">Administrator</span></p>
+        <button id="profileChangePassword" class="btn small">Change Password</button>
+        <button id="profileLogout" class="btn small">Lock / Sign out</button>
+      </div>
+    </div>
+  </div>
 </header>
 
 <section id="dashboard" class="section active">
@@ -512,6 +515,6 @@
 <script>
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.9.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=4.0.1"></script>
+<script src="app.js?v=4.1.0"></script>
 </body>
 </html>
