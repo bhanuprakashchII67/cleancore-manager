@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.32">
+<link rel="stylesheet" href="style.css?v=3.8.33">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -646,21 +646,21 @@
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
-  const K="cleancore_manager_cache_reset_432";
+  const K="cleancore_manager_cache_reset_433";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
       "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
       "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
-    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=422"));
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=423"));
   }
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.4",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.5",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.32"></script>
+<script src="app.js?v=3.8.33"></script>
 </body>
 </html>
