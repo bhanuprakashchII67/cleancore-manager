@@ -1711,8 +1711,17 @@ $("billForm").addEventListener("submit",async e=>{
    $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
    toast((isQuotation?"Quotation ":"Bill ")+(data.invoice_no||no)+" generated successfully.");
    if(savedInv){
-     if(isQuotation)await window.viewInvoice(savedInv.id);
-     else sendBillToCustomer(savedInv,customer,items);
+     if(isQuotation){
+       await window.viewInvoice(savedInv.id);
+     }else{
+       try{ await sendBillToCustomer(savedInv,customer,items); }
+       catch(sendErr){
+         console.error("Post-bill customer delivery action failed",sendErr);
+         const notice=$("billSendNotice");
+         if(notice){notice.classList.remove("hidden");notice.innerHTML="<strong>Invoice "+esc(savedInv.invoice_no||no)+" saved in Manager.</strong> WhatsApp/PDF delivery could not be started. Use View / Print / Save PDF from Sales."}
+         toast("Bill saved, but customer delivery action failed.",false,{action:"bill_delivery_action"});
+       }
+     }
    }
  }catch(err){
    if(preopenedWhatsAppWindow){
