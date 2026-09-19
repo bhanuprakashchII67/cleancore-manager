@@ -1278,3 +1278,31 @@ for each row execute function public.sync_website_order_invoice_status();
 
 -- Fixed + extended approval function is defined below so employee bill-status changes
 -- use the same Manager approval queue as all other employee changes.
+
+create or replace function public.approve_invoice_status_change_request(p_request_id uuid,p_approve boolean,p_note text default '')
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare r public.change_requests%rowtype; v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  select * into r from public.change_requests where id=p_request_id for update;
+  if r.id is null then raise exception 'Approval request not found'; end if;
+  if r.status<>'Pending' then raise exception 'Approval request is already reviewed'; end if;
+  if r.action<>'invoice_status_update' then raise exception 'Invalid invoice status request'; end if;
+  if not p_approve then
+    update public.change_requests set status='Rejected',reviewed_at=now(),reviewed_by=auth.uid(),review_note=coalesce(p_note,'') where id=r.id;
+    return jsonb_build_object('status','Rejected','request_id',r.id);
+  end if;
+  if r.target_id is null then raise exception 'Invoice target is required'; end if;
+  if r.payload->>'bill_status' is not null and r.payload->>'bill_status' not in ('Draft','Confirmed','Cancelled','Completed') then raise exception 'Invalid bill status'; end if;
+  if r.payload->>'delivery_status' is not null and r.payload->>'delivery_status' not in ('Pending','Out for Delivery','Delivered','Failed','Not Applicable') then raise exception 'Invalid delivery status'; end if;
+  update public.invoices set bill_status=coalesce(r.payload->>'bill_status',bill_status),delivery_status=coalesce(r.payload->>'delivery_status',delivery_status)
+  where id=r.target_id returning id into v_id;
+  if v_id is null then raise exception 'Invoice not found'; end if;
+  update public.change_requests set status='Approved',reviewed_at=now(),reviewed_by=auth.uid(),review_note=coalesce(p_note,'') where id=r.id;
+  insert into public.audit_logs(actor_user_id,employee_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+  values(auth.uid(),r.employee_id,'admin','CHANGE_APPROVED','billing','invoice_status_update','invoices',v_id,jsonb_build_object('request_id',r.id,'note',coalesce(p_note,'')));
+  return jsonb_build_object('status','Approved','request_id',r.id,'created_id',v_id);
+end; $$;
+revoke all on function public.approve_invoice_status_change_request(uuid,boolean,text) from public;
+grant execute on function public.approve_invoice_status_change_request(uuid,boolean,text) to authenticated;
