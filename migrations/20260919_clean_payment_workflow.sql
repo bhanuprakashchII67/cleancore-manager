@@ -90,3 +90,6 @@ end;
 $function$;
 
 grant execute on function public.review_payment_change_request(uuid,boolean,text) to authenticated;
+
+
+alter table public.invoices alter column payment_method set default 'Cash';
