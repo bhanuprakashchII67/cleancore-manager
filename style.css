@@ -516,3 +516,5 @@ body.modal-open{overflow:hidden}.investment-modal{display:none;position:fixed;in
 #loginView .auth-card{width:min(380px,100%);padding:24px}
 #loginView .auth-card form{margin-top:0}
 @media(max-width:600px){.login-brand{gap:12px;margin-bottom:18px}.login-brand .brand{width:48px;height:48px}.login-brand-text strong{font-size:26px}.login-brand-text span{font-size:16px}}
+
+.dashboard-link-card{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.dashboard-link-card:hover,.dashboard-link-card:focus-visible{transform:translateY(-2px);box-shadow:0 8px 24px rgba(7,26,51,.10);outline:0}.dashboard-link-card:focus-visible{outline:2px solid #0b7f83;outline-offset:2px}
