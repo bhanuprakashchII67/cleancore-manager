@@ -60,7 +60,7 @@ async function registerManagerPush(){
  if(!isAdmin||!user?.id)return false;
  if(!("serviceWorker" in navigator)||!("PushManager" in window)){toast("Push notifications are not supported on this device/browser.",false);return false;}
  try{
-   const permission=await Notification.requestPermission();
+   const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
    if(permission!=="granted"){toast("Push notification permission was not granted.",false);return false;}
    const reg=await navigator.serviceWorker.ready;
    let sub=await reg.pushManager.getSubscription();
