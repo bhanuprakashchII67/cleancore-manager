@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.8.12";
+const MANAGER_VERSION="3.8.13";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1011,6 +1011,7 @@ function paymentStatusBadge(v){const x=v||"Pending";return "<span class='badge "
 function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
 function invoicePaymentChoice(inv){
  if((inv?.payment_status||"")==="Paid")return "PAID";
+ if(inv?.payment_method==="Pending")return "UNPAID";
  if(inv?.payment_method==="COD")return "COD";
  if(inv?.payment_method==="Credit")return "CREDIT";
  if((inv?.payment_status||"")==="Partially Paid")return "PARTIAL";
@@ -1412,9 +1413,10 @@ function currentBillCustomer(){
  return customers.find(x=>x.id===$("billingCustomer").value)||null;
 }
 function paymentState(total){
- const type=$("paymentType")?.value||"PAID";
+ const type=$("paymentType")?.value||"PENDING";
  const bill=Number(total||0);
  const method=$("billPaymentMethod")?.value||"Cash";
+ if(type==="PENDING")return {type,method:"Pending",status:"Unpaid",paid:0,due:bill,dueDate:null};
  if(type==="PAID")return {type,method,status:"Paid",paid:bill,due:0,dueDate:null};
  if(type==="COD")return {type,method:"COD",status:"Unpaid",paid:0,due:bill,dueDate:null};
  if(type==="CREDIT")return {type,method:"Credit",status:"Unpaid",paid:0,due:bill,dueDate:$("dueDate").value||null};
@@ -1422,7 +1424,7 @@ function paymentState(total){
  return {type,method, status:paid>=bill?"Paid":paid>0?"Partially Paid":"Unpaid",paid,due:Math.max(0,bill-paid),dueDate:paid>=bill?null:($("dueDate").value||null)};
 }
 function syncPaymentInput(){
- const type=$("paymentType")?.value||"PAID";
+ const type=$("paymentType")?.value||"PENDING";
  const input=$("payingNowInput"),methodWrap=$("billPaymentMethodWrap"),dueWrap=$("billDueDateWrap");
  if(!input)return;
  const showPart=type==="PART";
@@ -1498,7 +1500,7 @@ $("clearBill").onclick=()=>{
  $("documentType").value="SALE";
  $("billType").value="NON_GST";
  const paymentBox=document.querySelector(".payment-box"); if(paymentBox)paymentBox.classList.remove("hidden");
- $("paymentType").value="PAID";
+ $("paymentType").value="PENDING";
  $("billPaymentMethod").value="Cash";
  $("gstPercent").value="18";
  ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin"].forEach(id=>$(id).textContent="—");
