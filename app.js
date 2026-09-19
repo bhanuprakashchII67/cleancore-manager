@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.29";
+const MANAGER_VERSION="3.8.30";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1348,10 +1348,12 @@ async function addInvestment(){
  investments=[data,...investments];$("investmentAmount").value="";$("investmentNotes").value="";$("investmentDate").value=dateKey(new Date());renderAll("dashboard");renderInvestmentHistory();toast("Investment added");
 }
 window.deleteInvestment=async id=>{if(!confirm("Delete this investment?"))return;const {error}=await db.from("manager_investments").delete().eq("id",id);if(error)return toast(error.message,false);investments=investments.filter(x=>x.id!==id);renderAll("dashboard");renderInvestmentHistory();toast("Investment deleted")};
-function openInvestment(){const d=$("investmentDialog");if(!d)return;const dt=$("investmentDate");if(dt)dt.value=dateKey(new Date());renderInvestmentHistory();if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","");}
+function openInvestment(){const d=$("investmentDialog");if(!d)return;const dt=$("investmentDate");if(dt)dt.value=dateKey(new Date());renderInvestmentHistory();d.classList.add("open");d.setAttribute("aria-hidden","false");document.body.classList.add("modal-open");}
 window.openInvestment=openInvestment;
 if($("investmentBox"))$("investmentBox").addEventListener("click",openInvestment);
-if($("closeInvestment"))$("closeInvestment").onclick=()=>$("investmentDialog")?.close();
+function closeInvestment(){const d=$("investmentDialog");if(!d)return;d.classList.remove("open");d.setAttribute("aria-hidden","true");document.body.classList.remove("modal-open");}
+if($("closeInvestment"))$("closeInvestment").onclick=closeInvestment;
+if($("investmentDialog"))$("investmentDialog").addEventListener("click",e=>{if(e.target.id==="investmentDialog")closeInvestment()});
 if($("investmentForm"))$("investmentForm").addEventListener("submit",e=>{e.preventDefault();addInvestment()});
 function resetProductForm(){
  editingProductId=null;
