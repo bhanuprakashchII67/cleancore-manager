@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.48";
+const MANAGER_VERSION="3.8.49";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -960,7 +960,7 @@ function renderAll(section){
  if(active==="sales")renderSales();
  if(active==="billing"){renderQuotations();rebuildLines();}
  if(active==="expenses")renderExpenses();
- if(active==="settings")loadErrorLogs();
+ if(active==="settings"){loadErrorLogs();if(!errorFinderRefreshTimer)errorFinderRefreshTimer=setInterval(()=>{if(active==="settings")loadErrorLogs();},10000);}else if(errorFinderRefreshTimer){clearInterval(errorFinderRefreshTimer);errorFinderRefreshTimer=null;}
  if(active==="customers")renderCustomers();
  if(active==="website_orders")renderWebsiteOrders();
  if(active==="enquiries"){
@@ -1182,6 +1182,7 @@ $("exportExpenses").onclick=()=>{
  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-expenses.csv";a.click();
 };
+let errorFinderRefreshTimer=null;
 async function loadErrorLogs(){
  if(!isAdmin)return;
  const {data,error}=await db.from("error_logs").select("id,created_at,app_name,app_version,page,url,action,error_name,message,stack,context,user_agent,status,resolved_at,resolved_by,fingerprint,occurrence_count,first_seen,last_seen").order("last_seen",{ascending:false}).limit(250);
@@ -1227,23 +1228,18 @@ $("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
  if(!isAdmin)return;
  const box=$("errorAiResult");if(box){box.classList.remove("hidden");box.textContent="Analyzing current Manager + customer website errors…";}
  try{
-   const result=await db.functions.invoke("error-finder-ai",{body:{limit:60}});
-   if(result.error){
-     let detail=result.error.message||"Edge Function request failed";
-     try{
-       const ctx=result.error.context;
-       if(ctx){
-         const body=typeof ctx.text==="function"?await ctx.text():"";
-         if(body){try{const parsed=JSON.parse(body);detail=parsed?.error||parsed?.message||body;}catch{detail=body;}}
-       }
-     }catch{}
-     throw new Error(detail);
-   }
-   const data=result.data;
+   const {data:{session}}=await db.auth.getSession();
+   const token=session?.access_token;
+   if(!token)throw new Error("Your Manager session has expired. Sign in again.");
+   const resp=await fetch(SUPABASE_URL+"/functions/v1/error-finder-ai",{method:"POST",headers:{"Authorization":"Bearer "+token,"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({limit:100})});
+   const raw=await resp.text();
+   let data={};try{data=JSON.parse(raw);}catch{}
+   if(!resp.ok)throw new Error(data?.error||data?.message||("Edge Function HTTP "+resp.status+": "+raw.slice(0,500)));
    if(box){box.innerHTML="<strong>AI Error Analysis</strong><pre>"+esc(data?.analysis||"No analysis returned.")+"</pre>";}
+   await loadErrorLogs();
  }catch(err){
    console.error("Error Finder AI analysis:",err);
-   const detail=err?.context?.error_description||err?.message||"Unknown error";
+   const detail=err?.message||"Unknown error";
    if(box)box.textContent="AI analysis failed: "+detail;
    toast("AI analysis failed: "+detail,false,{action:"error_finder_ai",context:{detail}});
  }
