@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.36">
+<link rel="stylesheet" href="style.css?v=3.8.37">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -485,6 +485,16 @@
   <div class="panel"><h3>Connection</h3><p class="muted">Browser uses the Supabase publishable key only.</p><code>https://rwfamxkfqslorxcryjrp.supabase.co</code></div>
 </section>
 </main></section>
+
+<dialog id="deletedRecordDialog">
+  <div class="dialog recovery-details-dialog">
+    <div class="panel-head">
+      <div><h3 id="deletedRecordTitle">Recovery Details</h3><p class="muted">Stored Recovery snapshot. This data is not active in the Manager or customer website.</p></div>
+      <button type="button" id="closeDeletedRecord" class="btn small">Close</button>
+    </div>
+    <div id="deletedRecordDetails"></div>
+  </div>
+</dialog>
 
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
