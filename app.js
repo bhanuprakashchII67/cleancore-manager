@@ -1007,7 +1007,7 @@ $("clearErrorLogs")?.addEventListener("click",async()=>{
 });
 document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-error");if(!b)return;const x=errorLogs.find(r=>r.id===b.dataset.errorId);if(!x)return;try{await navigator.clipboard.writeText(formatErrorForCopy(x));toast("Error copied");}catch(err){toast("Copy failed. Select the error manually.",false,{action:"copy_error"});}});
 function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
-function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":(x==="Partially Paid"||x==="Credit")?"warn":"danger")+"'>"+esc(x)+"</span>"}
+function paymentStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Paid"?"ok":(x==="Partially Paid"||x==="Credit")?"warn":"danger")+"'>"+esc(x)+"</span>"}
 function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
 function invoicePaymentChoice(inv){
  if((inv?.payment_status||"")==="Paid")return "PAID";
@@ -1079,10 +1079,10 @@ function renderSales(){
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
- $("salesTable").innerHTML=table(["Invoice","Customer","Total","Paid","Due","Payment","Bill","Delivery","Date","Action"],list.map(x=>[
-  esc(x.invoice_no),esc(x.customer_name),money(x.total),money(x.paid_amount),money(x.due_amount),
-  paymentStatusBadge(x.payment_status)+"<small class='muted'>"+esc(x.payment_method||"—")+"</small>",
-  billStatusBadge(x.bill_status),deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
+ $("salesTable").innerHTML=table(["Invoice","Customer","Total","Payment","Due","Payment Method","Delivery","Date","Action"],list.map(x=>[
+  esc(x.invoice_no),esc(x.customer_name),money(x.total),
+  paymentStatusBadge(x.payment_status),money(x.due_amount),x.payment_method?esc(x.payment_method):"<span class=\"muted\">Pending</span>",
+  deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
   '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> '+(Number(x.due_amount||0)>0?'<button type="button" class="link" onclick="recordPayment(\''+x.id+'\')">Record payment</button> ':'')+'<button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
 }
