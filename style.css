@@ -393,3 +393,41 @@ dialog .dialog{padding-top:52px}
   .refresh-btn,.profile-btn{white-space:nowrap}
   .notification-btn span:nth-child(2){display:inline}
 }
+
+/* Mobile Create Bill refinement */
+@media(max-width:600px){
+  #billing .section-toolbar{margin:0 2px 10px}
+  #billing .section-toolbar>span{font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  #billing>.panel{padding:12px;border-radius:16px}
+  #billing .panel-head h3{font-size:18px}
+  #billing .panel-head>.muted{font-size:11px}
+  #billing #billForm{gap:0}
+  #billing #billForm>label{margin:9px 0}
+  #billing #billForm select,#billing #billForm input,#billing #billForm textarea{min-height:46px;border-radius:12px}
+  #billing .bill-customer-card{grid-template-columns:1fr 1fr;gap:8px;padding:12px;border-radius:14px}
+  #billing .bill-customer-card>div{padding:8px 9px;border:1px solid #e6edf2;border-radius:10px;background:#fff}
+  #billing .bill-customer-card>div:last-child{grid-column:1/-1}
+  #billing .payment-box{padding:12px!important;margin:10px 0}
+  #billing .payment-choice-grid{grid-template-columns:1fr;gap:2px}
+  #billing .payment-summary{grid-template-columns:1fr 1fr;gap:8px}
+  #billing .payment-summary-item{padding:11px 12px;border-radius:11px}
+  #billing .payment-summary-item strong{font-size:17px}
+  #billing .payment-box .tiny{font-size:10px;line-height:1.35}
+  #billing .tax-breakdown{margin:8px 0}
+  #billing .full>.panel-head{margin-bottom:8px}
+  #billing .modern-line{grid-template-columns:minmax(0,1fr) 62px 92px 36px;gap:5px;padding:7px;border-radius:12px}
+  #billing .modern-line .lp{grid-column:1/-1}
+  #billing .modern-line .lq{grid-column:1}
+  #billing .modern-line .lr{grid-column:2}
+  #billing .modern-line .lv{grid-column:3}
+  #billing .modern-line .remove{grid-column:4}
+  #billing .modern-line .lp,#billing .modern-line .lq,#billing .modern-line .lr{min-height:42px}
+  #billing .total{padding-top:12px;margin-top:12px;font-size:16px}
+  #billing .actions{gap:8px}
+  #billing .actions .btn{min-height:44px}
+  .top{gap:8px}
+  .top-title .eyebrow{font-size:9px;letter-spacing:.08em}
+  .top-title h2{font-size:22px}
+  .top-actions{gap:6px}
+  .notification-btn,.refresh-btn,.profile-btn{padding:8px 10px;min-height:40px}
+}
