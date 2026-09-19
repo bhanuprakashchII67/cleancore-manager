@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.31";
+const MANAGER_VERSION="3.8.32";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -850,11 +850,12 @@ function renderAll(section){
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
  const todayKey=dateKey(now),monthKey=todayKey.slice(0,7);
  const saleInvoices=invoices.filter(isSaleDocument);
- const td=saleInvoices.filter(x=>new Date(x.created_at)>=day),mo=saleInvoices.filter(x=>new Date(x.created_at)>=mon);
+ const paidSales=saleInvoices.filter(x=>String(x.payment_status||"Unpaid")==="Paid");
+ const td=paidSales.filter(x=>new Date(x.created_at)>=day),mo=paidSales.filter(x=>new Date(x.created_at)>=mon);
  const grossMonth=mo.reduce((a,x)=>a+Number(x.profit||0),0);
  const monthExpenses=expenses.filter(x=>String(x.expense_date||"").startsWith(monthKey)).reduce((a,x)=>a+Number(x.amount||0),0);
- if($("today"))$("today").textContent=money(td.reduce((a,x)=>a+Number(x.total),0));
- if($("month"))$("month").textContent=money(mo.reduce((a,x)=>a+Number(x.total),0));
+ if($("today"))$("today").textContent=money(td.reduce((a,x)=>a+Number(x.paid_amount||0),0));
+ if($("month"))$("month").textContent=money(mo.reduce((a,x)=>a+Number(x.paid_amount||0),0));
  if($("grossProfit"))$("grossProfit").textContent=money(grossMonth);
  if($("monthlyExpenses"))$("monthlyExpenses").textContent=money(monthExpenses);
  if($("netProfit"))$("netProfit").textContent=money(grossMonth-monthExpenses);
@@ -862,7 +863,7 @@ function renderAll(section){
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
 
  if(active==="dashboard"){
-   if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],saleInvoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
+   if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],paidSales.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.paid_amount||0),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  }
  if($("investmentFrontTotal"))$("investmentFrontTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
  if(active==="products"){
