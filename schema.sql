@@ -1099,3 +1099,14 @@ end;
 $$;
 revoke all on function public.purge_deleted_records() from public;
 grant execute on function public.purge_deleted_records() to postgres;
+
+
+-- Scheduled cleanup: permanently purge Recovery entries once their 30-day window expires.
+create extension if not exists pg_cron with schema pg_catalog;
+do $$
+declare v_job_id bigint;
+begin
+  select jobid into v_job_id from cron.job where jobname='cleancore-recovery-purge' limit 1;
+  if v_job_id is not null then perform cron.unschedule(v_job_id); end if;
+  perform cron.schedule('cleancore-recovery-purge','0 * * * *','select public.purge_deleted_records();');
+end $$;
