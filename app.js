@@ -1234,8 +1234,8 @@ $("clearErrorLogs")?.addEventListener("click",async()=>{
  toast("Error Finder history cleared.");
 });
 document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-error");if(!b)return;const x=errorLogs.find(r=>r.id===b.dataset.errorId);if(!x)return;try{await navigator.clipboard.writeText(formatErrorForCopy(x));toast("Error copied");}catch(err){toast("Copy failed. Select the error manually.",false,{action:"copy_error"});}});
-function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
-function paymentStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Paid"?"ok":(x==="Partially Paid"||x==="Credit")?"warn":"danger")+"'>"+esc(x)+"</span>"}
+function billStatusBadge(v){const raw=v||"Draft";const x=raw==="Draft"?"Pending":raw;return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Pending"?"":"warn")+"'>"+esc(x)+"</span>"}
+function paymentStatusBadge(v){const raw=v||"Unpaid";const x=raw==="Unpaid"?"Pending":raw;return "<span class='badge "+(x==="Paid"?"ok":(x==="Partially Paid"||x==="Credit")?"warn":"")+"'>"+esc(x)+"</span>"}
 function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
 function invoicePaymentChoice(inv){
  if((inv?.payment_status||"")==="Paid")return "PAID";
@@ -1314,7 +1314,7 @@ function renderSales(){
   esc(x.invoice_no),esc(x.customer_name),money(x.total),
   paymentStatusBadge(x.payment_status),money(x.due_amount),x.payment_method?esc(x.payment_method):"<span class=\"muted\">Pending</span>",
   "<span class=\"badge ok\">"+esc(formatSaleSource(x))+"</span>",
-  "<span class=\"badge "+(x.bill_status==="Confirmed"?"ok":x.bill_status==="Completed"?"ok":x.bill_status==="Cancelled"?"danger":"")+"\">"+esc(x.bill_status||"Confirmed")+"</span>",
+  "<span class=\"badge "+(x.bill_status==="Confirmed"?"ok":x.bill_status==="Completed"?"ok":x.bill_status==="Cancelled"?"danger":"")+"\">"+esc(x.bill_status==="Draft"?"Pending":(x.bill_status||"Pending"))+"</span>",
   deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
   '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> <button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
