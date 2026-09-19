@@ -138,8 +138,25 @@ function announceWebsiteNotification(n){
  if(notificationPreferences.sound_enabled)playNotificationSound();
  maybeBrowserNotify(n,pref);
  toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
- // Pull the new order/enquiry into the currently open Manager section immediately.
- loadAll().catch(err=>console.warn("Manager data refresh after alert:",err.message));
+ // Pull only the affected data instead of rebuilding every Manager table.
+ const refresh=async()=>{
+   if(isOrder){
+     const [wo,cu]=await Promise.all([
+       db.from("website_orders").select("id,order_no,customer_id,status,subtotal,total,notes,created_at,updated_at,invoice_id,invoice_no,gst_enabled,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,place_of_supply,customer_gstin").order("created_at",{ascending:false}),
+       db.from("customers").select("id,name,phone,gstin,business_name,email,billing_address,delivery_address,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode,auth_user_id").is("archived_at",null).order("name")
+     ]);
+     if(wo.error)throw wo.error;if(cu.error)throw cu.error;
+     websiteOrders=wo.data||[];customers=cu.data||[];
+     renderWebsiteOrders();renderCustomers();
+     if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(x=>x.status==="New").length;
+   }else{
+     const en=await db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250);
+     if(en.error)throw en.error;
+     enquiries=en.data||[];
+     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+   }
+ };
+ refresh().catch(err=>console.warn("Manager alert refresh:",err.message));
 }
 async function loadWebsiteNotifications(firstLoad=false){
  if(!isAdmin)return;
@@ -177,7 +194,7 @@ async function startWebsiteNotifications(){
      if(isWebsiteManagerNotification(payload.new))announceWebsiteNotification(payload.new);
    })
    .subscribe();
- notificationPollTimer=setInterval(()=>loadWebsiteNotifications(false),10000);
+ notificationPollTimer=setInterval(()=>loadWebsiteNotifications(false),60000);
 }
 document.getElementById("testNotificationSound")?.addEventListener("click",async e=>{
   e.stopPropagation();
@@ -483,26 +500,26 @@ function scanOperationalNotifications(){
  localStorage.setItem(operationalSeenKey("LowStockState"),JSON.stringify(current));
 }
 async function loadAll(){
- const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("*").order("name"):null;
- const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("*").order("created_at",{ascending:false}):null;
- const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("*").is("archived_at",null).order("name"):null;
- const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("*").neq("source","website_order").order("created_at",{ascending:false}):null;
- const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("*").order("name"):null;
- const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}):null;
- const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false}):null;
- const qWO=(isAdmin||canAccess("website_orders"))?db.from("website_orders").select("*").order("created_at",{ascending:false}):null;
+ const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("id,name,unit,selling_price,cost_price,stock,low_stock_threshold,description,additional_details,image_urls,video_urls,hsn_code").order("name"):null;
+ const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source").order("created_at",{ascending:false}):null;
+ const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("id,name,phone,gstin,created_at,business_name,email,billing_address,delivery_address,updated_at,auth_user_id,alternate_phone,archived_at,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode").is("archived_at",null).order("name"):null;
+ const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250):null;
+ const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("id,name,unit,cost_per_unit,stock,low_stock_threshold,created_at,updated_at").order("name"):null;
+ const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("id,expense_date,category,amount,vendor,payment_method,notes,raw_material_id,quantity,unit_cost,created_at,updated_at").order("expense_date",{ascending:false}).order("created_at",{ascending:false}).limit(1000):null;
+ const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("id,invoice_id,customer_id,amount,payment_date,payment_method,notes,created_at").order("payment_date",{ascending:false}).order("created_at",{ascending:false}).limit(250):null;
+ const qWO=(isAdmin||canAccess("website_orders"))?db.from("website_orders").select("id,order_no,customer_id,status,subtotal,total,notes,created_at,updated_at,invoice_id,invoice_no,gst_enabled,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,place_of_supply,customer_gstin").order("created_at",{ascending:false}).limit(250):null;
  const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qWO]);
  const [p,i,cu,e,r,x,pm,wo]=qs;
  for(const q of qs)if(q?.error)throw new Error(q.error.message);
  products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
  if(isAdmin){
    const [er,ep,cr,ar,nr,dr]=await Promise.all([
-     db.from("employees").select("*").order("created_at",{ascending:false}),
-     db.from("employee_permissions").select("*"),
-     db.from("change_requests").select("*").order("requested_at",{ascending:false}),
-     db.from("access_requests").select("*").order("created_at",{ascending:false}),
-     db.from("manager_notifications").select("*").order("created_at",{ascending:false}),
-     db.from("deleted_records").select("id,entity_type,original_id,display_name,deleted_at,purge_at,status").eq("status","Deleted").order("deleted_at",{ascending:false})
+     db.from("employees").select("id,auth_user_id,username,full_name,team,alert_email,active,starts_at,ends_at,created_at,updated_at,portal_key").order("created_at",{ascending:false}).limit(100),
+     db.from("employee_permissions").select("employee_id,module,enabled"),
+     db.from("change_requests").select("id,employee_id,module,action,target_table,target_id,payload,status,requested_at,reviewed_at,reviewed_by,review_note").order("requested_at",{ascending:false}).limit(250),
+     db.from("access_requests").select("id,employee_id,module,action,reason,created_at,status,reviewed_at,reviewed_by").order("created_at",{ascending:false}).limit(250),
+     db.from("manager_notifications").select("id,notification_type,subject,body,related_id,email_to,email_status,created_at,sent_at").order("created_at",{ascending:false}).limit(250),
+     db.from("deleted_records").select("id,entity_type,original_id,display_name,deleted_at,purge_at,status").eq("status","Deleted").order("deleted_at",{ascending:false}).limit(250)
    ]);
    for(const q of [er,ep,cr,ar,nr,dr])if(q?.error)throw new Error(q.error.message);
    employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];deletedRecords=dr.data||[];
@@ -1037,7 +1054,7 @@ $("paymentForm").addEventListener("submit",async function(e){
  const ins=await db.from("payments").insert({invoice_id:inv.id,customer_id:inv.customer_id,amount,payment_date,payment_method:$("paymentMethod").value,notes:$("paymentNotes").value.trim()});
  if(ins.error)return toast(ins.error.message,false);
  const paid=Number(inv.paid_amount||0)+amount,due=Math.max(Number(inv.total||0)-paid,0);
- const status=due===0?"Paid":"Part Paid";
+ const status=due===0?"Paid":"Partially Paid";
  const upd=await db.from("invoices").update({paid_amount:paid,due_amount:due,payment_status:status,due_date:due>0?inv.due_date:null,payment_method:$("paymentMethod").value}).eq("id",inv.id);
  if(upd.error)return toast(upd.error.message,false);
  $("paymentDialog").close();toast("Payment recorded");await loadAll();
@@ -1201,9 +1218,9 @@ function paymentState(total){
  const type=$("paymentType")?.value||"CASH";
  const bill=Number(total||0);
  if(type==="CASH"||type==="ONLINE")return {type,method:type==="CASH"?"Cash":"Online",status:"Paid",paid:bill,due:0,dueDate:null};
- if(type==="CREDIT")return {type,method:"Credit",status:"Credit",paid:0,due:bill,dueDate:$("dueDate").value||null};
+ if(type==="CREDIT")return {type,method:"Credit",status:"Unpaid",paid:0,due:bill,dueDate:$("dueDate").value||null};
  let paid=Math.min(bill,Math.max(0,Number($("payingNowInput").value||0)));
- return {type,method:"Half / Part Payment",status:paid>=bill?"Paid":paid>0?"Part Paid":"Credit",paid,due:Math.max(0,bill-paid),dueDate:$("dueDate").value||null};
+ return {type,method:"Half / Part Payment",status:paid>=bill?"Paid":paid>0?"Partially Paid":"Unpaid",paid,due:Math.max(0,bill-paid),dueDate:$("dueDate").value||null};
 }
 function syncPaymentInput(){
  const type=$("paymentType")?.value||"CASH";
@@ -1354,7 +1371,8 @@ $("billForm").addEventListener("submit",async e=>{
    invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,
    billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
    subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,
-   total,profit:storedProfit,payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
+   total,profit:storedProfit,payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,
+   bill_status:isQuotation?"Draft":"Confirmed",delivery_status:isQuotation?"Not Applicable":"Pending",source:"Manager"
  }).select().single();
  if(inv.error)return toast(inv.error.message,false);
  if(!isQuotation&&pay.paid>0){
@@ -1381,7 +1399,7 @@ $("billForm").addEventListener("submit",async e=>{
    await loadAll();
    rebuildLines();
  }
- $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";await loadAll();rebuildLines();
+ $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
 $("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
