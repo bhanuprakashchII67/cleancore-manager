@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.37";
+const MANAGER_VERSION="3.8.40";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -374,7 +374,7 @@ function ensureDialogCloseButtons(){
    });
  });
 }
-document.addEventListener("DOMContentLoaded",ensureDialogCloseButtons);
+document.addEventListener("DOMContentLoaded",()=>{ensureDialogCloseButtons();document.addEventListener("keydown",e=>{if(e.key==="Escape"){document.querySelectorAll("dialog[open]").forEach(d=>{try{d.close();}catch(_){}});document.body.classList.remove("modal-open");}});document.addEventListener("click",e=>{document.querySelectorAll("dialog[open]").forEach(d=>{if(e.target===d){try{d.close();}catch(_){}}});});});
 
 async function refreshManagerData(){
  const b=$("refreshManager");
