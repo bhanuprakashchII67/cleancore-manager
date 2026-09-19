@@ -1158,3 +1158,5 @@ begin
     alter publication supabase_realtime add table public.manager_notifications;
   end if;
 end $$;
+
+revoke all on function public.notify_manager_new_website_activity() from public;
