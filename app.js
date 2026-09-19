@@ -1183,9 +1183,10 @@ function renderSales(){
   esc(x.invoice_no),esc(x.customer_name),money(x.total),
   paymentStatusBadge(x.payment_status),money(x.due_amount),x.payment_method?esc(x.payment_method):"<span class=\"muted\">Pending</span>",
   deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
-  `<button type="button" class="link" onclick="openInvoiceStatus('${x.id}')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice('${x.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>`
+  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> <button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
 }
+
 $("statusPaymentChoice")?.addEventListener("change",syncInvoiceStatusPaymentFields);
 $("invoiceStatusForm")?.addEventListener("submit",async e=>{
  e.preventDefault();
