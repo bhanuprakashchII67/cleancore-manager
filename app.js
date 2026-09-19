@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.8.17";
+const MANAGER_VERSION="3.8.18";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1861,6 +1861,27 @@ async function sendBillToCustomer(inv,customer,items){
  catch(err){console.error("Invoice PDF creation error",err);toast("Bill saved, but the PDF could not be prepared. You can open the bill and use Print / Save PDF.",false);}
  const encoded=encodeURIComponent(msg),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
  let w=window.__cleancoreBillWhatsAppWindow;window.__cleancoreBillWhatsAppWindow=null;
+
+ // Desktop: try the local WhatsApp Web bridge first. It uses the Manager's
+ // already-logged-in WhatsApp Web session and can attach the actual PDF file.
+ if(pdfFile&&!isMobile){
+   try{
+     const bridgeForm=new FormData();
+     bridgeForm.append("phone",phone);
+     bridgeForm.append("message",msg);
+     bridgeForm.append("pdf",pdfFile,pdfFile.name);
+     const bridgeResponse=await fetch("http://127.0.0.1:8787/send",{method:"POST",body:bridgeForm});
+     const bridgeData=await bridgeResponse.json().catch(()=>({}));
+     if(bridgeResponse.ok&&bridgeData?.sent){
+       if(w&&!w.closed)try{w.close();}catch(_){}
+       const n=$("billSendNotice");
+       if(n){n.classList.remove("hidden");n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" sent.</strong> The generated PDF was attached and sent through your WhatsApp Web session.";}
+       toast("Invoice PDF sent to WhatsApp.");
+       return;
+     }
+     if(bridgeData?.error)console.warn("WhatsApp bridge:",bridgeData.error);
+   }catch(err){console.info("WhatsApp bridge unavailable; using normal WhatsApp Web flow.",err?.message||err);}
+ }
  if(pdfFile&&isMobile&&navigator.share&&navigator.canShare){
    try{
      if(navigator.canShare({files:[pdfFile]})){
