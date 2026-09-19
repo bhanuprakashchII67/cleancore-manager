@@ -1367,3 +1367,55 @@ with check (manager_user_id=(select auth.uid()));
 
 update public.invoices i set source='Website'
 where exists(select 1 from public.website_orders w where w.invoice_id=i.id);
+
+create or replace function public.create_manager_bill(p_invoice jsonb,p_items jsonb)
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare
+ v_invoice_id uuid;
+ v_item record;
+ v_total numeric:=coalesce((p_invoice->>'total')::numeric,0);
+ v_paid numeric:=coalesce((p_invoice->>'paid_amount')::numeric,0);
+ v_due numeric:=greatest(v_total-v_paid,0);
+begin
+ if not public.is_admin() then raise exception 'Manager access required'; end if;
+ if coalesce(jsonb_array_length(p_items),0)=0 then raise exception 'Add at least one item'; end if;
+ if v_total<=0 then raise exception 'Bill total must be greater than zero'; end if;
+ if v_paid<0 or v_paid>v_total then raise exception 'Invalid payment amount'; end if;
+ for v_item in
+   select (x->>'product_id')::uuid product_id,greatest((x->>'qty')::numeric,0) qty,coalesce(x->>'product_name','') product_name,
+          coalesce((x->>'unit_price')::numeric,0) unit_price,coalesce((x->>'cost_price')::numeric,0) cost_price,
+          coalesce((x->>'line_total')::numeric,0) line_total,coalesce((x->>'line_profit')::numeric,0) line_profit
+   from jsonb_array_elements(p_items) x
+ loop
+   if v_item.qty<=0 then raise exception 'Invalid quantity for %',v_item.product_name; end if;
+   perform 1 from public.products where id=v_item.product_id and stock>=v_item.qty for update;
+   if not found then raise exception 'Insufficient stock for %',v_item.product_name; end if;
+ end loop;
+ insert into public.invoices(invoice_no,document_type,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit,payment_status,paid_amount,due_amount,due_date,payment_method,bill_status,delivery_status,source)
+ values(p_invoice->>'invoice_no',coalesce(p_invoice->>'document_type','SALE'),(p_invoice->>'customer_id')::uuid,p_invoice->>'customer_name',p_invoice->>'customer_phone',
+   nullif(p_invoice->>'gstin',''),p_invoice->>'customer_business',p_invoice->>'customer_email',coalesce(p_invoice->>'billing_address',''),coalesce(p_invoice->>'delivery_address',''),
+   coalesce((p_invoice->>'subtotal')::numeric,0),coalesce((p_invoice->>'discount')::numeric,0),coalesce((p_invoice->>'gst_percent')::numeric,0),coalesce((p_invoice->>'gst_amount')::numeric,0),
+   coalesce((p_invoice->>'cgst_percent')::numeric,0),coalesce((p_invoice->>'cgst_amount')::numeric,0),coalesce((p_invoice->>'sgst_percent')::numeric,0),coalesce((p_invoice->>'sgst_amount')::numeric,0),
+   coalesce((p_invoice->>'igst_percent')::numeric,0),coalesce((p_invoice->>'igst_amount')::numeric,0),v_total,coalesce((p_invoice->>'profit')::numeric,0),
+   case when coalesce(p_invoice->>'document_type','SALE')='QUOTATION' then 'Not Applicable' when v_due=0 then 'Paid' when v_paid>0 then 'Partially Paid' else 'Unpaid' end,
+   v_paid,v_due,nullif(p_invoice->>'due_date','')::date,p_invoice->>'payment_method',
+   case when coalesce(p_invoice->>'document_type','SALE')='QUOTATION' then 'Draft' else 'Confirmed' end,
+   case when coalesce(p_invoice->>'document_type','SALE')='QUOTATION' then 'Not Applicable' else 'Pending' end,'Manager'
+ ) returning id into v_invoice_id;
+ insert into public.invoice_items(invoice_id,product_id,product_name,hsn_code,qty,unit_price,cost_price,line_total,line_profit)
+ select v_invoice_id,(x->>'product_id')::uuid,x->>'product_name',coalesce(x->>'hsn_code',''),(x->>'qty')::numeric,(x->>'unit_price')::numeric,(x->>'cost_price')::numeric,(x->>'line_total')::numeric,(x->>'line_profit')::numeric
+ from jsonb_array_elements(p_items) x;
+ update public.products p set stock=p.stock-q.qty
+ from (select (x->>'product_id')::uuid product_id,sum((x->>'qty')::numeric) qty from jsonb_array_elements(p_items) x group by (x->>'product_id')::uuid) q
+ where p.id=q.product_id;
+ if v_paid>0 and coalesce(p_invoice->>'document_type','SALE')='SALE' then
+   insert into public.payments(invoice_id,customer_id,amount,payment_date,payment_method,notes)
+   values(v_invoice_id,(p_invoice->>'customer_id')::uuid,v_paid,current_date,p_invoice->>'payment_method','Initial payment');
+ end if;
+ insert into public.audit_logs(actor_user_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+ values(auth.uid(),'admin','BILL_CREATED','billing','invoice_create','invoices',v_invoice_id,jsonb_build_object('invoice_no',p_invoice->>'invoice_no','total',v_total,'paid',v_paid,'due',v_due));
+ return jsonb_build_object('id',v_invoice_id,'invoice_no',p_invoice->>'invoice_no','total',v_total,'paid',v_paid,'due',v_due);
+end; $$;
+revoke all on function public.create_manager_bill(jsonb,jsonb) from public;
+grant execute on function public.create_manager_bill(jsonb,jsonb) to authenticated;
