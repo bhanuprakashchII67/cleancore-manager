@@ -1028,7 +1028,7 @@ declare
 begin
  if not public.is_admin() then raise exception 'Manager approval required'; end if;
  if p_entity_type='customer' then
-   select to_jsonb(c),coalesce(c.business_name,nullif(c.name,''),'Customer'),c.auth_user_id into v_row,v_name,v_auth_user_id
+   select to_jsonb(c),coalesce(nullif(trim(c.business_name),''),nullif(trim(c.name),''),nullif(trim(c.phone),''),'Customer'),c.auth_user_id into v_row,v_name,v_auth_user_id
    from public.customers c where c.id=p_original_id;
    if v_row is null then raise exception 'Customer not found'; end if;
    select coalesce(array_agg(i.id),'{}'::uuid[]) into v_invoice_ids from public.invoices i where i.customer_id=p_original_id;
