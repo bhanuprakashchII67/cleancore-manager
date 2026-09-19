@@ -21,34 +21,24 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.7.5";
+const MANAGER_VERSION="3.7.6";
 let lastUserAction=null;
-function captureUserAction(type,target){
- const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;
- lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};
-}
+function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
 document.addEventListener("change",e=>captureUserAction("change",e.target),true);
 document.addEventListener("submit",e=>captureUserAction("submit",e.target),true);
-function reportClientError(err,meta={}){
- const e=err instanceof Error?err:new Error(String(err||"Unknown error"));
- const context={...(meta.context||{}),last_user_action:lastUserAction};
- const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"unhandled_error",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:context,p_user_agent:navigator.userAgent};
- db.rpc("log_client_error",payload).catch(logErr=>console.warn("CleanCore Error Finder logging failed:",logErr));
-}
-function toast(m,ok=true,meta={}){
- const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200);
- if(!ok)reportClientError(new Error(String(m)),{action:meta.action||"toast_error",context:meta.context||{}});
-}
+function errorQueueRead(){try{const q=JSON.parse(localStorage.getItem("cleancore_error_queue")||"[]");return Array.isArray(q)?q:[];}catch{return [];}}
+function errorQueueWrite(q){try{localStorage.setItem("cleancore_error_queue",JSON.stringify(q.slice(-20)));}catch{}}
+async function sendClientError(payload){try{const {error}=await db.rpc("log_client_error",payload);if(error)throw error;return true;}catch(err){const q=errorQueueRead();q.push({...payload,queued_at:new Date().toISOString(),logger_error:String(err?.message||err)});errorQueueWrite(q);return false;}}
+async function flushErrorQueue(){const q=errorQueueRead();if(!q.length)return;const remaining=[];for(const payload of q){try{const {error}=await db.rpc("log_client_error",payload);if(error)throw error;}catch{remaining.push(payload);}}errorQueueWrite(remaining);}
+function reportClientError(err,meta={}){const e=err instanceof Error?err:new Error(String(err||"Unknown error"));const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"unhandled_error",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:{...(meta.context||{}),last_user_action:lastUserAction},p_user_agent:navigator.userAgent};void sendClientError(payload);}
+function toast(m,ok=true,meta={}){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200);if(!ok)reportClientError(new Error(String(m)),{action:meta.action||"toast_error",context:meta.context||{}});}
 const nativeConsoleError=console.error.bind(console);
-console.error=(...args)=>{
- nativeConsoleError(...args);
- const first=args.find(x=>x instanceof Error);
- const message=args.map(x=>x instanceof Error?x.message:(typeof x==="string"?x:JSON.stringify(x))).join(" ").slice(0,4000);
- reportClientError(first||new Error(message),{action:"console_error",context:{console_arguments:message}});
-};
+console.error=(...args)=>{nativeConsoleError(...args);let message="";try{message=args.map(x=>x instanceof Error?x.message:(typeof x==="string"?x:JSON.stringify(x))).join(" ").slice(0,4000);}catch{message="Console error";}const first=args.find(x=>x instanceof Error);reportClientError(first||new Error(message),{action:"console_error",context:{console_arguments:message}});};
 window.addEventListener("error",e=>reportClientError(e.error||new Error(e.message||"Unhandled browser error"),{action:"window_error",context:{source:e.filename||"",line:e.lineno||0,column:e.colno||0}}));
 window.addEventListener("unhandledrejection",e=>reportClientError(e.reason||new Error("Unhandled promise rejection"),{action:"unhandled_rejection"}));
+setTimeout(flushErrorQueue,1500);
+
 const NOTIFICATION_DEFAULTS={notifications_enabled:true,sound_enabled:true,desktop_enabled:false,website_orders:true,website_enquiries:true,employee_access_requests:true,employee_change_requests:true,restricted_access_attempts:true,low_stock_alerts:true,payments_received:true,credit_due_alerts:true};
 let notificationPreferences={...NOTIFICATION_DEFAULTS};
 
@@ -981,6 +971,7 @@ function formatErrorForCopy(x){
  return ["CleanCore Error Report","Time: "+new Date(x.created_at).toLocaleString("en-IN"),"App: "+(x.app_name||"—"),"Version: "+(x.app_version||"—"),"Page: "+(x.page||"—"),"Action: "+(x.action||"—"),"Error: "+(x.error_name||"Error"),"Message: "+(x.message||"—"),"URL: "+(x.url||"—"),"Stack: "+(x.stack||"—"),"Context: "+JSON.stringify(x.context||{})].join("\n");
 }
 document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-status");if(s)updateErrorStatus(s.dataset.errorId,s.value);});
+$("testErrorFinder")?.addEventListener("click",async()=>{reportClientError(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await new Promise(r=>setTimeout(r,500));await loadErrorLogs();toast("Test error sent.");});
 document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-error");if(!b)return;const x=errorLogs.find(r=>r.id===b.dataset.errorId);if(!x)return;try{await navigator.clipboard.writeText(formatErrorForCopy(x));toast("Error copied");}catch(err){toast("Copy failed. Select the error manually.",false,{action:"copy_error"});}});
 function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
 function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":x==="Partially Paid"?"warn":"danger")+"'>"+esc(x)+"</span>"}
@@ -1482,7 +1473,7 @@ $("billForm").addEventListener("submit",async e=>{
      paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
    };
    const {data,error}=await db.rpc("create_manager_bill",{p_invoice:invoicePayload,p_items:itemPayload});
-   if(error)throw new Error(error.message||"Bill could not be generated.");
+   if(error){const rpcError=new Error(error.message||"Bill could not be generated.");rpcError.name="SupabaseRpcError";rpcError.code=error.code||"";rpcError.details=error.details||"";rpcError.hint=error.hint||"";throw rpcError;}
    const billId=data?.id;
    if(!billId)throw new Error("Bill was not returned by the server. Nothing was marked as generated.");
    await loadAll();
@@ -1494,15 +1485,23 @@ $("billForm").addEventListener("submit",async e=>{
      else sendBillToCustomer(savedInv,customer,items);
    }
  }catch(err){
-   console.error("CleanCore bill generation error",err);
-   reportClientError(err,{action:"generate_bill",context:{
+   const detail=err?.message||"Bill could not be generated.";
+   const billError=err instanceof Error?err:new Error(String(detail));
+   if(err?.code)billError.code=err.code;
+   if(err?.details)billError.details=err.details;
+   if(err?.hint)billError.hint=err.hint;
+   console.error("CleanCore bill generation error",billError);
+   reportClientError(billError,{action:"generate_bill",context:{
      document_type:$("documentType")?.value||"",
      customer_id:$("billingCustomer")?.value||"",
      bill_type:$("billType")?.value||"",
      payment_type:$("paymentType")?.value||"",
-     line_count:document.querySelectorAll(".line").length
+     line_count:document.querySelectorAll(".line").length,
+     supabase_code:err?.code||"",
+     supabase_details:err?.details||"",
+     supabase_hint:err?.hint||""
    }});
-   toast(err?.message||"Bill could not be generated. Nothing was saved.",false);
+   toast(detail,false);
  }finally{
    if(saveButton){saveButton.disabled=false;saveButton.textContent=saveButton.dataset.originalText||"Generate Bill";}
  }
