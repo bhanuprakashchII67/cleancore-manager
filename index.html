@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.24">
+<link rel="stylesheet" href="style.css?v=3.8.30">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v3.8.24</p>
+    <p class="version">CleanCore Manager v3.8.30</p>
   </div>
 </section>
 
@@ -646,7 +646,7 @@
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
-  const K="cleancore_manager_cache_reset_420";
+  const K="cleancore_manager_cache_reset_430";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
@@ -657,10 +657,10 @@
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.2",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.3",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.24"></script>
+<script src="app.js?v=3.8.30"></script>
 </body>
 </html>
