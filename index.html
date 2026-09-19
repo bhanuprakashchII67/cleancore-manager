@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.7.1">
+<link rel="stylesheet" href="style.css?v=3.8.0">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v3.7.1</p>
+    <p class="version">CleanCore Manager v3.8.0</p>
   </div>
 </section>
 
@@ -36,17 +36,17 @@
 <aside class="sidebar">
   <div class="side-brand"><div class="brand small">CC</div><div><b>CleanCore</b><span>Manager</span></div></div>
   <nav>
-    <button class="nav active" data-section="dashboard">Dashboard</button>
-    <button class="nav" data-section="products">Products & Stock</button>
-    <button class="nav" data-section="billing">Create Bill</button>
-    <button class="nav" data-section="sales">Sales</button>
-    <button class="nav" data-section="customers">Customers</button>
-    <button class="nav" data-section="enquiries">Enquiries</button>
-    <button class="nav" data-section="expenses">Expenses</button>
-    <button class="nav" data-section="settings">Settings</button>
-    <button class="nav" data-section="recovery">Recovery</button>
+    <button type="button" class="nav active" data-section="dashboard">Dashboard</button>
+    <button type="button" class="nav" data-section="products">Products & Stock</button>
+    <button type="button" class="nav" data-section="billing">Create Bill</button>
+    <button type="button" class="nav" data-section="sales">Sales</button>
+    <button type="button" class="nav" data-section="customers">Customers</button>
+    <button type="button" class="nav" data-section="enquiries">Enquiries</button>
+    <button type="button" class="nav" data-section="expenses">Expenses</button>
+    <button type="button" class="nav" data-section="settings">Settings</button>
+    <button type="button" class="nav" data-section="recovery">Recovery</button>
   </nav>
-  <button id="logout" class="nav logout">Sign out</button>
+  <button type="button" id="logout" class="nav logout">Sign out</button>
 </aside>
 
 <main class="main">
@@ -63,7 +63,7 @@
 </div>
 </div>
 <div class="profile-wrap">
-<button id="refreshManager" class="chip refresh-btn" type="button" title="Refresh current data" aria-label="Refresh current data">↻ Refresh</button>
+<button type="button" id="refreshManager" class="chip refresh-btn" title="Refresh data" aria-label="Refresh data">↻ Refresh</button>↻ Refresh</button>
 
 <button id="profileBtn" class="chip profile-btn" type="button">👤 Profile</button>
 <div id="profileMenu" class="profile-menu hidden">
@@ -79,7 +79,7 @@
 </header>
 
 <section id="dashboard" class="section active">
-  <div class="section-toolbar"><span>Dashboard data</span><button type="button" class="btn small page-refresh" data-page-refresh="dashboard">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Dashboard data</span></div>
   <div class="cards">
     <div class="metric"><span>Today sales</span><strong id="today">₹0</strong></div>
     <div class="metric"><span>This month</span><strong id="month">₹0</strong></div>
@@ -93,7 +93,7 @@
 </section>
 
 <section id="products" class="section">
-  <div class="section-toolbar"><span>Products & stock data</span><button type="button" class="btn small page-refresh" data-page-refresh="products">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Products & stock data</span></div>
   <div class="panel">
     <div class="panel-head">
       <div><h3>Products & Stock</h3><p class="muted">Manage finished products, prices, descriptions, photos and videos.</p></div>
@@ -111,7 +111,7 @@
 </section>
 
 <section id="billing" class="section">
-  <div class="section-toolbar"><span>Billing data</span><button type="button" class="btn small page-refresh" data-page-refresh="billing">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Billing data</span></div>
   <div class="panel">
     <div class="panel-head"><h3>Create Bill</h3><span class="muted">Invoice</span></div>
     <form id="billForm" class="grid">
@@ -205,7 +205,7 @@
 <div id="billSendNotice" class="send-notice hidden"></div>
 
 <section id="sales" class="section">
-  <div class="section-toolbar"><span>Sales data</span><button type="button" class="btn small page-refresh" data-page-refresh="sales">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Sales data</span></div>
   <div class="panel">
     <div class="panel-head"><div><h3>Sales</h3><p id="salesSummary" class="muted"></p></div><button id="export" class="btn small">Export CSV</button></div>
     <div class="filters"><label>From date<input id="salesFrom" type="date"></label><label>To date<input id="salesTo" type="date"></label><button id="clearSalesFilter" class="btn small">Clear dates</button></div>
@@ -214,7 +214,7 @@
 </section>
 
 <section id="customers" class="section">
-  <div class="section-toolbar"><span>Customer data</span><button type="button" class="btn small page-refresh" data-page-refresh="customers">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Customer data</span></div>
   <div class="panel">
     <div class="panel-head"><div><h3>Customers</h3><p class="muted">Add and edit complete customer records.</p></div><button id="addCustomer" class="btn primary small">+ New Customer</button></div>
     <div id="customersTable"></div>
@@ -246,7 +246,7 @@
 </dialog>
 
 <section id="enquiries" class="section">
-  <div class="section-toolbar"><span>Enquiries & website orders</span><button type="button" class="btn small page-refresh" data-page-refresh="enquiries">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Enquiries & website orders</span></div>
   <div id="websiteOrdersPanel" class="panel">
     <div class="panel-head"><div><h3>Website Orders</h3><p id="websiteOrdersSummary" class="muted"></p></div></div>
     <div id="websiteOrdersTable"></div>
@@ -258,7 +258,7 @@
 </section>
 
 <section id="expenses" class="section">
-  <div class="section-toolbar"><span>Expense data</span><button type="button" class="btn small page-refresh" data-page-refresh="expenses">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Expense data</span></div>
   <div class="panel">
     <div class="panel-head">
       <div><h3>Business Expenses</h3><p class="muted">Track daily business spending and subtract it from gross profit to calculate net profit.</p></div>
@@ -277,7 +277,7 @@
 </section>
 
 <section id="recovery" class="section">
-  <div class="section-toolbar"><span>Deleted records</span><button type="button" class="btn small page-refresh" data-page-refresh="recovery">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Deleted records</span></div>
   <div class="panel">
     <div class="panel-head">
       <div>
@@ -292,7 +292,7 @@
 </section>
 
 <section id="settings" class="section">
-  <div class="section-toolbar"><span>Manager settings</span><button type="button" class="btn small page-refresh" data-page-refresh="settings">↻ Refresh</button></div>
+  <div class="section-toolbar"><span>Manager settings</span></div>
   <div class="panel">
     <div class="panel-head"><div><h3>Security</h3><p class="muted">Manager account security and employee access control.</p></div></div>
     <button id="changePassword" class="btn primary">Change password</button>
@@ -499,19 +499,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
-  const K="cleancore_manager_cache_reset_371";
+  const K="cleancore_manager_cache_reset_380";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
       "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
       "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
-    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=370"));
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=380"));
   }
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.1.0",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=3.8.0",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=3.7.1"></script>
+<script src="app.js?v=3.8.0"></script>
 </body>
 </html>
