@@ -1449,7 +1449,9 @@ function printInvoiceNow(){
  area.innerHTML=body;
  document.body.appendChild(area);
  activePrintArea=area;
+ document.body.classList.add("printing-invoice");
  const cleanup=()=>{
+   document.body.classList.remove("printing-invoice");
    window.removeEventListener("afterprint",cleanup);
    if(activePrintArea){activePrintArea.remove();activePrintArea=null;}
  };
