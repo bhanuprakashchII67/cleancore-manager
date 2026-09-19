@@ -1277,8 +1277,7 @@ create trigger website_order_sync_invoice_status
 after update of status on public.website_orders
 for each row execute function public.sync_website_order_invoice_status();
 
--- Fixed + extended approval function is defined below so employee bill-status changes
--- use the same Manager approval queue as all other employee changes.
+-- Employee bill-status changes use a dedicated approval RPC so the existing approval actions remain isolated.
 
 create or replace function public.approve_invoice_status_change_request(p_request_id uuid,p_approve boolean,p_note text default '')
 returns jsonb language plpgsql security definer set search_path=public
