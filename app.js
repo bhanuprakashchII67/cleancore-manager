@@ -32,19 +32,23 @@ function playNotificationSound(){
  try{
    unlockNotificationAudio();
    const ctx=notificationAudioContext;if(!ctx)return;
+   const master=ctx.createGain();
+   master.gain.value=0.46;
+   master.connect(ctx.destination);
    const now=ctx.currentTime;
-   [0,0.18].forEach((offset,i)=>{
+   [0,0.2,0.42].forEach((offset,i)=>{
      const o=ctx.createOscillator(),g=ctx.createGain();
-     o.type="sine";
-     o.frequency.setValueAtTime(i===0?880:1175,now+offset);
+     o.type=i===2?"triangle":"sine";
+     o.frequency.setValueAtTime([880,1175,988][i],now+offset);
      g.gain.setValueAtTime(0.0001,now+offset);
-     g.gain.exponentialRampToValueAtTime(0.18,now+offset+0.02);
-     g.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.16);
-     o.connect(g);g.connect(ctx.destination);
-     o.start(now+offset);o.stop(now+offset+0.18);
+     g.gain.exponentialRampToValueAtTime(0.34,now+offset+0.025);
+     g.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.19);
+     o.connect(g);g.connect(master);
+     o.start(now+offset);o.stop(now+offset+0.21);
    });
  }catch(e){}
 }
+document.addEventListener("pointerdown",unlockNotificationAudio,{once:true,capture:true});
 function notificationReadAt(){return Number(localStorage.getItem(notificationStoreKey("read"))||0)}
 function notificationAlertedAt(){return Number(localStorage.getItem(notificationStoreKey("alerted"))||0)}
 function setNotificationTimestamp(type,v){localStorage.setItem(notificationStoreKey(type),String(v))}
@@ -184,25 +188,12 @@ async function refreshManagerData(){
    if(b){b.disabled=false;b.textContent="↻ Refresh";}
  }
 }
-async function refreshPageData(btn){
- if(!btn)return;
- const old=btn.innerHTML;
- btn.disabled=true;btn.innerHTML="↻ Refreshing…";
- try{
-   await loadAll();
-   toast("Page data refreshed");
- }catch(err){
-   toast(err?.message||"Refresh failed",false);
- }finally{
-   btn.disabled=false;btn.innerHTML=old;
- }
-}
 function bindRefreshControls(){
- const top=$("refreshManager");
- if(top)top.onclick=e=>{e.preventDefault();e.stopPropagation();refreshManagerData();};
- document.querySelectorAll("[data-page-refresh]").forEach(btn=>{
-  btn.type="button";
-  btn.onclick=e=>{e.preventDefault();e.stopPropagation();refreshPageData(btn);};
+ document.addEventListener("click",e=>{
+  const top=e.target.closest?.("#refreshManager");
+  if(!top)return;
+  e.preventDefault();e.stopPropagation();
+  refreshManagerData();
  });
 }
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
@@ -1452,19 +1443,32 @@ function getPrintableInvoiceHtml(){
  @media(max-width:700px){.inv-header,.inv-parties,.inv-meta,.inv-bottom{grid-template-columns:1fr;display:grid}.inv-title{text-align:left;margin-top:8px}}
  </style></head><body><div class="invoice-preview">${body}</div></body></html>`;
 }
-$("printInvoice").onclick=async e=>{
+$("printInvoice").onclick=e=>{
  e.preventDefault();
  try{
-  const html=getPrintableInvoiceHtml();
+  const invoiceHtml=getPrintableInvoiceHtml();
   const frame=document.createElement("iframe");
-  frame.title="CleanCore Invoice";
-  const printWindow=window.open("about:blank","_blank","width=1000,height=900");
-  if(!printWindow)return toast("Allow pop-ups for CleanCore to print or save the PDF.",false);
-  printWindow.document.open();
-  printWindow.document.write(html.replace("</body></html>","<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};<\\/script></body></html>"));
-  printWindow.document.close();
-  printWindow.focus();
- }catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
+  frame.title="CleanCore Invoice Print";
+  frame.setAttribute("aria-hidden","true");
+  frame.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;";
+  document.body.appendChild(frame);
+  frame.onload=()=>{
+   try{
+    const win=frame.contentWindow;
+    win.focus();
+    win.onafterprint=()=>setTimeout(()=>frame.remove(),250);
+    setTimeout(()=>win.print(),100);
+    setTimeout(()=>{if(document.body.contains(frame))frame.remove()},60000);
+   }catch(err){
+    frame.remove();
+    toast(err?.message||"Unable to print invoice.",false);
+   }
+  };
+  frame.srcdoc=invoiceHtml;
+ }catch(err){
+  console.error("Invoice print error",err);
+  toast(err?.message||"Unable to print invoice.",false);
+ }
 };
 $("profileBtn").onclick=()=>{
  $("notificationMenu")?.classList.add("hidden");
