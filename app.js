@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.7.6";
+const MANAGER_VERSION="3.7.8";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -72,6 +72,12 @@ async function saveNotificationPreferences(){
  const st=$("notificationSettingsStatus");if(st)st.textContent="Notification settings saved.";
 }
 function bindNotificationSettings(){
+ renderNotificationVolume();
+ $("notifVolume")?.addEventListener("input",e=>{
+   const v=Math.min(100,Math.max(20,Number(e.target.value)||100));
+   localStorage.setItem("cleancore_manager_alert_volume",String(v));
+   renderNotificationVolume();
+ });
  ["notifEnabled","notifSound","notifDesktop","notifWebsiteOrders","notifWebsiteEnquiries","notifEmployeeAccess","notifEmployeeChanges","notifRestrictedAccess","notifLowStock","notifPayments","notifCreditDue"].forEach(id=>$(id)?.addEventListener("change",saveNotificationPreferences));
  $("enableDesktopNotifications")?.addEventListener("click",async()=>{
    if(!("Notification" in window)){toast("Desktop notifications are not supported by this browser.",false);return;}
@@ -96,25 +102,34 @@ function unlockNotificationAudio(){
    if(notificationAudioContext.state==="suspended")notificationAudioContext.resume().catch(()=>{});
  }catch(e){}
 }
+function managerAlertVolume(){
+ const v=Number(localStorage.getItem("cleancore_manager_alert_volume")||100);
+ return Math.min(1,Math.max(0.2,v/100));
+}
+function renderNotificationVolume(){
+ const el=$("notifVolume"),out=$("notifVolumeValue");
+ if(el)el.value=Math.round(managerAlertVolume()*100);
+ if(out)out.textContent=Math.round(managerAlertVolume()*100)+"%";
+}
 async function playNotificationSound(){
  try{
    unlockNotificationAudio();
    const ctx=notificationAudioContext;if(!ctx)return;
    if(ctx.state==="suspended")await ctx.resume().catch(()=>{});
-   if(navigator.vibrate)navigator.vibrate([100,60,100]);
+   if(navigator.vibrate)navigator.vibrate([140,70,140]);
    const master=ctx.createGain();
-   master.gain.value=0.46;
+   master.gain.value=0.82*managerAlertVolume();
    master.connect(ctx.destination);
    const now=ctx.currentTime;
-   [0,0.2,0.42].forEach((offset,i)=>{
+   [0,0.18,0.38,0.58].forEach((offset,i)=>{
      const o=ctx.createOscillator(),g=ctx.createGain();
-     o.type=i===2?"triangle":"sine";
-     o.frequency.setValueAtTime([880,1175,988][i],now+offset);
+     o.type=i%2?"triangle":"sine";
+     o.frequency.setValueAtTime([784,1046,1319,988][i],now+offset);
      g.gain.setValueAtTime(0.0001,now+offset);
-     g.gain.exponentialRampToValueAtTime(0.34,now+offset+0.025);
-     g.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.19);
+     g.gain.exponentialRampToValueAtTime(0.42,now+offset+0.025);
+     g.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.18);
      o.connect(g);g.connect(master);
-     o.start(now+offset);o.stop(now+offset+0.21);
+     o.start(now+offset);o.stop(now+offset+0.2);
    });
  }catch(e){}
 }
