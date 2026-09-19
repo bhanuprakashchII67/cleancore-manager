@@ -558,3 +558,11 @@ input,select,textarea{background:#fff!important;color:#122033!important;border-c
 .link{color:#087f8f!important}
 .metric strong,.profit-card strong,.investment-summary strong,.investment-front-box strong{color:#0b2039!important}
 .top{background:transparent!important}
+
+/* Clean invoice layout */
+.invoice-preview .inv-meta{grid-template-columns:1fr auto;align-items:start}
+.invoice-preview .inv-meta>div:last-child{font-size:12px;line-height:1.45;color:#44515d}
+.invoice-preview .inv-parties>div{min-height:145px}
+.invoice-preview .inv-parties p{margin:.55rem 0 0;line-height:1.42;font-size:12px}
+.invoice-preview .inv-parties p strong{font-size:13px;color:#0b1f33}
+@media(max-width:600px){.invoice-preview .inv-parties>div{min-height:0}}
