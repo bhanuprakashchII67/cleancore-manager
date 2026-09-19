@@ -1351,6 +1351,13 @@ function customerStats(id){
  const lastPurchase=bills.length?bills.reduce((a,x)=>new Date(x.created_at)>new Date(a)?x.created_at:a,bills[0].created_at):null;
  return {bills,totalPurchases,totalPaid,creditDue,lastPurchase};
 }
+function customerPurchaseDate(id){
+ const stats=customerStats(id);
+ if(stats.lastPurchase)return stats.lastPurchase;
+ const webDates=(websiteOrders||[]).filter(x=>x.customer_id===id&&x.created_at).map(x=>x.created_at);
+ if(webDates.length)return webDates.sort((a,b)=>new Date(b)-new Date(a))[0];
+ return null;
+}
 
 function renderWebsiteOrders(){
  const list=websiteOrders.slice();
@@ -1416,14 +1423,15 @@ window.viewWebsiteOrder=async function(id){
 
 $("closeWebsiteOrder").onclick=function(){$("websiteOrderDialog").close()};
 function renderCustomers(){
- $("customersTable").innerHTML=table(["Customer","Business","Phone","Customer source","Total purchases","Paid","Amount due","Last purchase","Action"],customers.map(x=>{
+ $("customersTable").innerHTML=table(["Customer","Business","Phone","Email","Customer source","Total purchases","Paid","Amount due","Last purchase","Action"],customers.map(x=>{
   const source=String(x.customer_source||"").trim() || (x.auth_user_id?"Website":"Manager");
   const sourceBadge=source==="Website"?"<span class='badge ok'>Website</span>":"<span class='badge'>"+esc(source)+"</span>";
   const s=customerStats(x.id);
-  return [esc(x.name),esc(x.business_name),esc(x.phone),sourceBadge,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
+  const purchaseDate=customerPurchaseDate(x.id);
+  return [esc(x.name),esc(x.business_name),esc(x.phone),esc(x.email),sourceBadge,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),purchaseDate?isoDate(purchaseDate):"—",
    "<button class=\"link\" onclick=\"viewCustomerHistory('"+x.id+"')\">Purchase history</button> <button class=\"link\" onclick=\"editCustomer('"+x.id+"')\">Edit</button> <button class=\"link danger\" onclick=\"deleteCustomer('"+x.id+"')\">Remove</button>"];
  }));
- $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone)+")</option>").join("");
+ $("billingCustomer").innerHTML="<option value=\"\">New / enter customer</option>"+customers.map(x=>"<option value=\""+x.id+"\">"+esc(x.name)+(x.business_name?" — "+esc(x.business_name):"")+" ("+esc(x.phone||x.email||"")+")</option>").join("");
 }
 
 window.deleteCustomer=async function(id){
