@@ -912,17 +912,49 @@ $("exportExpenses").onclick=()=>{
  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-expenses.csv";a.click();
 };
+function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
+function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":x==="Partially Paid"?"warn":"danger")+"'>"+esc(x)+"</span>"}
+function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
+window.updateInvoiceStatus=async function(id,billStatus,deliveryStatus){
+ const inv=invoices.find(x=>x.id===id);if(!inv)return;
+ if(!isAdmin){
+   const ok=await submitChange("billing","invoice_status_update","invoices",id,{bill_status:billStatus,delivery_status:deliveryStatus},"Employee bill/payment/delivery status change");
+   if(ok)toast("Status change sent for Manager approval.");
+   return;
+ }
+ const {error}=await db.rpc("update_invoice_fulfillment",{p_invoice_id:id,p_bill_status:billStatus,p_delivery_status:deliveryStatus});
+ if(error)return toast(error.message||"Unable to update bill status.",false);
+ inv.bill_status=billStatus;inv.delivery_status=deliveryStatus;
+ renderSales();
+ toast("Bill status updated");
+};
+window.openInvoiceStatus=async function(id){
+ const inv=invoices.find(x=>x.id===id);if(!inv)return;
+ $("statusInvoiceId").value=id;
+ $("statusInvoiceNo").textContent=inv.invoice_no||"—";
+ $("statusBill").value=inv.bill_status||"Confirmed";
+ $("statusDelivery").value=inv.delivery_status||"Pending";
+ $("invoiceStatusDialog").showModal();
+};
 function renderSales(){
  const from=$("salesFrom")?.value,to=$("salesTo")?.value;
  let list=invoices.filter(isSaleDocument);
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
- $("salesTable").innerHTML=table(["Invoice","Customer","Subtotal","Discount","GST","Total","Profit","Paid","Credit","Status","Date","Action"],list.map(x=>[
-  esc(x.invoice_no),esc(x.customer_name),money(x.subtotal),money(x.discount),String(Number(x.gst_percent||0))+"%",money(x.total),money(x.profit),money(x.paid_amount),money(x.due_amount),esc(x.payment_status||"Credit"),new Date(x.created_at).toLocaleString("en-IN"),
-  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View Bill</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
+ $("salesTable").innerHTML=table(["Invoice","Customer","Total","Paid","Due","Payment","Bill","Delivery","Date","Action"],list.map(x=>[
+  esc(x.invoice_no),esc(x.customer_name),money(x.total),money(x.paid_amount),money(x.due_amount),paymentStatusBadge(x.payment_status),
+  billStatusBadge(x.bill_status),deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
+  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> <button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
 }
+$("invoiceStatusForm")?.addEventListener("submit",async e=>{
+ e.preventDefault();
+ const id=$("statusInvoiceId").value;
+ await window.updateInvoiceStatus(id,$("statusBill").value,$("statusDelivery").value);
+ $("invoiceStatusDialog").close();
+});
+$("closeInvoiceStatus")?.addEventListener("click",()=>$("invoiceStatusDialog")?.close());
 function customerStats(id){
  const bills=invoices.filter(x=>x.customer_id===id&&isSaleDocument(x));
  const totalPurchases=bills.reduce((a,x)=>a+Number(x.total||0),0);
@@ -1540,8 +1572,8 @@ window.viewInvoice=async id=>{
    const billingAddress=inv.billing_address||"—";
    const deliveryAddress=inv.delivery_address||"—";
    const metaStatus=isQuotation
-     ? "<b>Document Type:</b> Quotation Invoice<br><b>Payment Status:</b> Not applicable<br><b>Paid:</b> —<br><b>Credit Due:</b> —"
-     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Credit")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"");
+     ? "<b>Document Type:</b> Quotation Invoice<br><b>Bill Status:</b> "+esc(inv.bill_status||"Draft")+"<br><b>Delivery:</b> Not applicable<br><b>Payment Status:</b> Not applicable"
+     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Bill Status:</b> "+esc(inv.bill_status||"Confirmed")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Unpaid")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+"<br><b>Delivery:</b> "+esc(inv.delivery_status||"Pending")+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"");
    const quoteNote=isQuotation
      ? "<div class='quote-note'><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document is a price quotation and does not record a sale, payment, or stock movement.</div>"
      : "";
