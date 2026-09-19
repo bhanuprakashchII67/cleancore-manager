@@ -1020,7 +1020,7 @@ function syncInvoiceStatusPaymentFields(){
 window.updateInvoiceStatus=async function(id,billStatus,deliveryStatus,paymentChoice,paymentMethod,partialAmount){
  const inv=invoices.find(x=>x.id===id);if(!inv)return;
  const currentChoice=invoicePaymentChoice(inv);
- const paymentChanged=paymentChoice&&paymentChoice!==currentChoice;
+ const paymentChanged=paymentChoice&&(paymentChoice!==currentChoice||(paymentChoice==="PAID"&&paymentMethod&&paymentMethod!==inv.payment_method));
  const fulfillmentChanged=billStatus!==(inv.bill_status||"Confirmed")||deliveryStatus!==(inv.delivery_status||"Pending");
  if(!paymentChanged&&!fulfillmentChanged){$("invoiceStatusDialog").close();return;}
  if(!isAdmin){
