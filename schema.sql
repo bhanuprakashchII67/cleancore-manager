@@ -1182,3 +1182,7 @@ alter table public.manager_notification_preferences enable row level security;
 drop policy if exists manager_notification_preferences_own on public.manager_notification_preferences;
 create policy manager_notification_preferences_own on public.manager_notification_preferences
 for all to authenticated using(manager_user_id=auth.uid()) with check(manager_user_id=auth.uid());
+
+
+-- Leads / Enquiries are separate from customer orders.
+-- Website orders belong to website_orders/invoices and must never create enquiry rows.
