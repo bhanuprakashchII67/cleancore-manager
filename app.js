@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.20";
+const MANAGER_VERSION="3.8.21";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -831,7 +831,7 @@ function renderAll(section){
  if(active==="dashboard"){
    if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],saleInvoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  }
- if($("investmentTotal"))$("investmentTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
+ if($("investmentTotal"))$("investmentTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0)); if($("investmentFrontTotal"))$("investmentFrontTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0)); if($("investmentHistory"))renderInvestmentHistory();
  if(active==="products"){
    $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
      esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
@@ -1302,20 +1302,23 @@ $("paymentForm").addEventListener("submit",async function(e){
  if(upd.error)return toast(upd.error.message,false);
  $("paymentDialog").close();toast("Payment recorded");await loadAll();
 });
-async function addInvestment(){
- const amount=prompt("Investment amount (₹):");
- if(amount===null)return;
- const n=Number(amount);if(!Number.isFinite(n)||n<=0)return toast("Enter a valid investment amount",false);
- const date=prompt("Investment date (YYYY-MM-DD):",dateKey(new Date()));
- if(date===null)return;
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return toast("Enter date as YYYY-MM-DD",false);
- const notes=prompt("What was this investment for? (optional):","")||"";
- const {data,error}=await db.from("manager_investments").insert({investment_date:date,amount:n,notes}).select("id,investment_date,amount,notes,created_at,updated_at").single();
- if(error)return toast(error.message,false);
- investments=[data,...investments];renderAll("products");toast("Investment added");
+function renderInvestmentHistory(){
+ const el=$("investmentHistory");if(!el)return;
+ el.innerHTML=investments.length?table(["Date","Amount","Name / Purpose",""],investments.map(x=>[isoDate(x.investment_date),money(x.amount),esc(x.notes||"—"),"<button type='button' class='link danger' onclick=\"deleteInvestment('"+x.id+"')\">Delete</button>"])):"<div class='empty'>No investments yet.</div>";
 }
-window.deleteInvestment=async id=>{if(!confirm("Delete this investment?"))return;const {error}=await db.from("manager_investments").delete().eq("id",id);if(error)return toast(error.message,false);investments=investments.filter(x=>x.id!==id);renderAll("products");toast("Investment deleted")};
-if($("addInvestment"))$("addInvestment").onclick=addInvestment;
+async function addInvestment(){
+ const amount=Number($("investmentAmount")?.value);const date=$("investmentDate")?.value;const notes=$("investmentNotes")?.value?.trim()||"";
+ if(!Number.isFinite(amount)||amount<=0)return toast("Enter a valid investment amount",false);
+ if(!date)return toast("Select an investment date",false);
+ const {data,error}=await db.from("manager_investments").insert({investment_date:date,amount,notes}).select("id,investment_date,amount,notes,created_at,updated_at").single();
+ if(error)return toast(error.message,false);
+ investments=[data,...investments];$("investmentAmount").value="";$("investmentNotes").value="";$("investmentDate").value=dateKey(new Date());renderAll("dashboard");renderInvestmentHistory();toast("Investment added");
+}
+window.deleteInvestment=async id=>{if(!confirm("Delete this investment?"))return;const {error}=await db.from("manager_investments").delete().eq("id",id);if(error)return toast(error.message,false);investments=investments.filter(x=>x.id!==id);renderAll("dashboard");renderInvestmentHistory();toast("Investment deleted")};
+function openInvestment(){const d=$("investmentDialog");if(!d)return;$("investmentDate").value=dateKey(new Date());renderInvestmentHistory();d.showModal();}
+if($("investmentBox"))$("investmentBox").onclick=openInvestment;
+if($("closeInvestment"))$("closeInvestment").onclick=()=>$("investmentDialog")?.close();
+if($("investmentForm"))$("investmentForm").addEventListener("submit",e=>{e.preventDefault();addInvestment()});
 function resetProductForm(){
  editingProductId=null;
  ["pname","punit","phsn","pcost","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
