@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.29";
+const MANAGER_VERSION="3.8.27";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -890,35 +890,32 @@ function renderDashboardPeriods(startValue="",endValue=""){
    renderDashboardPeriods(from,to);
  };
  const exportBtn=$("exportDashboardCsv");
- if(exportBtn)exportBtn.onclick=()=>{
+ if(exportBtn)exportBtn.onclick=async()=>{
    const from=$("dashboardFromDate")?.value,to=$("dashboardToDate")?.value;
    if(!from||!to)return toast("Select both dates.",false);
    if(from>to)return toast("From date cannot be after To date.",false);
-   const csvRows=[
-     ["CleanCore Sales, Expenses & Profit Report"],
-     ["From",from,"To",to],
-     [],
-     ["Summary","Amount"],
-     ["Sales",v.sales],
-     ["Expenses",v.expenses],
-     ["Gross Profit",v.gross],
-     ["Net Profit",v.net],
-     [],
-     ["Weekly breakdown"],
-     ["Week","Sales","Expenses","Gross Profit","Net Profit"],
-     ...weekly.map(w=>[w.label,w.sales,w.expenses,w.gross,w.net])
-   ];
-   const csv=csvRows.map(r=>r.map(value=>`"${String(value??"").replaceAll('"','""')}"`).join(",")).join("\n");
-   const suffix=`-${from}-to-${to}`;
-   const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
-   const url=URL.createObjectURL(blob);
-   const link=document.createElement("a");
-   link.href=url;link.download=`cleancore-financial-report${suffix}.csv`;
-   document.body.appendChild(link);link.click();link.remove();
-   setTimeout(()=>URL.revokeObjectURL(url),1000);
-   toast("Financial report CSV exported.");
+   const startDate=new Date(from+"T00:00:00"),endDate=new Date(to+"T23:59:59.999");
+   const salesInRange=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=startDate&&new Date(x.created_at)<=endDate);
+   const expensesInRange=expenses.filter(x=>{const d=new Date((x.expense_date||x.created_at)+"T00:00:00");return d>=startDate&&d<=endDate});
+   const customerMap=new Map((customers||[]).map(x=>[String(x.id),x]));
+   const invoiceIds=salesInRange.map(x=>x.id).filter(Boolean);
+   let itemRows=[];
+   if(invoiceIds.length){const {data,error}=await db.from("invoice_items").select("invoice_id,product_id,product_name,qty,unit_price,cost_price,line_total,line_profit,hsn_code").in("invoice_id",invoiceIds);if(error){console.error("CSV invoice items error",error);return toast("Could not load purchased product details.",false);}itemRows=data||[];}
+   const itemsByInvoice=new Map();
+   itemRows.forEach(item=>{const key=String(item.invoice_id);if(!itemsByInvoice.has(key))itemsByInvoice.set(key,[]);itemsByInvoice.get(key).push(item);});
+   const csvRows=[],addSection=(title,headers,rows)=>{if(csvRows.length)csvRows.push([]);csvRows.push([title]);csvRows.push(headers);rows.forEach(r=>csvRows.push(r));};
+   csvRows.push(["CleanCore Detailed Business Report"],["From",from,"To",to],["Generated",new Date().toLocaleString("en-IN")]);
+   addSection("SUMMARY",["Metric","Amount"],[["Sales",v.sales],["Expenses",v.expenses],["Gross Profit",v.gross],["Net Profit",v.net],["Bills",salesInRange.length],["Customers with purchases",new Set(salesInRange.map(x=>x.customer_id||x.customer_phone||x.customer_name)).size]]);
+   addSection("SALES / CUSTOMER PURCHASES",["Date","Invoice","Customer","Business","Phone","Email","Customer Source","Order Source","Product","Qty","Unit Price","Product Total","Product Profit","Invoice Subtotal","Discount","GST","Invoice Total","Paid","Due","Payment Status","Payment Method","Due Date","Delivery Status","Billing Address","Delivery Address"],salesInRange.flatMap(inv=>{const customer=customerMap.get(String(inv.customer_id))||{};let items=itemsByInvoice.get(String(inv.id))||[];if(!items.length)items=[{}];return items.map(item=>[new Date(inv.created_at).toLocaleString("en-IN"),inv.invoice_no||"",inv.customer_name||"",inv.customer_business||customer.business_name||"",inv.customer_phone||customer.phone||"",inv.customer_email||customer.email||"",customer.customer_source||"Not recorded",inv.source||"Manager",item.product_name||"",item.qty??"",item.unit_price??"",item.line_total??"",item.line_profit??"",inv.subtotal??"",inv.discount??"",inv.gst_amount??"",inv.total??"",inv.paid_amount??0,inv.due_amount??0,inv.payment_status||"Unpaid",inv.payment_method||"",inv.due_date||"",inv.delivery_status||"",inv.billing_address||customer.billing_address||"",inv.delivery_address||customer.delivery_address||""]);}));
+   const grouped=new Map();salesInRange.forEach(inv=>{const key=String(inv.customer_id||inv.customer_phone||inv.customer_name||"");if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(inv);});
+   addSection("CUSTOMER PURCHASE SUMMARY",["Customer","Business","Phone","Email","Customer Source","Bills","Products Purchased","Total Purchase","Last Purchase Date"],Array.from(grouped.values()).map(customerSales=>{const inv=customerSales[0],customer=customerMap.get(String(inv.customer_id))||{},products=customerSales.flatMap(x=>itemsByInvoice.get(String(x.id))||[]);return [inv.customer_name||customer.name||"",inv.customer_business||customer.business_name||"",inv.customer_phone||customer.phone||"",inv.customer_email||customer.email||"",customer.customer_source||"Not recorded",customerSales.length,products.map(p=>(p.product_name||"Product")+" × "+(p.qty??"")).join(" | "),customerSales.reduce((sum,x)=>sum+Number(x.total||0),0),new Date(Math.max(...customerSales.map(x=>new Date(x.created_at).getTime()))).toLocaleDateString("en-IN")];}));
+   addSection("EXPENSES",["Date","Category","Amount","Vendor","Payment Method","Quantity","Unit Cost","Notes"],expensesInRange.map(x=>[x.expense_date||"",x.category||"",x.amount??0,x.vendor||"",x.payment_method||"",x.quantity??"",x.unit_cost??"",x.notes||""]));
+   addSection("WEEKLY BREAKDOWN",["Week","Sales","Expenses","Gross Profit","Net Profit"],weekly.map(w=>[w.label,w.sales,w.expenses,w.gross,w.net]));
+   const csv=csvRows.map(r=>r.map(value=>String.fromCharCode(34)+String(value??"").replaceAll(String.fromCharCode(34),String.fromCharCode(34)+String.fromCharCode(34))+String.fromCharCode(34)).join(",")).join("\n");
+   const suffix="-"+from+"-to-"+to,url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),link=document.createElement("a");
+   link.href=url;link.download="cleancore-detailed-business-report"+suffix+".csv";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   toast("Detailed CSV exported with sales, customers, products and expenses.");
  };
-}
 function renderAll(section){
  const active=section||document.querySelector(".section.active")?.id||"dashboard";
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
