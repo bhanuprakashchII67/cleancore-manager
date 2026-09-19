@@ -202,6 +202,17 @@ document.addEventListener("pointerdown",unlockNotificationAudio,{once:true,captu
 function notificationReadAt(){return Number(localStorage.getItem(notificationStoreKey("read"))||0)}
 function notificationAlertedAt(){return Number(localStorage.getItem(notificationStoreKey("alerted"))||0)}
 function setNotificationTimestamp(type,v){localStorage.setItem(notificationStoreKey(type),String(v))}
+function formatPushNotification(n){
+ const type=n?.notification_type||"Notification";
+ const isOrder=type==="Website Order";
+ const title=isOrder?"New Website Order":"New Website Enquiry";
+ const body=n?.body||n?.subject||"New CleanCore activity";
+ return {title,body,icon:"icon-192.svg",badge:"icon-192.svg"};
+}
+function showInPageNotification(n){
+ const d=formatPushNotification(n);
+ toast((d.title==="New Website Order"?"🛒 ":"✉️ ")+d.title);
+}
 function renderWebsiteNotifications(){
  const list=$("notificationList"),badge=$("notificationBadge");
  if(!list||!badge)return;
