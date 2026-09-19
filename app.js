@@ -187,7 +187,7 @@ async function playNotificationSound(){
    if(ctx.state==="suspended")await ctx.resume().catch(()=>{});
    if(navigator.vibrate)navigator.vibrate([140,70,140]);
    const master=ctx.createGain();
-   master.gain.value=0.82*managerAlertVolume();
+   master.gain.value=Math.min(1.35,1.18*managerAlertVolume());
    master.connect(ctx.destination);
    const now=ctx.currentTime;
    [0,0.18,0.38,0.58].forEach((offset,i)=>{
@@ -195,7 +195,7 @@ async function playNotificationSound(){
      o.type=i%2?"triangle":"sine";
      o.frequency.setValueAtTime([784,1046,1319,988][i],now+offset);
      g.gain.setValueAtTime(0.0001,now+offset);
-     g.gain.exponentialRampToValueAtTime(0.42,now+offset+0.025);
+     g.gain.exponentialRampToValueAtTime(0.68,now+offset+0.025);
      g.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.18);
      o.connect(g);g.connect(master);
      o.start(now+offset);o.stop(now+offset+0.2);
