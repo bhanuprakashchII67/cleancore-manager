@@ -469,3 +469,5 @@ dialog .dialog{padding-top:52px}
 .payment-status-summary strong{font-size:.95rem;color:#10243e}
 .salesTable small,.sales-table small{display:block;margin-top:.2rem}
 @media(max-width:700px){.payment-status-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.payment-update-box{margin:1rem 0;padding:1rem;border:1px solid #dbe4ee;border-radius:12px;background:#f7fafc}.payment-update-box>label,.payment-update-box>div>label{display:block;margin-bottom:.75rem}.payment-update-box select,.payment-update-box input{width:100%}
