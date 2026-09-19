@@ -368,6 +368,16 @@
     </div>
   </div>
 
+  <div class="panel error-finder-panel">
+    <div class="panel-head"><div><h3>Error Finder</h3><p class="muted">Errors from CleanCore Manager, website and connected apps are collected here.</p></div><button type="button" id="refreshErrorLogs" class="btn small">↻ Refresh</button></div>
+    <div class="error-finder-tools">
+      <label>Status<select id="errorLogStatusFilter"><option value="">All</option><option value="New">New</option><option value="Investigating">Investigating</option><option value="Fixed">Fixed</option><option value="Ignored">Ignored</option></select></label>
+      <label>App<select id="errorLogAppFilter"><option value="">All apps</option></select></label>
+      <span id="errorLogSummary" class="muted tiny"></span>
+    </div>
+    <div id="errorLogsTable"></div>
+  </div>
+
   <div class="panel">
     <div class="panel-head">
       <div><h3>Employees & Access</h3><p class="muted">Create employee usernames/passwords, assign sections, and set start/end date and time.</p></div>
