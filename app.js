@@ -1469,7 +1469,7 @@ $("billForm").addEventListener("submit",async e=>{
    const invoicePayload={
      invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
      billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",subtotal,discount,gst_percent:gp,gst_amount:gst,
-     cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit:storedProfit,
+     cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit:storedProfit,
      paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
    };
    const {data,error}=await db.rpc("create_manager_bill",{p_invoice:invoicePayload,p_items:itemPayload});
