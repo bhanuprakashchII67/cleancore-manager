@@ -471,3 +471,5 @@ dialog .dialog{padding-top:52px}
 @media(max-width:700px){.payment-status-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .payment-update-box{margin:1rem 0;padding:1rem;border:1px solid #dbe4ee;border-radius:12px;background:#f7fafc}.payment-update-box>label,.payment-update-box>div>label{display:block;margin-bottom:.75rem}.payment-update-box select,.payment-update-box input{width:100%}
+
+.investment-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;margin:12px 0;border:1px solid #dbe6ee;border-radius:14px;background:#f8fbfd}.investment-summary span{color:#64768a;font-size:13px;font-weight:800}.investment-summary strong{font-size:24px;color:#10243e}.investment-panel #investmentTable{margin-top:10px}
