@@ -367,3 +367,11 @@ dialog .dialog{padding-top:52px}
 @media(max-width:700px){.notification-btn span:nth-child(2){display:none}.notification-menu{right:-65px;width:340px}}
 
 .refresh-btn{cursor:pointer;margin-right:8px}.refresh-btn:disabled{opacity:.6;cursor:wait}
+
+#invoicePrintArea{display:none}
+@media print{
+  body.printing-invoice > :not(#invoicePrintArea){display:none!important}
+  body.printing-invoice #invoicePrintArea{display:block!important;position:static!important;width:100%!important;background:#fff!important}
+  body.printing-invoice #invoicePrintArea .invoice-preview{display:block!important}
+  body.printing-invoice{background:#fff!important;margin:0!important}
+}
