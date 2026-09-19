@@ -107,32 +107,35 @@ function setNotificationTimestamp(type,v){localStorage.setItem(notificationStore
 function renderWebsiteNotifications(){
  const list=$("notificationList"),badge=$("notificationBadge");
  if(!list||!badge)return;
+ const all=[...new Map([...websiteNotifications].map(n=>[n.id,n])).values()].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const readAt=notificationReadAt();
- const unread=websiteNotifications.filter(n=>new Date(n.created_at).getTime()>readAt).length;
+ const unread=all.filter(n=>new Date(n.created_at).getTime()>readAt).length;
  badge.textContent=String(unread);
  badge.classList.toggle("hidden",unread===0);
- if(!websiteNotifications.length){
-   list.innerHTML='<div class="empty">No website orders or enquiries yet.</div>';
+ if(!all.length){
+   list.innerHTML='<div class="empty">No new notifications.</div>';
    return;
  }
- list.innerHTML=websiteNotifications.slice(0,15).map(n=>{
-   const isOrder=n.notification_type==="Website Order";
+ list.innerHTML=all.slice(0,20).map(n=>{
+   const cfg=OPERATIONAL_EVENTS[n.notification_type];
+   const icon=n.notification_type==="Website Order"?"🛒":n.notification_type==="Website Enquiry"?"✉️":(cfg?.icon||"🔔");
    return '<button type="button" class="notification-item '+(new Date(n.created_at).getTime()>readAt?"unread":"")+'" data-notification-id="'+esc(n.related_id||"")+'" data-notification-type="'+esc(n.notification_type)+'">'+
-     '<span class="notification-icon">'+(isOrder?"🛒":"✉️")+'</span>'+
+     '<span class="notification-icon">'+icon+'</span>'+
      '<span class="notification-copy"><strong>'+esc(n.subject||n.notification_type)+'</strong><small>'+esc(n.body||"")+'</small><em>'+esc(notificationTime(n.created_at))+'</em></span>'+
    '</button>';
  }).join("");
 }
+
 function announceWebsiteNotification(n){
  if(!isWebsiteManagerNotification(n)||websiteNotifications.some(x=>x.id===n.id))return;
  websiteNotifications.unshift(n);
  const ts=new Date(n.created_at).getTime();
  setNotificationTimestamp("alerted",Math.max(notificationAlertedAt(),ts));
  renderWebsiteNotifications();
- if(notificationPreferences.sound_enabled)playNotificationSound();
  const isOrder=n.notification_type==="Website Order";
  const pref=isOrder?"website_orders":"website_enquiries";
  if(!notificationAllowed(pref))return;
+ if(notificationPreferences.sound_enabled)playNotificationSound();
  maybeBrowserNotify(n,pref);
  toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
  // Pull the new order/enquiry into the currently open Manager section immediately.
@@ -206,8 +209,10 @@ function bindWebsiteNotificationUi(){
    if(type==="Website Order"){
      await go("website_orders");
      setTimeout(()=>window.viewWebsiteOrder?.(id),80);
-   }else{
+   }else if(type==="Website Enquiry"){
      await go("enquiries");
+   }else{
+     await go(OPERATIONAL_EVENTS[type]?.section||"settings");
    }
  });
  document.addEventListener("click",e=>{
@@ -390,6 +395,93 @@ async function go(id){
  if(titleEl)titleEl.textContent=navLabel;
  document.title="CleanCore Manager • "+navLabel;
 }
+
+let operationalNotificationReady=false;
+let operationalNotificationSeen={};
+
+function operationalSeenKey(type){return "cleancore_manager_seen_"+type+"_"+(user?.id||"guest")}
+function operationalLastSeen(type){return Number(localStorage.getItem(operationalSeenKey(type))||0)}
+function setOperationalLastSeen(type,ts){localStorage.setItem(operationalSeenKey(type),String(ts||Date.now()))}
+
+const OPERATIONAL_EVENTS={
+  WebsiteEnquiry:{pref:"website_enquiries",icon:"✉️",section:"enquiries"},
+  EmployeeAccessRequest:{pref:"employee_access_requests",icon:"🔐",section:"settings"},
+  EmployeeChangeRequest:{pref:"employee_change_requests",icon:"✏️",section:"settings"},
+  LowStockAlert:{pref:"low_stock_alerts",icon:"📦",section:"products"},
+  PaymentReceived:{pref:"payments_received",icon:"💰",section:"customers"},
+  CreditDueAlert:{pref:"credit_due_alerts",icon:"🧾",section:"customers"}
+};
+
+function operationalNotificationAllowed(type){
+ const cfg=OPERATIONAL_EVENTS[type];return !!cfg&&notificationAllowed(cfg.pref);
+}
+function pushOperationalNotification(type,subject,body,relatedId,createdAt=new Date().toISOString()){
+ const cfg=OPERATIONAL_EVENTS[type];if(!cfg||!operationalNotificationAllowed(type))return;
+ const n={id:type+"-"+(relatedId||createdAt),notification_type:type,subject,body,related_id:relatedId||"",created_at:createdAt};
+ if(websiteNotifications.some(x=>x.id===n.id))return;
+ websiteNotifications.unshift(n);
+ renderWebsiteNotifications();
+ if(notificationPreferences.sound_enabled)playNotificationSound();
+ maybeBrowserNotify(n,cfg.pref);
+ toast(cfg.icon+" "+subject);
+}
+function scanOperationalNotifications(){
+ if(!isAdmin)return;
+ const now=Date.now();
+ if(!operationalNotificationReady){
+   [
+     ["WebsiteEnquiry",enquiries,"created_at"],
+     ["EmployeeAccessRequest",accessRequests,"created_at"],
+     ["EmployeeChangeRequest",changeRequests,"requested_at"],
+     ["PaymentReceived",payments,"created_at"],
+     ["CreditDueAlert",invoices.filter(x=>Number(x.due_amount||0)>0),"created_at"]
+   ].forEach(([type,rows,timeKey])=>{
+     const latest=(rows||[]).reduce((m,x)=>Math.max(m,new Date(x?.[timeKey]).getTime()||0),0);
+     setOperationalLastSeen(type,latest||now);
+   });
+   const lowState={};
+   [...(products||[]),...(rawMaterials||[])].forEach(x=>{if(Number(x.stock||0)<=Number(x.low_stock_threshold||5))lowState[x.id]=Number(x.stock||0)});
+   localStorage.setItem(operationalSeenKey("LowStockState"),JSON.stringify(lowState));
+   operationalNotificationReady=true;
+   return;
+ }
+ const scanRows=(type,rows,timeKey)=>{
+   const last=operationalLastSeen(type);
+   let max=last;
+   (rows||[]).forEach(x=>{
+     const ts=new Date(x?.[timeKey]).getTime()||0;
+     if(ts>max)max=ts;
+     if(ts>last){
+       let subject="",body="";
+       if(type==="WebsiteEnquiry"){subject="New website enquiry";body=(x.name||"Customer")+" submitted a new enquiry.";}
+       if(type==="EmployeeAccessRequest"){const emp=employeeById?.(x.employee_id);subject="Employee access request";body=(emp?.username||"Employee")+" requested "+(MODULE_LABELS[x.module]||x.module)+" access.";}
+       if(type==="EmployeeChangeRequest"){const emp=employeeById?.(x.employee_id);subject="Employee change needs approval";body=(emp?.username||"Employee")+" submitted "+(x.action||"a change")+" for approval.";}
+       if(type==="PaymentReceived"){subject="Payment received";body=(x.amount?money(x.amount):"A payment")+" was recorded against an invoice.";}
+       if(type==="CreditDueAlert"){subject="Customer credit recorded";body=(x.customer_name||"Customer")+" has "+money(x.due_amount||0)+" credit due.";}
+       if(subject)pushOperationalNotification(type,subject,body,x.id,x[timeKey]);
+     }
+   });
+   setOperationalLastSeen(type,max);
+ };
+ scanRows("WebsiteEnquiry",enquiries,"created_at");
+ scanRows("EmployeeAccessRequest",accessRequests,"created_at");
+ scanRows("EmployeeChangeRequest",changeRequests,"requested_at");
+ scanRows("PaymentReceived",payments,"created_at");
+ scanRows("CreditDueAlert",invoices.filter(x=>Number(x.due_amount||0)>0),"created_at");
+
+ const previous=(()=>{try{return JSON.parse(localStorage.getItem(operationalSeenKey("LowStockState"))||"{}")}catch{return {}}})();
+ const current={};
+ [...(products||[]),...(rawMaterials||[])].forEach(x=>{
+   const threshold=Number(x.low_stock_threshold??5),stock=Number(x.stock||0);
+   if(stock<=threshold){
+     current[x.id]=stock;
+     if(!(String(x.id) in previous)){
+       pushOperationalNotification("LowStockAlert","Low stock alert",(x.name||"Item")+" has only "+stock+" remaining.",x.id,new Date().toISOString());
+     }
+   }
+ });
+ localStorage.setItem(operationalSeenKey("LowStockState"),JSON.stringify(current));
+}
 async function loadAll(){
  const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("*").order("name"):null;
  const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("*").order("created_at",{ascending:false}):null;
@@ -415,6 +507,7 @@ async function loadAll(){
    for(const q of [er,ep,cr,ar,nr,dr])if(q?.error)throw new Error(q.error.message);
    employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];deletedRecords=dr.data||[];
    renderEmployeeData();
+   scanOperationalNotifications();
    renderRecovery();
  }
  renderAll();
