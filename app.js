@@ -486,7 +486,7 @@ async function loadAll(){
  const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("*").order("name"):null;
  const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("*").order("created_at",{ascending:false}):null;
  const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("*").is("archived_at",null).order("name"):null;
- const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("*").order("created_at",{ascending:false}):null;
+ const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("*").neq("source","website_order").order("created_at",{ascending:false}):null;
  const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("*").order("name"):null;
  const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("*").order("expense_date",{ascending:false}).order("created_at",{ascending:false}):null;
  const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("*").order("payment_date",{ascending:false}).order("created_at",{ascending:false}):null;
@@ -1474,7 +1474,7 @@ $("customerForm").addEventListener("submit",async e=>{
  await loadAll();
 });
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
-$("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
+$("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value,source:"manager"};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
 $("export").onclick=()=>{const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],...invoices.filter(isSaleDocument).map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Credit",x.due_date||"",x.created_at])];const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-sales.csv";a.click()};
 
 document.addEventListener("click",e=>{
