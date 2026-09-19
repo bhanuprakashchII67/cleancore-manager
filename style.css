@@ -518,3 +518,18 @@ body.modal-open{overflow:hidden}.investment-modal{display:none;position:fixed;in
 @media(max-width:600px){.login-brand{gap:12px;margin-bottom:18px}.login-brand .brand{width:48px;height:48px}.login-brand-text strong{font-size:26px}.login-brand-text span{font-size:16px}}
 
 .dashboard-link-card{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.dashboard-link-card:hover,.dashboard-link-card:focus-visible{transform:translateY(-2px);box-shadow:0 8px 24px rgba(7,26,51,.10);outline:0}.dashboard-link-card:focus-visible{outline:2px solid #0b7f83;outline-offset:2px}
+
+
+/* CleanCore Manager modern eye-friendly theme */
+:root{--cc-primary:#0F4C81;--cc-primary-dark:#12324D;--cc-secondary:#14B8A6;--cc-secondary-dark:#0F766E;--cc-bg:#F3F8FC;--cc-card:#FFFFFF;--cc-text:#1F2937;--cc-muted:#6B7280;--cc-border:#E5E7EB;--cc-success:#10B981;--cc-danger:#EF4444;--cc-warning:#F59E0B}
+body{background:var(--cc-bg);color:var(--cc-text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.auth-shell{background:linear-gradient(135deg,var(--cc-primary-dark),var(--cc-secondary))}.brand{background:var(--cc-primary)}.eyebrow{color:var(--cc-secondary-dark)}
+.primary{background:var(--cc-primary);border-color:var(--cc-primary);color:#fff}.secondary{background:#E6F7F4;color:var(--cc-secondary-dark);border-color:#C7EEE8}.btn{border-color:var(--cc-border);color:var(--cc-text)}.btn:hover{border-color:#CBD5E1;background:#F8FAFC}
+.sidebar{background:var(--cc-primary-dark)}.nav{color:#DCE8F2}.nav.active,.nav:hover{background:rgba(20,184,166,.16);color:#fff}.main{background:var(--cc-bg)}
+.metric,.panel,.auth-card,.chip,dialog,.investment-modal-card{background:var(--cc-card);border-color:var(--cc-border)}
+.metric span,.muted,th,.section-toolbar>span,.profit-card span,.profit-card small{color:var(--cc-muted)}.metric strong,.profit-card strong,.investment-summary strong,.investment-front-box strong{color:var(--cc-primary-dark)}
+input,select,textarea{border-color:var(--cc-border);background:#fff;color:var(--cc-text)}input:focus,select:focus,textarea:focus{outline:2px solid rgba(20,184,166,.2);border-color:var(--cc-secondary)}th,td{border-bottom-color:var(--cc-border)}.link{color:var(--cc-secondary-dark)}
+.ok{background:#ECFDF3;color:#166534}.warn{background:#FFF7E6;color:#92400E}.remove{background:#FEF2F2;color:#B42318}.security-box,.media-item,.tax-breakdown,.payment-box,.payment-status-summary,.payment-update-box,.investment-summary,.dashboard-date-filter{background:#F8FBFD;border-color:var(--cc-border)}
+.toast.ok{background:var(--cc-success)}.toast.bad{background:var(--cc-danger)}.dialog-x{background:#F3F6F8;color:#475569}.dialog-x:hover{background:#E7EDF2;color:var(--cc-primary-dark)}
+.invoice-preview .inv-header{border-bottom-color:var(--cc-secondary);background:linear-gradient(135deg,#fff,#F2FBFA)}.invoice-preview .inv-brand,.invoice-preview .inv-title{color:var(--cc-primary-dark)}.invoice-preview .inv-sub{color:var(--cc-secondary-dark)}.invoice-preview .invoice-items th{background:var(--cc-primary-dark)}.invoice-preview .grand-total td{background:#E8F7F4}
+.dashboard-link-card:focus-visible{outline-color:var(--cc-secondary)}#notifVolumeValue{background:var(--cc-primary-dark)}#notifVolume{accent-color:var(--cc-secondary)}
