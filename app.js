@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.23";
+const MANAGER_VERSION="3.8.24";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -862,7 +862,12 @@ function renderDashboardPeriods(){
  const calc=(start,end)=>{const sales=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=start&&new Date(x.created_at)<end);const ex=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=start&&d<end});const salesTotal=sales.reduce((z,x)=>z+Number(x.total||0),0);const gross=sales.reduce((z,x)=>z+Number(x.profit||0),0);const expenseTotal=ex.reduce((z,x)=>z+Number(x.amount||0),0);return [money(salesTotal),money(expenseTotal),money(gross),money(gross-expenseTotal)];};
  let rows=[];for(let n=0;n<4;n++){const st=new Date(monday);st.setDate(st.getDate()+n*7);const en=new Date(st);en.setDate(en.getDate()+7);const v=calc(st,en);rows.push([fmt(st)+" – "+fmt(new Date(en-1)),...v]);}
  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);const monthEnd=new Date(now.getFullYear(),now.getMonth()+1,1);const mv=calc(monthStart,monthEnd);
- el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit</h3><p class="muted">Weekly and monthly figures with dates.</p></div><span class="period-current">'+fmt(monthStart)+' – '+fmt(new Date(monthEnd-1))+'</span></div>'+table(["Period","Sales","Expenses","Gross Profit","Net Profit"],rows)+'<div class="dashboard-period-month"><b>This month</b><span>Sales '+mv[0]+' · Expenses '+mv[1]+' · Gross Profit '+mv[2]+' · Net Profit '+mv[3]+'</span></div>';
+ const salesN=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=monthStart&&new Date(x.created_at)<monthEnd).reduce((z,x)=>z+Number(x.total||0),0);
+ const expN=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=monthStart&&d<monthEnd}).reduce((z,x)=>z+Number(x.amount||0),0);
+ const grossN=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=monthStart&&new Date(x.created_at)<monthEnd).reduce((z,x)=>z+Number(x.profit||0),0);
+ const netN=grossN-expN;
+ const cards='<div class="profit-cards">'+[['Sales',salesN],['Expenses',expN],['Gross Profit',grossN],['Net Profit',netN]].map(([k,v])=>'<div class="profit-card"><span>'+k+'</span><strong>'+money(v)+'</strong><small>'+fmt(monthStart)+' – '+fmt(new Date(monthEnd-1))+'</small></div>').join('')+'</div>';
+ el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit</h3><p class="muted">A quick financial view for the current month.</p></div><span class="period-current">'+fmt(monthStart)+' – '+fmt(new Date(monthEnd-1))+'</span></div>'+cards+'<div class="profit-weekly"><h4>Weekly breakdown</h4>'+table(["Week","Sales","Expenses","Gross Profit","Net Profit"],rows)+'</div>';
 }
 function renderAll(section){
  const active=section||document.querySelector(".section.active")?.id||"dashboard";
@@ -1784,7 +1789,7 @@ function fillAddressFields(prefix,c,legacy){
 $("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
 function resetCustomerForm(){
  editingCustomerId=null;
- ["customerName","businessName","customerPhone","customerEmail","customerGstin",
+ ["customerName","businessName","customerPhone","customerEmail","customerGstin","customerSource",
   "billingShopNo","billingColony","billingCity","billingState","billingPincode",
   "deliveryShopNo","deliveryColony","deliveryCity","deliveryState","deliveryPincode"
  ].forEach(id=>$(id).value="");
@@ -1798,6 +1803,7 @@ window.editCustomer=id=>{
  $("customerPhone").value=c.phone||"";
  $("customerEmail").value=c.email||"";
  $("customerGstin").value=c.gstin||"";
+ $("customerSource").value=c.customer_source||"Existing Customer";
  fillAddressFields("billing",c,c.billing_address||"");
  fillAddressFields("delivery",c,c.delivery_address||"");
  $("customerDialogTitle").textContent="Edit Customer";
@@ -1817,6 +1823,7 @@ $("customerForm").addEventListener("submit",async e=>{
    phone,
    email:$("customerEmail").value.trim(),
    gstin,
+   customer_source:$("customerSource").value,
    billing_shop_no:$("billingShopNo").value.trim(),
    billing_colony:$("billingColony").value.trim(),
    billing_city:$("billingCity").value.trim(),
