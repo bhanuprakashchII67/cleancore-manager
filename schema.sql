@@ -319,36 +319,48 @@ security definer
 set search_path=public
 as $$
 declare
- v_name text := coalesce(new.raw_user_meta_data->>'full_name','');
+ v_name text := trim(coalesce(new.raw_user_meta_data->>'full_name',''));
  v_business text := coalesce(new.raw_user_meta_data->>'business_name','');
- v_phone text := regexp_replace(coalesce(new.raw_user_meta_data->>'phone',''),'[^0-9]','','g');
+ v_email text := coalesce(new.raw_user_meta_data->>'customer_email','');
+ v_phone text := regexp_replace(coalesce(new.raw_user_meta_data->>'customer_phone',coalesce(new.phone,'')),'[^0-9]','','g');
  v_billing text := coalesce(new.raw_user_meta_data->>'billing_address','');
  v_delivery text := coalesce(new.raw_user_meta_data->>'delivery_address','');
  v_customer_id uuid;
 begin
- if new.email is null then raise exception 'Customer account requires an email address'; end if;
- select id into v_customer_id from public.customers
- where auth_user_id is null and lower(coalesce(email,''))=lower(new.email) and coalesce(email,'')<>''
- order by created_at limit 1;
- if v_customer_id is null and v_phone<>'' then
-  select id into v_customer_id from public.customers
-  where auth_user_id is null and phone=v_phone order by created_at limit 1;
+ if coalesce(new.raw_user_meta_data->>'employee','false')='true'
+    or coalesce(new.raw_user_meta_data->>'customer_account','false')<>'true' then
+   return new;
  end if;
+ if v_phone='' then raise exception 'Customer account requires a phone number'; end if;
+
+ select id into v_customer_id from public.customers where auth_user_id=new.id limit 1;
+
  if v_customer_id is null then
-  insert into public.customers(name,phone,business_name,email,billing_address,delivery_address,auth_user_id,updated_at)
-  values(coalesce(nullif(v_name,''),split_part(new.email,'@',1)),nullif(v_phone,''),v_business,new.email,v_billing,v_delivery,new.id,now())
-  returning id into v_customer_id;
+   select id into v_customer_id from public.customers
+   where auth_user_id is null and phone=v_phone order by created_at limit 1;
+ end if;
+
+ if v_customer_id is null and v_email<>'' then
+   select id into v_customer_id from public.customers
+   where auth_user_id is null and lower(coalesce(email,''))=lower(v_email)
+   order by created_at limit 1;
+ end if;
+
+ if v_customer_id is null then
+   insert into public.customers(name,phone,business_name,email,billing_address,delivery_address,auth_user_id,updated_at)
+   values(coalesce(nullif(v_name,''),split_part(new.email,'@',1)),nullif(v_phone,''),v_business,v_email,v_billing,v_delivery,new.id,now())
+   returning id into v_customer_id;
  else
-  update public.customers
-  set name=coalesce(nullif(v_name,''),name),
-      phone=coalesce(nullif(v_phone,''),phone),
-      business_name=case when v_business<>'' then v_business else business_name end,
-      email=new.email,
-      billing_address=case when v_billing<>'' then v_billing else billing_address end,
-      delivery_address=case when v_delivery<>'' then v_delivery else delivery_address end,
-      auth_user_id=new.id,
-      updated_at=now()
-  where id=v_customer_id;
+   update public.customers
+   set name=case when v_name<>'' then v_name else name end,
+       phone=v_phone,
+       business_name=case when v_business<>'' then v_business else business_name end,
+       email=case when v_email<>'' then v_email else email end,
+       billing_address=case when v_billing<>'' then v_billing else billing_address end,
+       delivery_address=case when v_delivery<>'' then v_delivery else delivery_address end,
+       auth_user_id=new.id,
+       updated_at=now()
+   where id=v_customer_id;
  end if;
  return new;
 end;
