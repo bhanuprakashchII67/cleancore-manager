@@ -508,7 +508,7 @@ function scanOperationalNotifications(){
        if(type==="EmployeeAccessRequest"){const emp=employeeById?.(x.employee_id);subject="Employee access request";body=(emp?.username||"Employee")+" requested "+(MODULE_LABELS[x.module]||x.module)+" access.";}
        if(type==="EmployeeChangeRequest"){const emp=employeeById?.(x.employee_id);subject="Employee change needs approval";body=(emp?.username||"Employee")+" submitted "+(x.action||"a change")+" for approval.";}
        if(type==="PaymentReceived"){subject="Payment received";body=(x.amount?money(x.amount):"A payment")+" was recorded against an invoice.";}
-       if(type==="CreditDueAlert"){subject="Customer credit recorded";body=(x.customer_name||"Customer")+" has "+money(x.due_amount||0)+" credit due.";}
+       if(type==="CreditDueAlert"){subject="Customer credit recorded";body=(x.customer_name||"Customer")+" has "+money(x.due_amount||0)+" credit outstanding.";}
        if(subject)pushOperationalNotification(type,subject,body,x.id,x[timeKey]);
      }
    });
@@ -518,7 +518,7 @@ function scanOperationalNotifications(){
  scanRows("EmployeeAccessRequest",accessRequests,"created_at");
  scanRows("EmployeeChangeRequest",changeRequests,"requested_at");
  scanRows("PaymentReceived",payments,"created_at");
- scanRows("CreditDueAlert",invoices.filter(x=>Number(x.due_amount||0)>0),"created_at");
+ scanRows("CreditDueAlert",invoices.filter(x=>Number(x.due_amount||0)>0&&x.payment_method==="Credit"),"created_at");
 
  const previous=(()=>{try{return JSON.parse(localStorage.getItem(operationalSeenKey("LowStockState"))||"{}")}catch{return {}}})();
  const current={};
@@ -540,7 +540,7 @@ async function loadAll(){
  const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250):null;
  const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("id,name,unit,cost_per_unit,stock,low_stock_threshold,created_at,updated_at").order("name"):null;
  const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("id,expense_date,category,amount,vendor,payment_method,notes,raw_material_id,quantity,unit_cost,created_at,updated_at").order("expense_date",{ascending:false}).order("created_at",{ascending:false}).limit(1000):null;
- const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("id,invoice_id,customer_id,amount,payment_date,payment_method,notes,created_at").order("payment_date",{ascending:false}).order("created_at",{ascending:false}).limit(250):null;
+ const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("id,invoice_id,customer_id,amount,payment_date,payment_method,reference,notes,created_at").order("payment_date",{ascending:false}).order("created_at",{ascending:false}).limit(250):null;
  const qWO=(isAdmin||canAccess("website_orders"))?db.from("website_orders").select("id,order_no,customer_id,status,subtotal,total,notes,created_at,updated_at,invoice_id,invoice_no,gst_enabled,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,place_of_supply,customer_gstin").order("created_at",{ascending:false}).limit(250):null;
  const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qWO]);
  const [p,i,cu,e,r,x,pm,wo]=qs;
@@ -989,7 +989,7 @@ document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-st
 $("testErrorFinder")?.addEventListener("click",async()=>{reportClientError(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await new Promise(r=>setTimeout(r,500));await loadErrorLogs();toast("Test error sent.");});
 document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-error");if(!b)return;const x=errorLogs.find(r=>r.id===b.dataset.errorId);if(!x)return;try{await navigator.clipboard.writeText(formatErrorForCopy(x));toast("Error copied");}catch(err){toast("Copy failed. Select the error manually.",false,{action:"copy_error"});}});
 function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
-function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":x==="Partially Paid"?"warn":"danger")+"'>"+esc(x)+"</span>"}
+function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":(x==="Partially Paid"||x==="Credit")?"warn":"danger")+"'>"+esc(x)+"</span>"}
 function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
 window.updateInvoiceStatus=async function(id,billStatus,deliveryStatus){
  const inv=invoices.find(x=>x.id===id);if(!inv)return;
@@ -1114,7 +1114,7 @@ window.viewWebsiteOrder=async function(id){
 
 $("closeWebsiteOrder").onclick=function(){$("websiteOrderDialog").close()};
 function renderCustomers(){
- $("customersTable").innerHTML=table(["Customer","Business","Phone","Website account","Total purchases","Paid","Credit due","Last purchase","Action"],customers.map(x=>{
+ $("customersTable").innerHTML=table(["Customer","Business","Phone","Website account","Total purchases","Paid","Amount due","Last purchase","Action"],customers.map(x=>{
   const account=x.auth_user_id?"<span class='badge ok'>Website</span>":"—";
   const s=customerStats(x.id);
   return [esc(x.name),esc(x.business_name),esc(x.phone),account,money(s.totalPurchases),money(s.totalPaid),money(s.creditDue),s.lastPurchase?isoDate(s.lastPurchase):"—",
@@ -1126,7 +1126,7 @@ window.deleteCustomer=async function(id){
  const customer=customers.find(x=>x.id===id);if(!customer)return;
  const s=customerStats(id);
  const warning=s.bills.length
-   ?"This customer has "+s.bills.length+" bill"+(s.bills.length===1?"":"s")+" and "+money(s.creditDue)+" credit due. The customer will be removed from the active list, while financial history is preserved."
+   ?"This customer has "+s.bills.length+" bill"+(s.bills.length===1?"":"s")+" and "+money(s.creditDue)+" amount due. The customer will be removed from the active list, while financial history is preserved."
    :"Remove this customer from the active customer list?";
  if(!confirm(warning))return;
  if(!isAdmin){
@@ -1361,7 +1361,7 @@ function paymentState(total){
  const method=$("billPaymentMethod")?.value||"Cash";
  if(type==="PAID")return {type,method,status:"Paid",paid:bill,due:0,dueDate:null};
  if(type==="COD")return {type,method:"COD",status:"Unpaid",paid:0,due:bill,dueDate:null};
- if(type==="CREDIT")return {type,method:"Credit",status:"Credit",paid:0,due:bill,dueDate:$("dueDate").value||null};
+ if(type==="CREDIT")return {type,method:"Credit",status:"Unpaid",paid:0,due:bill,dueDate:$("dueDate").value||null};
  let paid=Math.min(bill,Math.max(0,Number($("payingNowInput").value||0)));
  return {type,method, status:paid>=bill?"Paid":paid>0?"Partially Paid":"Unpaid",paid,due:Math.max(0,bill-paid),dueDate:paid>=bill?null:($("dueDate").value||null)};
 }
@@ -1458,7 +1458,8 @@ $("documentType").onchange=()=>{
  const payBox=document.querySelector(".payment-box");
  if(payBox)payBox.classList.toggle("hidden",isQuotation);
  if(isQuotation){
-   $("paymentType").value="CASH";
+   $("paymentType").value="PAID";
+   $("billPaymentMethod").value="Cash";
    $("payingNowInput").value="0";
  }
  calc();
