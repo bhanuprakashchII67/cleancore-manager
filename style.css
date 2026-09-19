@@ -533,3 +533,11 @@ input,select,textarea{border-color:var(--cc-border);background:#fff;color:var(--
 .toast.ok{background:var(--cc-success)}.toast.bad{background:var(--cc-danger)}.dialog-x{background:#F3F6F8;color:#475569}.dialog-x:hover{background:#E7EDF2;color:var(--cc-primary-dark)}
 .invoice-preview .inv-header{border-bottom-color:var(--cc-secondary);background:linear-gradient(135deg,#fff,#F2FBFA)}.invoice-preview .inv-brand,.invoice-preview .inv-title{color:var(--cc-primary-dark)}.invoice-preview .inv-sub{color:var(--cc-secondary-dark)}.invoice-preview .invoice-items th{background:var(--cc-primary-dark)}.invoice-preview .grand-total td{background:#E8F7F4}
 .dashboard-link-card:focus-visible{outline-color:var(--cc-secondary)}#notifVolumeValue{background:var(--cc-primary-dark)}#notifVolume{accent-color:var(--cc-secondary)}
+
+
+/* Manager typography aligned with customer website */
+body,input,select,textarea,button{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif}
+.auth-card h1,.top h2,.panel h3,.metric strong,.profit-card strong,.investment-summary strong,.investment-front-box strong,.login-brand-text strong,.inv-brand,.inv-title b{font-family:'Manrope','Inter',system-ui,-apple-system,'Segoe UI',sans-serif}
+body{background:#f6f8f9;color:#17212b}
+.sidebar,.auth-shell{background:#0b1f33}
+.primary{background:#0b1f33;border-color:#0b1f33}.secondary{background:#e9f7f5;color:#0d746e;border-color:#cfe8e5}
