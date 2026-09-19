@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-const MANAGER_VERSION="3.8.0";
+const MANAGER_VERSION="3.8.1";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -669,7 +669,7 @@ window.reviewChange=async function(id,approve){
  if(!isAdmin)return;
  const note=approve?"":(prompt("Reason for rejection (optional):","")||"");
  const req=changeRequests.find(x=>x.id===id);
- const rpcName=req?.action==="invoice_status_update"?"approve_invoice_status_change_request":req?.action==="payment_create"?"review_payment_change_request":req?.action==="raw_material_delete"?"review_raw_material_delete_request":req?.action==="customer_delete"?"review_customer_delete_request":(req?.action==="customer_create"||req?.action==="customer_update")?"review_customer_change_request":"review_change_request";
+ const rpcName=req?.action==="invoice_status_update"?"approve_invoice_status_change_request":req?.action==="invoice_payment_selection_update"?"review_invoice_payment_selection_change_request":req?.action==="payment_create"?"review_payment_change_request":req?.action==="raw_material_delete"?"review_raw_material_delete_request":req?.action==="customer_delete"?"review_customer_delete_request":(req?.action==="customer_create"||req?.action==="customer_update")?"review_customer_change_request":"review_change_request";
  const {data,error}=await db.rpc(rpcName,{p_request_id:id,p_approve:approve,p_note:note});
  if(error)return toast(error.message,false);
  toast(approve?"Change approved and applied.":"Change request rejected.");
@@ -1001,18 +1001,52 @@ document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-er
 function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
 function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":(x==="Partially Paid"||x==="Credit")?"warn":"danger")+"'>"+esc(x)+"</span>"}
 function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
-window.updateInvoiceStatus=async function(id,billStatus,deliveryStatus){
+function invoicePaymentChoice(inv){
+ if((inv?.payment_status||"")==="Paid")return "PAID";
+ if(inv?.payment_method==="COD")return "COD";
+ if(inv?.payment_method==="Credit")return "CREDIT";
+ if((inv?.payment_status||"")==="Partially Paid")return "PARTIAL";
+ return "UNPAID";
+}
+function syncInvoiceStatusPaymentFields(){
+ const choice=$("statusPaymentChoice")?.value||"UNPAID";
+ const methodWrap=$("statusPaymentMethodWrap"),partialWrap=$("statusPartialAmountWrap");
+ const needsMethod=choice==="PAID"||choice==="PARTIAL";
+ methodWrap?.classList.toggle("hidden",!needsMethod);
+ partialWrap?.classList.toggle("hidden",choice!=="PARTIAL");
+ const hint=$("statusPaymentHint");
+ if(hint)hint.textContent=choice==="COD"?"COD means collect on delivery. The invoice remains Unpaid until a payment is recorded.":choice==="CREDIT"?"Credit means pay later. The invoice remains Unpaid until a payment is recorded.":choice==="PAID"?"Marking Paid records the outstanding balance as received.":choice==="PARTIAL"?"Enter the amount received now. The invoice becomes Partially Paid unless the balance reaches zero.":"No payment has been received. The invoice remains Unpaid.";
+}
+window.updateInvoiceStatus=async function(id,billStatus,deliveryStatus,paymentChoice,paymentMethod,partialAmount){
  const inv=invoices.find(x=>x.id===id);if(!inv)return;
+ const currentChoice=invoicePaymentChoice(inv);
+ const paymentChanged=paymentChoice&&paymentChoice!==currentChoice;
+ const fulfillmentChanged=billStatus!==(inv.bill_status||"Confirmed")||deliveryStatus!==(inv.delivery_status||"Pending");
+ if(!paymentChanged&&!fulfillmentChanged){$("invoiceStatusDialog").close();return;}
  if(!isAdmin){
-   const ok=await submitChange("billing","invoice_status_update","invoices",id,{bill_status:billStatus,delivery_status:deliveryStatus},"Employee bill/payment/delivery status change");
-   if(ok)toast("Status change sent for Manager approval.");
+   if(paymentChanged){
+     const ok=await submitChange("billing","invoice_payment_selection_update","invoices",id,{payment_choice:paymentChoice,payment_method:paymentMethod||null,partial_amount:partialAmount||null},"Employee payment selection change");
+     if(!ok)return;
+   }
+   if(fulfillmentChanged){
+     const ok=await submitChange("billing","invoice_status_update","invoices",id,{bill_status:billStatus,delivery_status:deliveryStatus},"Employee bill/delivery status change");
+     if(!ok)return;
+   }
+   $("invoiceStatusDialog").close();
+   toast(paymentChanged&&fulfillmentChanged?"Payment and bill status sent for Manager approval.":paymentChanged?"Payment change sent for Manager approval.":"Bill status sent for Manager approval.");
    return;
  }
- const {error}=await db.rpc("update_invoice_fulfillment",{p_invoice_id:id,p_bill_status:billStatus,p_delivery_status:deliveryStatus});
- if(error)return toast(error.message||"Unable to update bill status.",false);
- inv.bill_status=billStatus;inv.delivery_status=deliveryStatus;
- renderSales();
- toast("Bill status updated");
+ if(paymentChanged){
+   const {error}=await db.rpc("set_invoice_payment_selection",{p_invoice_id:id,p_payment_choice:paymentChoice,p_payment_method:paymentMethod||null,p_partial_amount:partialAmount||null});
+   if(error)return toast(error.message||"Unable to update payment.",false);
+ }
+ if(fulfillmentChanged){
+   const {error}=await db.rpc("update_invoice_fulfillment",{p_invoice_id:id,p_bill_status:billStatus,p_delivery_status:deliveryStatus});
+   if(error)return toast(error.message||"Unable to update bill status.",false);
+ }
+ await loadAll();
+ $("invoiceStatusDialog").close();
+ toast(paymentChanged&&fulfillmentChanged?"Payment and bill status updated":paymentChanged?"Payment updated":"Bill status updated");
 };
 window.openInvoiceStatus=async function(id){
  const inv=invoices.find(x=>x.id===id);if(!inv)return;
@@ -1024,11 +1058,11 @@ window.openInvoiceStatus=async function(id){
  $("statusPaidAmount").textContent=money(inv.paid_amount);
  $("statusDueAmount").textContent=money(inv.due_amount);
  $("statusPaymentMethod").textContent=inv.payment_method||"—";
- const payBtn=$("recordStatusPayment");
- if(payBtn){
-   payBtn.classList.toggle("hidden",!(Number(inv.due_amount||0)>0));
-   payBtn.onclick=()=>{ $("invoiceStatusDialog").close(); window.recordPayment(inv.id); };
- }
+ $("statusPaymentChoice").value=invoicePaymentChoice(inv);
+ $("statusPaymentMethodSelect").value=["Cash","UPI","Bank Transfer","Card","Cheque","Other"].includes(inv.payment_method)?inv.payment_method:"Cash";
+ $("statusPartialAmount").value="";
+ syncInvoiceStatusPaymentFields();
+ $("recordStatusPayment")?.classList.add("hidden");
  $("invoiceStatusDialog").showModal();
 };
 function renderSales(){
@@ -1044,11 +1078,15 @@ function renderSales(){
   '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> '+(Number(x.due_amount||0)>0?'<button type="button" class="link" onclick="recordPayment(\''+x.id+'\')">Record payment</button> ':'')+'<button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
 }
+$("statusPaymentChoice")?.addEventListener("change",syncInvoiceStatusPaymentFields);
 $("invoiceStatusForm")?.addEventListener("submit",async e=>{
  e.preventDefault();
  const id=$("statusInvoiceId").value;
- await window.updateInvoiceStatus(id,$("statusBill").value,$("statusDelivery").value);
- $("invoiceStatusDialog").close();
+ const choice=$("statusPaymentChoice").value;
+ const method=$("statusPaymentMethodSelect").value;
+ const partial=Number($("statusPartialAmount").value||0);
+ if(choice==="PARTIAL"&&!((partial>0)&&Number.isFinite(partial)))return toast("Enter the amount received now.",false);
+ await window.updateInvoiceStatus(id,$("statusBill").value,$("statusDelivery").value,choice,method,partial);
 });
 $("closeInvoiceStatus")?.addEventListener("click",()=>$("invoiceStatusDialog")?.close());
 function customerStats(id){
