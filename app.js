@@ -1010,6 +1010,15 @@ window.openInvoiceStatus=async function(id){
  $("statusInvoiceNo").textContent=inv.invoice_no||"—";
  $("statusBill").value=inv.bill_status||"Confirmed";
  $("statusDelivery").value=inv.delivery_status||"Pending";
+ $("statusPaymentStatus").textContent=inv.payment_status||"Unpaid";
+ $("statusPaidAmount").textContent=money(inv.paid_amount);
+ $("statusDueAmount").textContent=money(inv.due_amount);
+ $("statusPaymentMethod").textContent=inv.payment_method||"—";
+ const payBtn=$("recordStatusPayment");
+ if(payBtn){
+   payBtn.classList.toggle("hidden",!(Number(inv.due_amount||0)>0));
+   payBtn.onclick=()=>{ $("invoiceStatusDialog").close(); window.recordPayment(inv.id); };
+ }
  $("invoiceStatusDialog").showModal();
 };
 function renderSales(){
@@ -1019,9 +1028,10 @@ function renderSales(){
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
  $("salesTable").innerHTML=table(["Invoice","Customer","Total","Paid","Due","Payment","Bill","Delivery","Date","Action"],list.map(x=>[
-  esc(x.invoice_no),esc(x.customer_name),money(x.total),money(x.paid_amount),money(x.due_amount),paymentStatusBadge(x.payment_status),
+  esc(x.invoice_no),esc(x.customer_name),money(x.total),money(x.paid_amount),money(x.due_amount),
+  paymentStatusBadge(x.payment_status)+"<small class='muted'>"+esc(x.payment_method||"—")+"</small>",
   billStatusBadge(x.bill_status),deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
-  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> <button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
+  '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> '+(Number(x.due_amount||0)>0?'<button type="button" class="link" onclick="recordPayment(\''+x.id+'\')">Record payment</button> ':'')+'<button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
 }
 $("invoiceStatusForm")?.addEventListener("submit",async e=>{
@@ -1133,8 +1143,8 @@ window.viewCustomerHistory=function(id){
  const c=customers.find(x=>x.id===id);if(!c)return;
  const s=customerStats(id);
  $("customerHistoryTitle").textContent=(c.business_name||c.name)+" — Purchase History";
- $("customerHistorySummary").innerHTML="<div class=\"history-cards\"><div><span>Total purchases</span><b>"+money(s.totalPurchases)+"</b></div><div><span>Total paid</span><b>"+money(s.totalPaid)+"</b></div><div><span>Credit due</span><b>"+money(s.creditDue)+"</b></div><div><span>Last purchase</span><b>"+(s.lastPurchase?isoDate(s.lastPurchase):"—")+"</b></div></div>";
- $("customerHistoryTable").innerHTML=table(["Invoice","Purchase date","Total","Paid","Credit due","Payment status","Due date","Action"],s.bills.map(inv=>[
+ $("customerHistorySummary").innerHTML="<div class=\"history-cards\"><div><span>Total purchases</span><b>"+money(s.totalPurchases)+"</b></div><div><span>Total paid</span><b>"+money(s.totalPaid)+"</b></div><div><span>Amount due</span><b>"+money(s.creditDue)+"</b></div><div><span>Last purchase</span><b>"+(s.lastPurchase?isoDate(s.lastPurchase):"—")+"</b></div></div>";
+ $("customerHistoryTable").innerHTML=table(["Invoice","Purchase date","Total","Paid","Amount due","Payment status","Due date","Action"],s.bills.map(inv=>[
    esc(inv.invoice_no),new Date(inv.created_at).toLocaleString("en-IN"),money(inv.total),money(inv.paid_amount),money(inv.due_amount),esc(inv.payment_status||"Unpaid"),inv.due_date?isoDate(inv.due_date):"—",
    Number(inv.due_amount||0)>0?"<button class=\"link\" onclick=\"recordPayment(\'"+inv.id+"\')\">Record payment</button>":"Paid"
  ]));
@@ -1143,8 +1153,16 @@ window.viewCustomerHistory=function(id){
 $("closeCustomerHistory").onclick=function(){$("customerHistoryDialog").close()};
 window.recordPayment=function(invoiceId){
  const inv=invoices.find(x=>x.id===invoiceId);if(!inv||Number(inv.due_amount||0)<=0)return;
- $("paymentInvoiceId").value=invoiceId;$("paymentInvoiceNo").textContent=inv.invoice_no;$("paymentCustomerName").textContent=inv.customer_name;$("paymentOutstanding").textContent=money(inv.due_amount);
- $("paymentDate").value=dateKey();$("paymentAmount").value=Number(inv.due_amount).toFixed(2);$("paymentMethod").value="Cash";$("paymentNotes").value="";$("paymentDialog").showModal();
+ $("paymentInvoiceId").value=invoiceId;
+ $("paymentInvoiceNo").textContent=inv.invoice_no;
+ $("paymentCustomerName").textContent=inv.customer_name;
+ $("paymentOutstanding").textContent=money(inv.due_amount);
+ $("paymentDate").value=dateKey();
+ $("paymentAmount").value=Number(inv.due_amount).toFixed(2);
+ $("paymentMethod").value="Cash";
+ $("paymentReference").value="";
+ $("paymentNotes").value="";
+ $("paymentDialog").showModal();
 };
 $("closePayment").onclick=function(){$("paymentDialog").close()};
 $("paymentForm").addEventListener("submit",async function(e){
@@ -1152,18 +1170,32 @@ $("paymentForm").addEventListener("submit",async function(e){
  const invoiceId=$("paymentInvoiceId").value,inv=invoices.find(x=>x.id===invoiceId);
  if(!inv)return toast("Invoice not found",false);
  const amount=+$("paymentAmount").value;
- if(!(amount>0&&amount<=Number(inv.due_amount||0)))return toast("Payment must be greater than 0 and not exceed the outstanding credit.",false);
+ if(!(amount>0&&amount<=Number(inv.due_amount||0)))return toast("Payment must be greater than 0 and not exceed the outstanding amount.",false);
  const payment_date=$("paymentDate").value||dateKey();
+ const payment_method=$("paymentMethod").value;
+ const reference=$("paymentReference").value.trim();
+ const notes=$("paymentNotes").value.trim();
  if(!isAdmin){
-   const ok=await submitChange("billing","payment_create","invoices",inv.id,{customer_id:inv.customer_id,amount,payment_date,payment_method:$("paymentMethod").value,notes:$("paymentNotes").value.trim()},"Employee payment record");
+   const ok=await submitChange("billing","payment_create","invoices",inv.id,{customer_id:inv.customer_id,amount,payment_date,payment_method,reference,notes},"Employee payment record");
    if(ok)$("paymentDialog").close();
    return;
  }
- const ins=await db.from("payments").insert({invoice_id:inv.id,customer_id:inv.customer_id,amount,payment_date,payment_method:$("paymentMethod").value,notes:$("paymentNotes").value.trim()});
+ const ins=await db.from("payments").insert({invoice_id:inv.id,customer_id:inv.customer_id,amount,payment_date,payment_method,reference,notes});
  if(ins.error)return toast(ins.error.message,false);
- const paid=Number(inv.paid_amount||0)+amount,due=Math.max(Number(inv.total||0)-paid,0);
+ const {data:paymentRows,error:rowsError}=await db.from("payments").select("amount,payment_method").eq("invoice_id",inv.id);
+ if(rowsError)return toast(rowsError.message,false);
+ const paid=(paymentRows||[]).reduce((sum,row)=>sum+Number(row.amount||0),0);
+ const due=Math.max(Number(inv.total||0)-paid,0);
  const status=due===0?"Paid":"Partially Paid";
- const upd=await db.from("invoices").update({paid_amount:paid,due_amount:due,payment_status:status,due_date:due>0?inv.due_date:null,payment_method:$("paymentMethod").value}).eq("id",inv.id);
+ const methods=[...new Set((paymentRows||[]).map(row=>row.payment_method).filter(Boolean))];
+ const summaryMethod=methods.length===1?methods[0]:"Multiple";
+ const upd=await db.from("invoices").update({
+   paid_amount:paid,
+   due_amount:due,
+   payment_status:status,
+   due_date:due>0?inv.due_date:null,
+   payment_method:summaryMethod
+ }).eq("id",inv.id);
  if(upd.error)return toast(upd.error.message,false);
  $("paymentDialog").close();toast("Payment recorded");await loadAll();
 });
@@ -1299,6 +1331,7 @@ $("discount").oninput=calc;
 $("gstPercent").oninput=calc;
 $("billType").onchange=calc;
 $("paymentType").onchange=()=>{syncPaymentInput();calc()};
+$("billPaymentMethod").onchange=calc;
 $("payingNowInput").oninput=calc;
 $("dueDate").oninput=updatePaymentFields;
 
@@ -1323,33 +1356,37 @@ function currentBillCustomer(){
  return customers.find(x=>x.id===$("billingCustomer").value)||null;
 }
 function paymentState(total){
- const type=$("paymentType")?.value||"CASH";
+ const type=$("paymentType")?.value||"PAID";
  const bill=Number(total||0);
- if(type==="CASH"||type==="ONLINE")return {type,method:type==="CASH"?"Cash":"Online",status:"Paid",paid:bill,due:0,dueDate:null};
- if(type==="CREDIT")return {type,method:"Credit",status:"Unpaid",paid:0,due:bill,dueDate:$("dueDate").value||null};
+ const method=$("billPaymentMethod")?.value||"Cash";
+ if(type==="PAID")return {type,method,status:"Paid",paid:bill,due:0,dueDate:null};
+ if(type==="COD")return {type,method:"COD",status:"Unpaid",paid:0,due:bill,dueDate:null};
+ if(type==="CREDIT")return {type,method:"Credit",status:"Credit",paid:0,due:bill,dueDate:$("dueDate").value||null};
  let paid=Math.min(bill,Math.max(0,Number($("payingNowInput").value||0)));
- return {type,method:"Half / Part Payment",status:paid>=bill?"Paid":paid>0?"Partially Paid":"Unpaid",paid,due:Math.max(0,bill-paid),dueDate:$("dueDate").value||null};
+ return {type,method, status:paid>=bill?"Paid":paid>0?"Partially Paid":"Unpaid",paid,due:Math.max(0,bill-paid),dueDate:paid>=bill?null:($("dueDate").value||null)};
 }
 function syncPaymentInput(){
- const type=$("paymentType")?.value||"CASH";
- const input=$("payingNowInput");
+ const type=$("paymentType")?.value||"PAID";
+ const input=$("payingNowInput"),methodWrap=$("billPaymentMethodWrap"),dueWrap=$("billDueDateWrap");
  if(!input)return;
- if(type==="HALF"){
-   input.classList.remove("hidden");
+ const showPart=type==="PART";
+ input.classList.toggle("hidden",!showPart);
+ if(showPart){
    if(!Number.isFinite(Number(input.value))||Number(input.value)<=0)input.value=(billTotal/2).toFixed(2);
    input.removeAttribute("readonly");
  }else{
-   input.classList.add("hidden");
    input.setAttribute("readonly","readonly");
    const state=paymentState(billTotal);
    input.value=state.paid.toFixed(2);
  }
+ if(methodWrap)methodWrap.classList.toggle("hidden",type==="COD"||type==="CREDIT");
+ if(dueWrap)dueWrap.classList.toggle("hidden",!(type==="CREDIT"||(type==="PART"&&Number(input.value||0)<billTotal)));
 }
 function updatePaymentFields(){
  const state=paymentState(billTotal);
- const needsDue=state.due>0;
- $("billDueDateWrap").classList.toggle("hidden",!needsDue);
- if(!needsDue)$("dueDate").value="";
+ const showDueDate=state.type==="CREDIT"||(state.type==="PART"&&state.due>0);
+ $("billDueDateWrap").classList.toggle("hidden",!showDueDate);
+ if(!showDueDate)$("dueDate").value="";
  $("payingNowShow").textContent=money(state.paid);
  $("creditAmountShow").textContent=money(state.due);
  if($("payingNowInput")&&!$("payingNowInput").classList.contains("hidden")){
@@ -1358,7 +1395,7 @@ function updatePaymentFields(){
    $("payingNowInput").value=v.toFixed(2);
  }
  $("paymentPreview").textContent=billTotal
-   ?state.status+" • Paying now "+money(state.paid)+" • Credit "+money(state.due)
+   ?state.status+" • Paid now "+money(state.paid)+" • Amount due "+money(state.due)+(state.type==="COD"?" • Collect on delivery":"")
    :"Add items to calculate payment";
 }
 function calc(){
@@ -1405,7 +1442,8 @@ $("clearBill").onclick=()=>{
  $("documentType").value="SALE";
  $("billType").value="NON_GST";
  const paymentBox=document.querySelector(".payment-box"); if(paymentBox)paymentBox.classList.remove("hidden");
- $("paymentType").value="CASH";
+ $("paymentType").value="PAID";
+ $("billPaymentMethod").value="Cash";
  $("gstPercent").value="18";
  ["billCustomerName","billCustomerBusiness","billCustomerPhone","billCustomerEmail","billCustomerGstin"].forEach(id=>$(id).textContent="—");
  $("selectedCustomerCard").classList.add("hidden");
@@ -1511,6 +1549,7 @@ $("billForm").addEventListener("submit",async e=>{
      customer_id:$("billingCustomer")?.value||"",
      bill_type:$("billType")?.value||"",
      payment_type:$("paymentType")?.value||"",
+     payment_method:$("billPaymentMethod")?.value||"",
      line_count:document.querySelectorAll(".line").length,
      supabase_code:err?.code||"",
      supabase_details:err?.details||"",
