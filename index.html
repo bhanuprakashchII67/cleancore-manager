@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.0">
+<link rel="stylesheet" href="style.css?v=3.8.1">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v3.8.0</p>
+    <p class="version">CleanCore Manager v3.8.1</p>
   </div>
 </section>
 
@@ -285,13 +285,41 @@
       <option value="Not Applicable">Not Applicable</option>
     </select>
   </label>
+  <div class="payment-update-box">
+  <label>Payment
+    <select id="statusPaymentChoice">
+      <option value="PAID">Payment received — Paid</option>
+      <option value="UNPAID">Not paid</option>
+      <option value="COD">COD — collect on delivery</option>
+      <option value="CREDIT">Credit — pay later</option>
+      <option value="PARTIAL">Partially paid</option>
+    </select>
+  </label>
+  <div id="statusPaymentMethodWrap">
+    <label>Payment method
+      <select id="statusPaymentMethodSelect">
+        <option>Cash</option>
+        <option>UPI</option>
+        <option>Bank Transfer</option>
+        <option>Card</option>
+        <option>Cheque</option>
+        <option>Other</option>
+      </select>
+    </label>
+  </div>
+  <div id="statusPartialAmountWrap" class="hidden">
+    <label>Payment received now ₹
+      <input id="statusPartialAmount" type="number" min="0.01" step="0.01">
+    </label>
+  </div>
   <div class="payment-status-summary">
-  <div><span>Payment status</span><strong id="statusPaymentStatus">Unpaid</strong></div>
-  <div><span>Paid</span><strong id="statusPaidAmount">₹0.00</strong></div>
-  <div><span>Amount due</span><strong id="statusDueAmount">₹0.00</strong></div>
-  <div><span>Method</span><strong id="statusPaymentMethod">—</strong></div>
+    <div><span>Current status</span><strong id="statusPaymentStatus">Unpaid</strong></div>
+    <div><span>Paid</span><strong id="statusPaidAmount">₹0.00</strong></div>
+    <div><span>Amount due</span><strong id="statusDueAmount">₹0.00</strong></div>
+    <div><span>Current method</span><strong id="statusPaymentMethod">—</strong></div>
+  </div>
+  <p id="statusPaymentHint" class="muted tiny">Choose the payment situation, then save. COD and Credit stay unpaid until money is actually recorded.</p>
 </div>
-<p class="muted tiny">Payment status is controlled by recorded payments. Delivery changes do not mark a bill as paid. Use Record payment when money is actually received.</p>
   <div class="actions"><button type="button" id="recordStatusPayment" class="btn secondary hidden">Record payment</button><button type="button" id="closeInvoiceStatus" class="btn">Cancel</button><button class="btn primary">Save Status</button></div>
 </form>
 </dialog>
@@ -606,6 +634,6 @@
 <script>
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.1",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=3.8.0"></script>
+<script src="app.js?v=3.8.1"></script>
 </body>
 </html>
