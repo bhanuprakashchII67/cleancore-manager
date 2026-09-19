@@ -10,7 +10,7 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const phoneRE=/^[6-9]\d{9}$/;
 const gstRE=/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-const ADMIN_EMAIL="cleancorehyd@gmail.com";
+const ADMIN_EMAIL="bhanuprakashchadalawada10@gmail.com";
 const STAFF_AUTH_DOMAIN="@staff.cleancore.local";
 const ALL_MODULES=["dashboard","products","billing","sales","customers","enquiries","website_orders","expenses"];
 const MODULE_LABELS={dashboard:"Dashboard",products:"Products & Stock",billing:"Billing",sales:"Sales",customers:"Customers",enquiries:"Leads / Enquiries",website_orders:"Website Orders",expenses:"Expenses"};
