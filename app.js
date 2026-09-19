@@ -198,12 +198,12 @@ async function refreshManagerData(){
  }
 }
 function bindRefreshControls(){
- document.addEventListener("click",e=>{
-  const top=e.target.closest?.("#refreshManager");
-  if(!top)return;
-  e.preventDefault();e.stopPropagation();
-  refreshManagerData();
- });
+ const bind=()=>{const b=$("refreshManager");if(!b||b.dataset.bound==="1")return false;
+   b.dataset.bound="1";
+   b.addEventListener("click",refreshManagerData);
+   return true;
+ };
+ if(!bind())window.addEventListener("load",bind,{once:true});
 }
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
@@ -1438,46 +1438,29 @@ $("closeInvoice").onclick=()=>$("invoiceDialog").close();
 function getPrintableInvoiceHtml(){
  const body=$("invoicePreview")?.innerHTML?.trim();
  if(!body)throw new Error("Open a bill before printing.");
- return `<!doctype html><html><head><meta charset="utf-8"><title>CleanCore Invoice</title><style>
- @page{size:A4;margin:10mm}
- *{box-sizing:border-box}
- body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:11px;margin:0;background:#fff}
- .invoice-preview{width:100%;padding:0}
- .inv-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}
- .inv-brand{font-size:22px;font-weight:800}.inv-sub{font-weight:700;margin:3px 0 6px}.inv-title{text-align:right;font-size:20px}.inv-title span{display:block;font-size:9px;margin-top:4px}
- .inv-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111;padding:8px 0}
- .inv-parties{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:10px 0;border-bottom:1px solid #111}.inv-parties>div{border:1px solid #ddd;padding:8px;border-radius:4px}.inv-parties b{font-size:9px;letter-spacing:.04em}.inv-parties p{margin:5px 0 0;line-height:1.45}
- .invoice-items{width:100%;border-collapse:collapse;margin-top:10px}.invoice-items th,.invoice-items td{border:1px solid #ccc;padding:6px 7px;vertical-align:top}.invoice-items th{font-size:9px;text-transform:uppercase;text-align:left}.invoice-items .subtotal-row td,.invoice-items .grand-total td{font-weight:800}.invoice-items .grand-total td{font-size:13px;border-top:2px solid #111}
- .tax-label{text-align:right;font-weight:700}.amount-words{margin-top:9px;padding:8px;border:1px solid #ddd}.inv-bottom{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:14px}.signature{text-align:right}
- @media(max-width:700px){.inv-header,.inv-parties,.inv-meta,.inv-bottom{grid-template-columns:1fr;display:grid}.inv-title{text-align:left;margin-top:8px}}
- </style></head><body><div class="invoice-preview">${body}</div></body></html>`;
+ return body;
+}
+let activePrintArea=null;
+function printInvoiceNow(){
+ const body=getPrintableInvoiceHtml();
+ if(activePrintArea)activePrintArea.remove();
+ const area=document.createElement("div");
+ area.id="invoicePrintArea";
+ area.innerHTML=body;
+ document.body.appendChild(area);
+ activePrintArea=area;
+ const cleanup=()=>{
+   window.removeEventListener("afterprint",cleanup);
+   if(activePrintArea){activePrintArea.remove();activePrintArea=null;}
+ };
+ window.addEventListener("afterprint",cleanup);
+ setTimeout(()=>{window.focus();window.print();},60);
+ setTimeout(cleanup,60000);
 }
 $("printInvoice").onclick=e=>{
  e.preventDefault();
- try{
-  const invoiceHtml=getPrintableInvoiceHtml();
-  const frame=document.createElement("iframe");
-  frame.title="CleanCore Invoice Print";
-  frame.setAttribute("aria-hidden","true");
-  frame.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;";
-  document.body.appendChild(frame);
-  frame.onload=()=>{
-   try{
-    const win=frame.contentWindow;
-    win.focus();
-    win.onafterprint=()=>setTimeout(()=>frame.remove(),250);
-    setTimeout(()=>win.print(),100);
-    setTimeout(()=>{if(document.body.contains(frame))frame.remove()},60000);
-   }catch(err){
-    frame.remove();
-    toast(err?.message||"Unable to print invoice.",false);
-   }
-  };
-  frame.srcdoc=invoiceHtml;
- }catch(err){
-  console.error("Invoice print error",err);
-  toast(err?.message||"Unable to print invoice.",false);
- }
+ try{printInvoiceNow();}
+ catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
 };
 $("profileBtn").onclick=()=>{
  $("notificationMenu")?.classList.add("hidden");
@@ -1491,19 +1474,16 @@ $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();i
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
 
 // Manager login policy:
-// - Installed Manager app (PWA): stay signed in for 7 days.
+// - Installed Manager app: stay signed in for 7 days.
 // - Normal browser/web link: require login again after every page reload.
-// - The PWA launch URL carries app=1 so the rule is reliable even when display-mode
-//   is temporarily unavailable during startup.
+// The installed app is launched with ?app=1 via the manifest.
 var MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
 var MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
-var MANAGER_APP_FLAG="cleancore_manager_app";
 var managerExpiryTimer=null;
 
 function isStandaloneManagerApp(){
  const params=new URLSearchParams(location.search);
  return params.get("app")==="1" ||
-   localStorage.getItem(MANAGER_APP_FLAG)==="1" ||
    !!(window.matchMedia?.("(display-mode: standalone)")?.matches ||
       window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches ||
       window.navigator.standalone===true);
@@ -1518,13 +1498,13 @@ function startManagerLoginWindow(){
    clearManagerLoginWindow();
    return;
  }
- localStorage.setItem(MANAGER_APP_FLAG,"1");
  const expiresAt=Date.now()+MANAGER_LOGIN_TTL_MS;
  localStorage.setItem(MANAGER_LOGIN_EXPIRY_KEY,String(expiresAt));
  armManagerExpiryTimer();
 }
 function armManagerExpiryTimer(){
  clearTimeout(managerExpiryTimer);
+ managerExpiryTimer=null;
  if(!isStandaloneManagerApp())return;
  const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
  if(!expiresAt)return;
@@ -1534,39 +1514,28 @@ function armManagerExpiryTimer(){
 }
 async function forceManagerExpiry(){
  clearManagerLoginWindow();
- try{await db.auth.signOut({scope:"local"})}finally{
-   user=null;
-   $("loginView").classList.remove("hidden");
-   $("appView").classList.add("hidden");
- }
+ try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Manager sign out:",err)}
+ user=null;
+ $("loginView").classList.remove("hidden");
+ $("appView").classList.add("hidden");
 }
 async function restoreManagerSession(){
- const app=isStandaloneManagerApp();
- if(!app){
+ if(!isStandaloneManagerApp()){
    clearManagerLoginWindow();
-   localStorage.removeItem(MANAGER_APP_FLAG);
    try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Web session cleanup:",err)}
    $("loginView").classList.remove("hidden");
    $("appView").classList.add("hidden");
    return;
  }
-
  const {data,error}=await db.auth.getSession();
  if(error){console.warn("Manager session check:",error.message);return;}
  if(!data?.session)return;
-
  let expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
  if(!expiresAt){
-   // A valid Supabase session existed before this 7-day marker was introduced.
-   // Start a fresh 7-day app window once, rather than forcing a logout.
    startManagerLoginWindow();
    expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
  }
- if(!expiresAt||Date.now()>=expiresAt){
-   await forceManagerExpiry();
-   return;
- }
-
+ if(!expiresAt||Date.now()>=expiresAt){await forceManagerExpiry();return;}
  user=data.session.user;
  try{
    await enter();
@@ -1576,9 +1545,6 @@ async function restoreManagerSession(){
    toast(err?.message||"Unable to restore the Manager session.",false);
  }
 }
-window.addEventListener("storage",e=>{
- if(e.key===MANAGER_LOGIN_EXPIRY_KEY||e.key===MANAGER_APP_FLAG)armManagerExpiryTimer();
-});
 bindRefreshControls();
 bindWebsiteNotificationUi();
 bootstrapManagerSession();
