@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.22">
+<link rel="stylesheet" href="style.css?v=3.8.23">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -28,7 +28,7 @@
       <button class="btn primary">Sign in</button>
     </form>
     <p class="security-note">Secure access to your CleanCore business workspace.</p>
-    <p class="version">CleanCore Manager v3.8.22</p>
+    <p class="version">CleanCore Manager v3.8.23</p>
   </div>
 </section>
 
@@ -115,28 +115,6 @@
     </div>
     <div id="rawTable"></div>
   </div>
-  <button id="investmentBox" type="button" class="investment-box" aria-label="Open Investment history">
-    <span>Investment</span><strong id="investmentTotal">₹0.00</strong><small>Click to view</small>
-  </button>
-  <dialog id="investmentDialog">
-    <form method="dialog" id="investmentForm" class="dialog">
-      <h3>Investment</h3>
-      <div class="investment-form-grid">
-        <label>Amount ₹<input id="investmentAmount" type="number" min="0.01" step="0.01" required></label>
-        <label>Date<input id="investmentDate" type="date" required></label>
-      </div>
-      <label>Investment name / purpose<input id="investmentNotes" maxlength="200" placeholder="e.g. Initial capital, machine purchase"></label>
-      <div class="actions">
-        <button type="button" id="saveInvestment" class="btn primary">Save Investment</button>
-        <button type="button" id="closeInvestment" class="btn">Close</button>
-      </div>
-      <div class="panel investment-history-panel">
-        <div class="panel-head"><h3>Investment History</h3></div>
-        <div id="investmentTable"></div>
-      </div>
-    </form>
-  </dialog>
-</section>
 
 <section id="billing" class="section">
   <div class="section-toolbar"><span>Create Bill</span><button type="button" class="btn small page-refresh" data-page-refresh="billing">↻ Refresh</button></div>
@@ -661,6 +639,6 @@ if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.ser
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.22"></script>
+<script src="app.js?v=3.8.23"></script>
 </body>
 </html>
