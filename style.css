@@ -375,3 +375,21 @@ dialog .dialog{padding-top:52px}
   body.printing-invoice #invoicePrintArea .invoice-preview{display:block!important}
   body.printing-invoice{background:#fff!important;margin:0!important}
 }
+
+/* Clean top action group */
+.top{gap:16px}
+.top-title{min-width:0}
+.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.profile-wrap{display:flex;align-items:center;gap:8px}
+@media(max-width:700px){
+  .top{display:grid;grid-template-columns:1fr;align-items:start}
+  .top-actions{width:100%;justify-content:flex-end;gap:8px}
+  .notification-menu{right:0}
+}
+@media(max-width:480px){
+  .top-actions{justify-content:space-between}
+  .notification-btn{flex:1 1 auto}
+  .profile-wrap{flex:1 1 auto;justify-content:flex-end}
+  .refresh-btn,.profile-btn{white-space:nowrap}
+  .notification-btn span:nth-child(2){display:inline}
+}
