@@ -12,6 +12,8 @@ self.addEventListener("push",event=>{
    tag:data.notification_id||"cleancore-manager-push",
    data:{url:data.url||"/",notification_id:data.notification_id||""},
    vibrate:[200,100,200],
+   silent:false,
+   renotify:true,
    requireInteraction:true
  };
  event.waitUntil((async()=>{
@@ -19,7 +21,7 @@ self.addEventListener("push",event=>{
      await self.registration.showNotification(title,options);
    }catch(err){
      try{
-       await self.registration.showNotification(title,{body:options.body,tag:options.tag,data:options.data,vibrate:options.vibrate});
+       await self.registration.showNotification(title,{body:options.body,tag:options.tag,data:options.data,vibrate:options.vibrate,silent:false,renotify:true});
      }catch(_){}
    }
  })());
