@@ -505,3 +505,14 @@ body.modal-open{overflow:hidden}.investment-modal{display:none;position:fixed;in
 #loginView .auth-card .btn{font-size:15px;padding:11px 18px;border-radius:10px;width:auto}
 #loginView .auth-card form{gap:0}
 @media(max-width:600px){#loginView .auth-card{padding:20px;width:min(350px,calc(100vw - 28px))}#loginView .auth-card h1{font-size:26px}}
+
+
+/* CleanCore Business Manager login branding */
+.login-brand{display:flex;align-items:center;gap:14px;margin:0 0 22px}
+.login-brand .brand{flex:0 0 auto}
+.login-brand-text{display:flex;flex-direction:column;line-height:1.05}
+.login-brand-text strong{font-size:30px;letter-spacing:-.03em;color:#071a33}
+.login-brand-text span{font-size:18px;font-weight:700;color:#64768a;margin-top:5px}
+#loginView .auth-card{width:min(380px,100%);padding:24px}
+#loginView .auth-card form{margin-top:0}
+@media(max-width:600px){.login-brand{gap:12px;margin-bottom:18px}.login-brand .brand{width:48px;height:48px}.login-brand-text strong{font-size:26px}.login-brand-text span{font-size:16px}}
