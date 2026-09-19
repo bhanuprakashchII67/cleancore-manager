@@ -12,9 +12,9 @@ const ADMIN_EMAIL="bhanuprakashchadalawada10@gmail.com";
 const STAFF_AUTH_DOMAIN="@staff.cleancore.local";
 const ALL_MODULES=["dashboard","products","billing","sales","customers","enquiries","website_orders","expenses"];
 const MODULE_LABELS={dashboard:"Dashboard",products:"Products & Stock",billing:"Billing",sales:"Sales",customers:"Customers",enquiries:"Leads / Enquiries",website_orders:"Website Orders",expenses:"Expenses"};
-const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing",sales:"sales",customers:"customers",enquiries:"enquiries",expenses:"expenses",settings:"settings"};
+const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing",sales:"sales",customers:"customers",enquiries:"enquiries",expenses:"expenses",settings:"settings",recovery:"recovery"};
 const EMPLOYEE_PORTAL_BASE="https://bhanuprakashchII67.github.io/cleancore-website/employee.html";
-let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[];
+let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[],deletedRecords=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
 function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
@@ -194,16 +194,18 @@ async function loadAll(){
  for(const q of qs)if(q?.error)throw new Error(q.error.message);
  products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
  if(isAdmin){
-   const [er,ep,cr,ar,nr]=await Promise.all([
+   const [er,ep,cr,ar,nr,dr]=await Promise.all([
      db.from("employees").select("*").order("created_at",{ascending:false}),
      db.from("employee_permissions").select("*"),
      db.from("change_requests").select("*").order("requested_at",{ascending:false}),
      db.from("access_requests").select("*").order("created_at",{ascending:false}),
-     db.from("manager_notifications").select("*").order("created_at",{ascending:false})
+     db.from("manager_notifications").select("*").order("created_at",{ascending:false}),
+     db.from("deleted_records").select("id,entity_type,original_id,display_name,deleted_at,purge_at,status").eq("status","Deleted").order("deleted_at",{ascending:false})
    ]);
-   for(const q of [er,ep,cr,ar,nr])if(q?.error)throw new Error(q.error.message);
-   employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];
+   for(const q of [er,ep,cr,ar,nr,dr])if(q?.error)throw new Error(q.error.message);
+   employees=er.data||[];employeePermissionRows=ep.data||[];changeRequests=cr.data||[];accessRequests=ar.data||[];managerNotifications=nr.data||[];deletedRecords=dr.data||[];
    renderEmployeeData();
+   renderRecovery();
  }
  renderAll();
 }
@@ -441,23 +443,48 @@ window.deleteInvoice=async function(id){
  if(!isAdmin){toast("Only the Manager can delete invoices.",false);return;}
  const inv=invoices.find(x=>x.id===id);if(!inv)return;
  if(!confirm("Delete invoice "+(inv.invoice_no||"")+"? Its invoice items and payment records will also be deleted. This cannot be undone."))return;
- const {error}=await db.from("invoices").delete().eq("id",id);
+ const {data,error}=await db.rpc("delete_invoice_with_recovery",{p_invoice_id:id});
  if(error)return toast(error.message||"Unable to delete invoice.",false);
- toast("Invoice deleted");
+ toast("Invoice moved to Recovery for 30 days");
  await loadAll();
 };
 window.deleteEnquiry=async id=>{
  if(!isAdmin){toast("Only the Manager can delete enquiries.",false);return;}
  if(!confirm("Delete this enquiry?"))return;
- const {error}=await db.from("enquiries").delete().eq("id",id);
- if(error)return toast(error.message,false);
- toast("Enquiry deleted");
+ const {data,error}=await db.rpc("delete_record_with_recovery",{p_entity_type:"enquiry",p_original_id:id});
+ if(error)return toast(error.message||"Unable to delete enquiry.",false);
+ toast("Enquiry moved to Recovery for 30 days");
  await loadAll();
 };
 function expenseList(){
  const from=$("expenseFrom")?.value||"",to=$("expenseTo")?.value||"";
  return expenses.filter(x=>(!from||String(x.expense_date)>=from)&&(!to||String(x.expense_date)<=to));
 }
+function renderRecovery(){
+ if(!isAdmin||!$("recoveryTable"))return;
+ const rows=deletedRecords.map(r=>{
+   const days=Math.max(0,Math.ceil((new Date(r.purge_at)-new Date())/86400000));
+   return [
+     esc(r.entity_type.replaceAll("_"," ")),
+     esc(r.display_name),
+     formatAccessDate(r.deleted_at),
+     formatAccessDate(r.purge_at),
+     days+" day"+(days===1?"":"s"),
+     "<button type='button' class='link' onclick=\"restoreDeletedRecord('"+r.id+"')\">Restore</button>"
+   ];
+ });
+ $("recoveryTable").innerHTML=table(["Type","Record","Deleted","Auto-delete","Time left","Action"],rows);
+ if($("recoverySummary"))$("recoverySummary").textContent=deletedRecords.length+" deleted record"+(deletedRecords.length===1?"":"s")+" currently recoverable. Records are permanently removed after 30 days.";
+}
+window.restoreDeletedRecord=async id=>{
+ if(!isAdmin)return;
+ const rec=deletedRecords.find(x=>x.id===id);if(!rec)return;
+ if(!confirm("Restore "+(rec.display_name||rec.entity_type)+"?"))return;
+ const {data,error}=await db.rpc("restore_deleted_record",{p_deleted_id:id});
+ if(error)return toast(error.message||"Restore failed.",false);
+ toast("Record restored");
+ await loadAll();
+};
 function renderExpenses(){
  const list=expenseList();
  const gross=invoices.filter(inv=>{
@@ -520,9 +547,9 @@ window.editExpense=id=>{
 window.deleteExpense=async id=>{
  if(!confirm("Delete this expense?"))return;
  if(!isAdmin){const ok=await submitChange("expenses","expense_delete","expenses",id,{},"Employee expense deletion");if(ok)await loadAll();return;}
- const {error}=await db.from("expenses").delete().eq("id",id);
- if(error)return toast(error.message,false);
- toast("Expense deleted");
+ const {data,error}=await db.rpc("delete_record_with_recovery",{p_entity_type:"expense",p_original_id:id});
+ if(error)return toast(error.message||"Unable to delete expense.",false);
+ toast("Expense moved to Recovery for 30 days");
  await loadAll();
 };
 $("expenseForm").addEventListener("submit",async e=>{
@@ -658,9 +685,9 @@ window.deleteCustomer=async function(id){
    if(ok)await loadAll();
    return;
  }
- const {data,error}=await db.rpc("archive_customer_admin",{p_customer_id:id});
+ const {data,error}=await db.rpc("delete_record_with_recovery",{p_entity_type:"customer",p_original_id:id});
  if(error)return toast(error.message||"Unable to remove customer.",false);
- toast("Customer removed from active list");
+ toast("Customer moved to Recovery for 30 days");
  await loadAll();
 };
 window.viewCustomerHistory=function(id){
@@ -736,9 +763,9 @@ window.deleteProduct=async id=>{
     if(ok)await loadAll();
     return;
   }
-  const {error}=await db.from("products").delete().eq("id",id);
-  if(error)return toast(error.message,false);
-  toast("Product deleted");
+  const {data,error}=await db.rpc("delete_record_with_recovery",{p_entity_type:"product",p_original_id:id});
+  if(error)return toast(error.message||"Unable to delete product.",false);
+  toast("Product moved to Recovery for 30 days");
   await loadAll();
 };
 window.deleteRawMaterial=async id=>{
@@ -748,9 +775,9 @@ window.deleteRawMaterial=async id=>{
     if(ok)await loadAll();
     return;
   }
-  const {data,error}=await db.rpc("delete_raw_material_admin",{p_id:id});
-  if(error)return toast(error.message,false);
-  toast("Raw material deleted");
+  const {data,error}=await db.rpc("delete_record_with_recovery",{p_entity_type:"raw_material",p_original_id:id});
+  if(error)return toast(error.message||"Unable to delete raw material.",false);
+  toast("Raw material moved to Recovery for 30 days");
   await loadAll();
 };
 window.removeProductMedia=async(id,type,encoded)=>{
