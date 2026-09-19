@@ -19,9 +19,9 @@ const EMPLOYEE_PORTAL_BASE="https://bhanuprakashchII67.github.io/cleancore-websi
 let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[],deletedRecords=[],websiteNotifications=[];
 let notificationChannel=null,notificationPollTimer=null,notificationAudioContext=null;
 let errorLogs=[];
-let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
+let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.19";
+const MANAGER_VERSION="3.8.20";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -584,9 +584,10 @@ async function loadAll(){
  const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("id,name,unit,cost_per_unit,stock,low_stock_threshold,created_at,updated_at").order("name"):null;
  const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("id,expense_date,category,amount,vendor,payment_method,notes,raw_material_id,quantity,unit_cost,created_at,updated_at").order("expense_date",{ascending:false}).order("created_at",{ascending:false}).limit(1000):null;
  const qPM=(isAdmin||canAccess("billing")||canAccess("sales")||canAccess("customers"))?db.from("payments").select("id,invoice_id,customer_id,amount,payment_date,payment_method,reference,notes,created_at").order("payment_date",{ascending:false}).order("created_at",{ascending:false}).limit(250):null;
+ const qINV=(isAdmin||canAccess("products"))?db.from("manager_investments").select("id,investment_date,amount,notes,created_at,updated_at").order("investment_date",{ascending:false}).order("created_at",{ascending:false}):null;
  const qWO=(isAdmin||canAccess("website_orders"))?db.from("website_orders").select("id,order_no,customer_id,status,subtotal,total,notes,created_at,updated_at,invoice_id,invoice_no,gst_enabled,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,place_of_supply,customer_gstin").order("created_at",{ascending:false}).limit(250):null;
- const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qWO]);
- const [p,i,cu,e,r,x,pm,wo]=qs;
+ const qs=await Promise.all([qP,qI,qC,qE,qR,qX,qPM,qINV,qWO]);
+ const [p,i,cu,e,r,x,pm,inv,wo]=qs;
  for(const q of qs)if(q?.error)throw new Error(q.error.message);
  products=p?.data||[];invoices=i?.data||[];customers=cu?.data||[];enquiries=e?.data||[];rawMaterials=r?.data||[];expenses=x?.data||[];payments=pm?.data||[];websiteOrders=wo?.data||[];
  if(isAdmin){
@@ -830,12 +831,14 @@ function renderAll(section){
  if(active==="dashboard"){
    if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],saleInvoices.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.total),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  }
+ if($("investmentTotal"))$("investmentTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
  if(active==="products"){
    $("productsTable").innerHTML=table(["Product","Unit","Selling","Cost","Stock","Status","Action"],products.map(p=>[
      esc(p.name),esc(p.unit),money(p.selling_price),money(p.cost_price),p.stock,
      Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
      '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
    ]));
+   $("investmentTable").innerHTML=table(["Date","Amount","Notes",""],investments.map(x=>[isoDate(x.investment_date),money(x.amount),esc(x.notes||"—"),"<button type='button' class='link danger' onclick=\"deleteInvestment('"+x.id+"')\">Delete</button>"]));
    $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
      esc(r.name),esc(r.unit),money(r.cost_per_unit),r.stock,
      Number(r.stock)<=Number(r.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
@@ -1299,6 +1302,20 @@ $("paymentForm").addEventListener("submit",async function(e){
  if(upd.error)return toast(upd.error.message,false);
  $("paymentDialog").close();toast("Payment recorded");await loadAll();
 });
+async function addInvestment(){
+ const amount=prompt("Investment amount (₹):");
+ if(amount===null)return;
+ const n=Number(amount);if(!Number.isFinite(n)||n<=0)return toast("Enter a valid investment amount",false);
+ const date=prompt("Investment date (YYYY-MM-DD):",dateKey(new Date()));
+ if(date===null)return;
+ if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return toast("Enter date as YYYY-MM-DD",false);
+ const notes=prompt("What was this investment for? (optional):","")||"";
+ const {data,error}=await db.from("manager_investments").insert({investment_date:date,amount:n,notes}).select("id,investment_date,amount,notes,created_at,updated_at").single();
+ if(error)return toast(error.message,false);
+ investments=[data,...investments];renderAll("products");toast("Investment added");
+}
+window.deleteInvestment=async id=>{if(!confirm("Delete this investment?"))return;const {error}=await db.from("manager_investments").delete().eq("id",id);if(error)return toast(error.message,false);investments=investments.filter(x=>x.id!==id);renderAll("products");toast("Investment deleted")};
+if($("addInvestment"))$("addInvestment").onclick=addInvestment;
 function resetProductForm(){
  editingProductId=null;
  ["pname","punit","phsn","pcost","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
