@@ -18,9 +18,23 @@ const SECTION_MODULE={dashboard:"dashboard",products:"products",billing:"billing
 const EMPLOYEE_PORTAL_BASE="https://bhanuprakashchII67.github.io/cleancore-website/employee.html";
 let user=null,isAdmin=false,employee=null,employeePermissions=new Set(),employeePermissionRows=[],products=[],invoices=[],customers=[],enquiries=[],rawMaterials=[],expenses=[],payments=[],websiteOrders=[],employees=[],changeRequests=[],accessRequests=[],managerNotifications=[],deletedRecords=[],websiteNotifications=[];
 let notificationChannel=null,notificationPollTimer=null,notificationAudioContext=null;
+let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null; let billTotal=0;
 
-function toast(m,ok=true){const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200)}
+const MANAGER_VERSION="3.7.4";
+let errorReportBusy=false;
+function reportClientError(err,meta={}){
+ const e=err instanceof Error?err:new Error(String(err||"Unknown error"));
+ const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:meta.context||{},p_user_agent:navigator.userAgent};
+ if(errorReportBusy)return;
+ errorReportBusy=true;db.rpc("log_client_error",payload).catch(()=>{}).finally(()=>{errorReportBusy=false});
+}
+function toast(m,ok=true,meta={}){
+ const t=$("toast");t.textContent=m;t.className="toast show "+(ok?"ok":"bad");setTimeout(()=>t.className="toast",3200);
+ if(!ok)reportClientError(new Error(String(m)),{action:meta.action||"toast_error",context:meta.context||{}});
+}
+window.addEventListener("error",e=>reportClientError(e.error||new Error(e.message||"Unhandled browser error"),{action:"window_error",context:{source:e.filename||"",line:e.lineno||0,column:e.colno||0}}));
+window.addEventListener("unhandledrejection",e=>reportClientError(e.reason||new Error("Unhandled promise rejection"),{action:"unhandled_rejection"}));
 const NOTIFICATION_DEFAULTS={notifications_enabled:true,sound_enabled:true,desktop_enabled:false,website_orders:true,website_enquiries:true,employee_access_requests:true,employee_change_requests:true,restricted_access_attempts:true,low_stock_alerts:true,payments_received:true,credit_due_alerts:true};
 let notificationPreferences={...NOTIFICATION_DEFAULTS};
 
@@ -769,6 +783,7 @@ function renderAll(section){
  if(active==="sales")renderSales();
  if(active==="billing"){renderQuotations();rebuildLines();}
  if(active==="expenses")renderExpenses();
+ if(active==="settings")loadErrorLogs();
  if(active==="customers")renderCustomers();
  if(active==="website_orders")renderWebsiteOrders();
  if(active==="enquiries"){
@@ -920,6 +935,39 @@ $("exportExpenses").onclick=()=>{
  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cleancore-expenses.csv";a.click();
 };
+async function loadErrorLogs(){
+ if(!isAdmin)return;
+ const {data,error}=await db.from("error_logs").select("id,created_at,app_name,app_version,page,url,action,error_name,message,stack,context,user_agent,status,resolved_at").order("created_at",{ascending:false}).limit(250);
+ if(error){console.warn("Error Finder:",error.message);return toast("Unable to load Error Finder: "+error.message,false,{action:"load_error_logs"});}
+ errorLogs=data||[];
+ const apps=[...new Set(errorLogs.map(x=>x.app_name).filter(Boolean))].sort();
+ const appSelect=$("errorLogAppFilter");
+ if(appSelect){const current=appSelect.value;appSelect.innerHTML='<option value="">All apps</option>'+apps.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join("");if(apps.includes(current))appSelect.value=current;}
+ renderErrorLogs();
+}
+function renderErrorLogs(){
+ const box=$("errorLogsTable");if(!box)return;
+ const sf=$("errorLogStatusFilter")?.value||"",af=$("errorLogAppFilter")?.value||"";
+ const list=errorLogs.filter(x=>(!sf||x.status===sf)&&(!af||x.app_name===af));
+ $("errorLogSummary").textContent=list.length+" error"+(list.length===1?"":"s")+" shown • "+errorLogs.filter(x=>x.status==="New").length+" new";
+ $("errorLogsTable").innerHTML=table(["Time","App","Page","Error","Message","Status","Action"],list.map(x=>{
+   const msg=String(x.message||"");
+   const status='<select class="error-log-status" data-error-id="'+esc(x.id)+'"><option '+(x.status==="New"?"selected":"")+' >New</option><option '+(x.status==="Investigating"?"selected":"")+'>Investigating</option><option '+(x.status==="Fixed"?"selected":"")+'>Fixed</option><option '+(x.status==="Ignored"?"selected":"")+'>Ignored</option></select>';
+   const copy='<button type="button" class="btn small copy-error" data-error-id="'+esc(x.id)+'">Copy Error</button>';
+   return [isoDate(x.created_at),esc(x.app_name),esc(x.page||"—"),esc(x.error_name||"Error"),'<span class="error-log-message">'+esc(msg)+'</span>',status,copy];
+ }));
+}
+async function updateErrorStatus(id,status){
+ const {error}=await db.from("error_logs").update({status,resolved_at:status==="Fixed"?new Date().toISOString():null,resolved_by:status==="Fixed"?user?.id:null}).eq("id",id);
+ if(error)return toast("Unable to update error: "+error.message,false,{action:"update_error_status",context:{id,status}});
+ const row=errorLogs.find(x=>x.id===id);if(row){row.status=status;row.resolved_at=status==="Fixed"?new Date().toISOString():null;}
+ renderErrorLogs();
+}
+function formatErrorForCopy(x){
+ return ["CleanCore Error Report","Time: "+new Date(x.created_at).toLocaleString("en-IN"),"App: "+(x.app_name||"—"),"Version: "+(x.app_version||"—"),"Page: "+(x.page||"—"),"Action: "+(x.action||"—"),"Error: "+(x.error_name||"Error"),"Message: "+(x.message||"—"),"URL: "+(x.url||"—"),"Stack: "+(x.stack||"—"),"Context: "+JSON.stringify(x.context||{})].join("\n");
+}
+document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-status");if(s)updateErrorStatus(s.dataset.errorId,s.value);});
+document.addEventListener("click",async e=>{const b=e.target.closest?.(".copy-error");if(!b)return;const x=errorLogs.find(r=>r.id===b.dataset.errorId);if(!x)return;try{await navigator.clipboard.writeText(formatErrorForCopy(x));toast("Error copied");}catch(err){toast("Copy failed. Select the error manually.",false,{action:"copy_error"});}});
 function billStatusBadge(v){const x=v||"Confirmed";return "<span class='badge "+(x==="Cancelled"?"danger":x==="Completed"?"ok":x==="Draft"?"":"warn")+"'>"+esc(x)+"</span>"}
 function paymentStatusBadge(v){const x=v||"Unpaid";return "<span class='badge "+(x==="Paid"?"ok":x==="Partially Paid"?"warn":"danger")+"'>"+esc(x)+"</span>"}
 function deliveryStatusBadge(v){const x=v||"Pending";return "<span class='badge "+(x==="Delivered"?"ok":x==="Out for Delivery"?"warn":x==="Failed"?"danger":"")+"'>"+esc(x)+"</span>"}
