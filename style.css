@@ -303,7 +303,7 @@ dialog .dialog{padding-top:52px}
 /* Per-page Manager refresh control */
 .section-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:0 2px}
 .section-toolbar>span{font-size:12px;font-weight:700;color:#6a7d8f}
-.page-refresh{white-space:nowrap}
+
 
 .customer-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 16px}
 .address-fieldset{border:1px solid #dce5ee;border-radius:12px;padding:14px 15px 12px;margin:16px 0;background:#fbfcfd}
@@ -365,3 +365,5 @@ dialog .dialog{padding-top:52px}
 .notification-copy small{font-size:12px;line-height:1.35;color:#647587}
 .notification-copy em{font-size:10px;font-style:normal;color:#8291a0}
 @media(max-width:700px){.notification-btn span:nth-child(2){display:none}.notification-menu{right:-65px;width:340px}}
+
+.refresh-btn{cursor:pointer;margin-right:8px}.refresh-btn:disabled{opacity:.6;cursor:wait}
