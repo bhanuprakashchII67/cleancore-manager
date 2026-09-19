@@ -929,3 +929,173 @@ create index if not exists invoices_document_type_created_idx
 -- The deployed review_change_request function contains the quotation-specific
 -- behavior: quotations are stored and itemized, but do not create payments,
 -- do not decrement product stock, and do not contribute to sales/profit.
+
+
+-- Link website orders to the Enquiries view so deleting a linked sale removes the same order from both places.
+alter table public.enquiries
+  add column if not exists website_order_id uuid references public.website_orders(id) on delete set null,
+  add column if not exists invoice_id uuid references public.invoices(id) on delete set null;
+
+create index if not exists enquiries_website_order_idx on public.enquiries(website_order_id);
+create index if not exists enquiries_invoice_idx on public.enquiries(invoice_id);
+
+-- 30-day Recovery/Trash storage for Manager deletions.
+create table if not exists public.deleted_records(
+  id uuid primary key default gen_random_uuid(),
+  entity_type text not null check(entity_type in ('invoice','product','raw_material','customer','expense','enquiry')),
+  original_id uuid not null,
+  display_name text not null default '',
+  deleted_at timestamptz not null default now(),
+  purge_at timestamptz not null default (now()+interval '30 days'),
+  status text not null default 'Deleted' check(status in ('Deleted','Restored','Purged')),
+  snapshot jsonb not null default '{}'::jsonb,
+  restored_at timestamptz,
+  restored_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists deleted_records_purge_idx on public.deleted_records(status,purge_at);
+create index if not exists deleted_records_entity_idx on public.deleted_records(entity_type,deleted_at desc);
+alter table public.deleted_records enable row level security;
+drop policy if exists deleted_records_admin on public.deleted_records;
+create policy deleted_records_admin on public.deleted_records for all to authenticated using(public.is_admin()) with check(public.is_admin());
+
+-- Recovery RPCs are intentionally Manager-only; employee deletions still go through approval.
+create or replace function public.archive_deleted_record(p_entity_type text,p_original_id uuid,p_display_name text,p_snapshot jsonb)
+returns uuid language plpgsql security definer set search_path=public
+as $$
+declare v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  insert into public.deleted_records(entity_type,original_id,display_name,snapshot)
+  values(p_entity_type,p_original_id,coalesce(p_display_name,''),coalesce(p_snapshot,'{}'::jsonb))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+revoke all on function public.archive_deleted_record(text,uuid,text,jsonb) from public;
+grant execute on function public.archive_deleted_record(text,uuid,text,jsonb) to authenticated;
+
+create or replace function public.delete_invoice_with_recovery(p_invoice_id uuid)
+returns uuid language plpgsql security definer set search_path=public
+as $$
+declare v_inv jsonb;v_items jsonb;v_payments jsonb;v_orders jsonb;v_order_items jsonb;v_enquiries jsonb;v_record_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  select to_jsonb(i),
+         coalesce((select jsonb_agg(to_jsonb(ii) order by ii.created_at) from public.invoice_items ii where ii.invoice_id=i.id),'[]'::jsonb),
+         coalesce((select jsonb_agg(to_jsonb(pm) order by pm.created_at) from public.payments pm where pm.invoice_id=i.id),'[]'::jsonb)
+    into v_inv,v_items,v_payments
+    from public.invoices i where i.id=p_invoice_id;
+  if v_inv is null then raise exception 'Invoice not found'; end if;
+  select coalesce(jsonb_agg(to_jsonb(o) order by o.created_at),'[]'::jsonb) into v_orders
+    from public.website_orders o where o.invoice_id=p_invoice_id;
+  select coalesce(jsonb_agg(to_jsonb(oi) order by oi.created_at),'[]'::jsonb) into v_order_items
+    from public.website_order_items oi where oi.order_id in (select id from public.website_orders where invoice_id=p_invoice_id);
+  select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at),'[]'::jsonb) into v_enquiries
+    from public.enquiries e where e.invoice_id=p_invoice_id or e.website_order_id in (select id from public.website_orders where invoice_id=p_invoice_id);
+  v_record_id:=public.archive_deleted_record('invoice',p_invoice_id,coalesce(v_inv->>'invoice_no','Invoice'),
+    jsonb_build_object('invoice',v_inv,'invoice_items',v_items,'payments',v_payments,'website_orders',v_orders,'website_order_items',v_order_items,'enquiries',v_enquiries));
+  delete from public.enquiries where invoice_id=p_invoice_id or website_order_id in (select id from public.website_orders where invoice_id=p_invoice_id);
+  delete from public.website_orders where invoice_id=p_invoice_id;
+  delete from public.invoices where id=p_invoice_id;
+  return v_record_id;
+end;
+$$;
+revoke all on function public.delete_invoice_with_recovery(uuid) from public;
+grant execute on function public.delete_invoice_with_recovery(uuid) to authenticated;
+
+create or replace function public.delete_record_with_recovery(p_entity_type text,p_original_id uuid)
+returns uuid language plpgsql security definer set search_path=public
+as $$
+declare v_row jsonb;v_name text;v_record_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  if p_entity_type='product' then
+    select to_jsonb(p),coalesce(p.name,'Product') into v_row,v_name from public.products p where p.id=p_original_id;
+  elsif p_entity_type='raw_material' then
+    select to_jsonb(r),coalesce(r.name,'Raw material') into v_row,v_name from public.raw_materials r where r.id=p_original_id;
+  elsif p_entity_type='customer' then
+    select to_jsonb(c),coalesce(c.business_name,nullif(c.name,''),'Customer') into v_row,v_name from public.customers c where c.id=p_original_id;
+  elsif p_entity_type='expense' then
+    select to_jsonb(e),coalesce(e.category,'Expense')||' • '||coalesce(to_char(e.expense_date,'DD-MM-YYYY'),'') into v_row,v_name from public.expenses e where e.id=p_original_id;
+  elsif p_entity_type='enquiry' then
+    select to_jsonb(e),coalesce(nullif(e.business,''),nullif(e.name,''),'Enquiry') into v_row,v_name from public.enquiries e where e.id=p_original_id;
+  else raise exception 'Unsupported recovery entity type'; end if;
+  if v_row is null then raise exception 'Record not found'; end if;
+  v_record_id:=public.archive_deleted_record(p_entity_type,p_original_id,v_name,jsonb_build_object('row',v_row));
+  if p_entity_type='customer' then
+    update public.customers set archived_at=coalesce(archived_at,now()),updated_at=now() where id=p_original_id;
+  elsif p_entity_type='product' then
+    delete from public.products where id=p_original_id;
+  elsif p_entity_type='raw_material' then
+    delete from public.raw_materials where id=p_original_id;
+  elsif p_entity_type='expense' then
+    delete from public.expenses where id=p_original_id;
+  elsif p_entity_type='enquiry' then
+    delete from public.enquiries where id=p_original_id;
+  end if;
+  return v_record_id;
+end;
+$$;
+revoke all on function public.delete_record_with_recovery(text,uuid) from public;
+grant execute on function public.delete_record_with_recovery(text,uuid) to authenticated;
+
+create or replace function public.restore_deleted_record(p_deleted_id uuid)
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare r public.deleted_records%rowtype;v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Manager approval required'; end if;
+  select * into r from public.deleted_records where id=p_deleted_id for update;
+  if r.id is null then raise exception 'Recovery record not found'; end if;
+  if r.status<>'Deleted' then raise exception 'This record has already been restored or purged'; end if;
+  if r.purge_at<=now() then raise exception 'Recovery window has expired'; end if;
+
+  if r.entity_type='invoice' then
+    insert into public.invoices select * from jsonb_populate_record(null::public.invoices,r.snapshot->'invoice') returning id into v_id;
+    insert into public.invoice_items select * from jsonb_populate_recordset(null::public.invoice_items,r.snapshot->'invoice_items');
+    insert into public.payments select * from jsonb_populate_recordset(null::public.payments,r.snapshot->'payments');
+    insert into public.website_orders select * from jsonb_populate_recordset(null::public.website_orders,r.snapshot->'website_orders');
+    insert into public.website_order_items select * from jsonb_populate_recordset(null::public.website_order_items,r.snapshot->'website_order_items');
+    insert into public.enquiries select * from jsonb_populate_recordset(null::public.enquiries,r.snapshot->'enquiries');
+  elsif r.entity_type='product' then
+    insert into public.products select * from jsonb_populate_record(null::public.products,r.snapshot->'row') returning id into v_id;
+  elsif r.entity_type='raw_material' then
+    insert into public.raw_materials select * from jsonb_populate_record(null::public.raw_materials,r.snapshot->'row') returning id into v_id;
+  elsif r.entity_type='customer' then
+    update public.customers set archived_at=null,updated_at=now() where id=(r.snapshot->'row'->>'id')::uuid returning id into v_id;
+    if v_id is null then insert into public.customers select * from jsonb_populate_record(null::public.customers,r.snapshot->'row') returning id into v_id; end if;
+  elsif r.entity_type='expense' then
+    insert into public.expenses select * from jsonb_populate_record(null::public.expenses,r.snapshot->'row') returning id into v_id;
+  elsif r.entity_type='enquiry' then
+    insert into public.enquiries select * from jsonb_populate_record(null::public.enquiries,r.snapshot->'row') returning id into v_id;
+  else raise exception 'Unsupported recovery entity type'; end if;
+
+  update public.deleted_records set status='Restored',restored_at=now(),restored_by=auth.uid() where id=r.id;
+  insert into public.audit_logs(actor_user_id,actor_type,event_type,module,action,target_table,target_id,metadata)
+  values(auth.uid(),'admin','RECOVERY_RESTORED','recovery','restore',r.entity_type,v_id,jsonb_build_object('deleted_record_id',r.id,'display_name',r.display_name));
+  return jsonb_build_object('status','Restored','deleted_record_id',r.id,'created_id',v_id);
+exception when unique_violation then
+  raise exception 'Restore could not complete because a record with the same unique identifier already exists.';
+end;
+$$;
+revoke all on function public.restore_deleted_record(uuid) from public;
+grant execute on function public.restore_deleted_record(uuid) to authenticated;
+
+create or replace function public.purge_deleted_records()
+returns integer language plpgsql security definer set search_path=public
+as $$
+declare r public.deleted_records%rowtype;n integer:=0;
+begin
+  for r in select * from public.deleted_records where status='Deleted' and purge_at<=now() order by purge_at loop
+    if r.entity_type='customer' then
+      delete from public.customers where id=(r.snapshot->'row'->>'id')::uuid and archived_at is not null;
+    end if;
+    update public.deleted_records set status='Purged' where id=r.id;
+    n:=n+1;
+  end loop;
+  return n;
+end;
+$$;
+revoke all on function public.purge_deleted_records() from public;
+grant execute on function public.purge_deleted_records() to postgres;
