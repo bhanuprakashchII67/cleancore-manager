@@ -854,20 +854,22 @@ function renderQuotations(){
    '<button type="button" class="link view-quotation" data-invoice-id="'+esc(x.id)+'">View / Print</button>'
  ]));
 }
-function renderDashboardPeriods(){
+function renderDashboardPeriods(startValue="",endValue=""){
  const el=$("dashboardPeriods");if(!el)return;
- const now=new Date();now.setHours(23,59,59,999);
- const monday=new Date(now);monday.setHours(0,0,0,0);const offset=(monday.getDay()+6)%7;monday.setDate(monday.getDate()-offset);
+ const now=new Date();const pad=n=>String(n).padStart(2,"0");
+ const todayKey=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+ const defaultStart=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-01";
+ const startValueSafe=startValue||defaultStart,endValueSafe=endValue||todayKey;
+ const start=new Date(startValueSafe+"T00:00:00"),end=new Date(endValueSafe+"T00:00:00");end.setDate(end.getDate()+1);
  const fmt=d=>d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
- const calc=(start,end)=>{const sales=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=start&&new Date(x.created_at)<end);const ex=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=start&&d<end});const salesTotal=sales.reduce((z,x)=>z+Number(x.total||0),0);const gross=sales.reduce((z,x)=>z+Number(x.profit||0),0);const expenseTotal=ex.reduce((z,x)=>z+Number(x.amount||0),0);return [money(salesTotal),money(expenseTotal),money(gross),money(gross-expenseTotal)];};
- let rows=[];for(let n=0;n<4;n++){const st=new Date(monday);st.setDate(st.getDate()+n*7);const en=new Date(st);en.setDate(en.getDate()+7);const v=calc(st,en);rows.push([fmt(st)+" – "+fmt(new Date(en-1)),...v]);}
- const monthStart=new Date(now.getFullYear(),now.getMonth(),1);const monthEnd=new Date(now.getFullYear(),now.getMonth()+1,1);const mv=calc(monthStart,monthEnd);
- const salesN=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=monthStart&&new Date(x.created_at)<monthEnd).reduce((z,x)=>z+Number(x.total||0),0);
- const expN=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=monthStart&&d<monthEnd}).reduce((z,x)=>z+Number(x.amount||0),0);
- const grossN=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=monthStart&&new Date(x.created_at)<monthEnd).reduce((z,x)=>z+Number(x.profit||0),0);
- const netN=grossN-expN;
- const cards='<div class="profit-cards">'+[['Sales',salesN],['Expenses',expN],['Gross Profit',grossN],['Net Profit',netN]].map(([k,v])=>'<div class="profit-card"><span>'+k+'</span><strong>'+money(v)+'</strong><small>'+fmt(monthStart)+' – '+fmt(new Date(monthEnd-1))+'</small></div>').join('')+'</div>';
- el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit</h3><p class="muted">A quick financial view for the current month.</p></div><span class="period-current">'+fmt(monthStart)+' – '+fmt(new Date(monthEnd-1))+'</span></div>'+cards+'<div class="profit-weekly"><h4>Weekly breakdown</h4>'+table(["Week","Sales","Expenses","Gross Profit","Net Profit"],rows)+'</div>';
+ const calc=(st,en)=>{const sales=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=st&&new Date(x.created_at)<en);const ex=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=st&&d<en});const salesTotal=sales.reduce((z,x)=>z+Number(x.total||0),0);const gross=sales.reduce((z,x)=>z+Number(x.profit||0),0);const expenseTotal=ex.reduce((z,x)=>z+Number(x.amount||0),0);return {sales:salesTotal,expenses:expenseTotal,gross,net:gross-expenseTotal};};
+ const v=calc(start,end);
+ const days=Math.ceil((end-start)/86400000);
+ const rows=[];
+ for(let off=0;off<days;off+=7){const st=new Date(start);st.setDate(st.getDate()+off);const en2=new Date(st);en2.setDate(en2.getDate()+Math.min(7,days-off));const w=calc(st,en2);rows.push([fmt(st)+" – "+fmt(new Date(en2-1)),money(w.sales),money(w.expenses),money(w.gross),money(w.net)]);}
+ const cards='<div class="profit-cards">'+[['Sales',v.sales],['Expenses',v.expenses],['Gross Profit',v.gross],['Net Profit',v.net]].map(([name,val])=>'<div class="profit-card"><span>'+name+'</span><strong>'+money(val)+'</strong></div>').join('')+'</div>';
+ el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit of Month</h3><p class="muted">Select the period you want to analyse.</p></div></div><div class="dashboard-date-filter"><label>From<input id="dashboardFromDate" type="date" value="'+startValueSafe+'"></label><span>to</span><label>To<input id="dashboardToDate" type="date" value="'+endValueSafe+'"></label><button type="button" class="btn primary" id="applyDashboardDates">Apply</button></div>'+cards+'<div class="period-selected-label">'+fmt(start)+' – '+fmt(new Date(end-1))+'</div><div class="profit-weekly"><h4>Weekly breakdown</h4>'+table(["Week","Sales","Expenses","Gross Profit","Net Profit"],rows)+'</div>';
+ const apply=$("applyDashboardDates");if(apply)apply.onclick=()=>{const from=$("dashboardFromDate")?.value,to=$("dashboardToDate")?.value;if(!from||!to)return toast("Select both dates.",false);if(from>to)return toast("From date cannot be after To date.",false);renderDashboardPeriods(from,to);};
 }
 function renderAll(section){
  const active=section||document.querySelector(".section.active")?.id||"dashboard";
