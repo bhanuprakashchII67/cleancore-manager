@@ -1110,3 +1110,51 @@ begin
   if v_job_id is not null then perform cron.unschedule(v_job_id); end if;
   perform cron.schedule('cleancore-recovery-purge','0 * * * *','select public.purge_deleted_records();');
 end $$;
+
+
+-- Live Manager alerts for customer-facing website activity.
+create or replace function public.notify_manager_new_website_activity()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_type text; v_subject text; v_body text; v_related uuid;
+begin
+  if tg_table_name='website_orders' then
+    v_type:='Website Order';
+    v_related:=new.id;
+    v_subject:='New website order '||coalesce(new.order_no,'');
+    v_body:='New website order '||coalesce(new.order_no,'')||' for ₹'||to_char(coalesce(new.total,0),'FM999999990.00')||'.';
+  elsif tg_table_name='enquiries' and coalesce(new.source,'')='website' then
+    v_type:='Website Enquiry';
+    v_related:=new.id;
+    v_subject:='New website enquiry from '||coalesce(new.name,'Customer');
+    v_body:='New website enquiry from '||coalesce(new.name,'Customer')||'. Phone: '||coalesce(new.phone,'—')||'. Product: '||coalesce(new.product_name,'—')||'.';
+  else return new;
+  end if;
+  if not exists(select 1 from public.manager_notifications where notification_type=v_type and related_id=v_related) then
+    insert into public.manager_notifications(notification_type,subject,body,related_id)
+    values(v_type,v_subject,v_body,v_related);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists website_orders_manager_notification on public.website_orders;
+create trigger website_orders_manager_notification after insert on public.website_orders
+for each row execute function public.notify_manager_new_website_activity();
+
+drop trigger if exists enquiries_manager_notification on public.enquiries;
+create trigger enquiries_manager_notification after insert on public.enquiries
+for each row execute function public.notify_manager_new_website_activity();
+
+do $$
+begin
+  if not exists(
+    select 1 from pg_publication_tables
+    where pubname='supabase_realtime' and schemaname='public' and tablename='manager_notifications'
+  ) then
+    alter publication supabase_realtime add table public.manager_notifications;
+  end if;
+end $$;
