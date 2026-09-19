@@ -1265,7 +1265,8 @@ begin
     else 'Pending'
   end;
   update public.invoices
-  set delivery_status=v_delivery,
+  set source='Website',
+      delivery_status=v_delivery,
       bill_status=case when new.status='Cancelled' then 'Cancelled'
                        when new.status='Delivered' then 'Completed'
                        else bill_status end
@@ -1364,3 +1365,6 @@ drop policy if exists manager_notification_preferences_own on public.manager_not
 create policy manager_notification_preferences_own on public.manager_notification_preferences for all to authenticated
 using (manager_user_id=(select auth.uid()))
 with check (manager_user_id=(select auth.uid()));
+
+update public.invoices i set source='Website'
+where exists(select 1 from public.website_orders w where w.invoice_id=i.id);
