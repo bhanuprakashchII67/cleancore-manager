@@ -1205,18 +1205,16 @@ function renderErrorLogs(){
  }));
 }
 async function updateErrorStatus(id,status){
- if(status==="Fixed"){
-   const {error}=await db.from("error_logs").delete().eq("id",id);
-   if(error)return toast("Unable to remove fixed error: "+error.message,false,{action:"delete_fixed_error",context:{id}});
-   errorLogs=errorLogs.filter(x=>x.id!==id);
-   renderErrorLogs();
-   toast("Fixed error removed permanently.");
-   return;
+ const row=errorLogs.find(x=>x.id===id);if(!row)return;
+ if(status==="Ignored"){
+   const {error:upsertError}=await db.from("error_fingerprints").upsert({fingerprint:row.fingerprint,reason:"Ignored from Error Finder",disabled_by:user?.id||null,disabled_at:new Date().toISOString()});
+   if(upsertError)return toast("Unable to disable this error: "+upsertError.message,false,{action:"disable_error",context:{id}});
  }
- const {error}=await db.from("error_logs").update({status,resolved_at:null,resolved_by:null}).eq("id",id);
+ const {error}=await db.from("error_logs").update({status,resolved_at:status==="Fixed"?new Date().toISOString():null,resolved_by:status==="Fixed"?(user?.id||null):null}).eq("id",id);
  if(error)return toast("Unable to update error: "+error.message,false,{action:"update_error_status",context:{id,status}});
- const row=errorLogs.find(x=>x.id===id);if(row){row.status=status;row.resolved_at=null;row.resolved_by=null;}
+ row.status=status;row.resolved_at=status==="Fixed"?new Date().toISOString():null;row.resolved_by=status==="Fixed"?(user?.id||null):null;
  renderErrorLogs();
+ toast(status==="Ignored"?"Error disabled. Future occurrences of this exact error will be suppressed.":status==="Fixed"?"Error marked resolved. It remains in history and will not be deleted.":"Error status updated.");
 }
 function formatErrorForCopy(x){
  return ["CleanCore Error Report","Time: "+new Date(x.created_at).toLocaleString("en-IN"),"App: "+(x.app_name||"—"),"Version: "+(x.app_version||"—"),"Page: "+(x.page||"—"),"Action: "+(x.action||"—"),"Error: "+(x.error_name||"Error"),"Message: "+(x.message||"—"),"URL: "+(x.url||"—"),"Stack: "+(x.stack||"—"),"Context: "+JSON.stringify(x.context||{})].join("\n");
@@ -1225,9 +1223,22 @@ document.addEventListener("change",e=>{const s=e.target.closest?.(".error-log-st
 $("testErrorFinder")?.addEventListener("click",async()=>{const ok=await reportClientErrorAndWait(new Error("Error Finder test: intentional diagnostic event."),{action:"error_finder_test",context:{trigger:"Settings > Error Finder > Test Error Finder"}});await loadErrorLogs();toast(ok?"Test error saved to Error Finder.":"Test error queued locally — Supabase logging failed. Check your connection/session.",ok);});
 $("refreshErrorLogs")?.addEventListener("click",()=>loadErrorLogs());
 async function reportClientErrorAndWait(err,meta={}){const e=err instanceof Error?err:new Error(String(err||"Unknown error"));const payload={p_app_name:meta.app_name||"CleanCore Manager",p_app_version:MANAGER_VERSION,p_page:location.pathname.split("/").pop()||"index.html",p_url:location.href,p_action:meta.action||"unhandled_error",p_error_name:e.name||"Error",p_message:String(e.message||e).slice(0,4000),p_stack:String(e.stack||"").slice(0,12000),p_context:{...(meta.context||{}),last_user_action:lastUserAction},p_user_agent:navigator.userAgent};return sendClientError(payload);}
+$("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
+ if(!isAdmin)return;
+ const box=$("errorAiResult");if(box){box.classList.remove("hidden");box.textContent="Analyzing current Manager + customer website errors…";}
+ try{
+   const {data,error}=await db.functions.invoke("error-finder-ai",{body:{limit:60}});
+   if(error)throw error;
+   if(box){box.innerHTML="<strong>AI Error Analysis</strong><pre>"+esc(data?.analysis||"No analysis returned.")+"</pre>";}
+ }catch(err){
+   console.error("Error Finder AI analysis:",err);
+   if(box)box.textContent="AI analysis failed: "+(err?.message||"Unknown error");
+   toast("AI analysis failed. Check the OpenAI key/configuration.",false,{action:"error_finder_ai"});
+ }
+});
 $("clearErrorLogs")?.addEventListener("click",async()=>{
  if(!isAdmin)return;
- if(!confirm("Clear all Error Finder history? This permanently removes the current error records."))return;
+ if(!confirm("Clear all Error Finder history? This removes the current error records, but does not disable recurring errors."))return;
  const {error}=await db.from("error_logs").delete().neq("id","00000000-0000-0000-0000-000000000000");
  if(error){reportClientError(error,{action:"clear_error_logs"});return toast("Unable to clear Error Finder history: "+error.message,false);}
  errorLogs=[];
