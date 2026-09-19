@@ -1160,3 +1160,25 @@ begin
 end $$;
 
 revoke all on function public.notify_manager_new_website_activity() from public;
+
+ 
+-- Manager notification preferences
+create table if not exists public.manager_notification_preferences(
+  manager_user_id uuid primary key references auth.users(id) on delete cascade,
+  notifications_enabled boolean not null default true,
+  sound_enabled boolean not null default true,
+  desktop_enabled boolean not null default false,
+  website_orders boolean not null default true,
+  website_enquiries boolean not null default true,
+  employee_access_requests boolean not null default true,
+  employee_change_requests boolean not null default true,
+  restricted_access_attempts boolean not null default true,
+  low_stock_alerts boolean not null default true,
+  payments_received boolean not null default true,
+  credit_due_alerts boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+alter table public.manager_notification_preferences enable row level security;
+drop policy if exists manager_notification_preferences_own on public.manager_notification_preferences;
+create policy manager_notification_preferences_own on public.manager_notification_preferences
+for all to authenticated using(manager_user_id=auth.uid()) with check(manager_user_id=auth.uid());
