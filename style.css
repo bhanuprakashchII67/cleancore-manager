@@ -462,3 +462,10 @@ dialog .dialog{padding-top:52px}
 .notification-volume-head small{color:#6e8091;line-height:1.35}
 #notifVolumeValue{min-width:48px;text-align:center;padding:5px 9px;border-radius:999px;background:#0b1f33;color:#fff;font-weight:900}
 #notifVolume{width:100%;accent-color:#0b1f33;cursor:pointer}
+
+.payment-status-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem;margin:1rem 0;padding:.85rem;border:1px solid #dbe4ee;border-radius:12px;background:#f7fafc}
+.payment-status-summary>div{display:flex;flex-direction:column;gap:.2rem}
+.payment-status-summary span{font-size:.75rem;color:#66758a}
+.payment-status-summary strong{font-size:.95rem;color:#10243e}
+.salesTable small,.sales-table small{display:block;margin-top:.2rem}
+@media(max-width:700px){.payment-status-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
