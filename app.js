@@ -197,13 +197,33 @@ async function refreshManagerData(){
    if(b){b.disabled=false;b.textContent="↻ Refresh";}
  }
 }
+function refreshPageData(btn){
+ if(!btn)return;
+ const old=btn.textContent;
+ const section=btn.dataset.pageRefresh||"";
+ btn.disabled=true;
+ btn.textContent="↻ Refreshing…";
+ loadAll()
+   .then(async()=>{ if(section)await go(section); toast("Page data refreshed"); })
+   .catch(err=>toast(err?.message||"Refresh failed",false))
+   .finally(()=>{ btn.disabled=false; btn.textContent=old; });
+}
 function bindRefreshControls(){
- const bind=()=>{const b=$("refreshManager");if(!b||b.dataset.bound==="1")return false;
-   b.dataset.bound="1";
-   b.addEventListener("click",refreshManagerData);
-   return true;
+ const bind=()=>{
+   const b=$("refreshManager");
+   if(b&&b.dataset.bound!=="1"){
+     b.dataset.bound="1";
+     b.addEventListener("click",refreshManagerData);
+   }
+   document.querySelectorAll("[data-page-refresh]").forEach(btn=>{
+     if(btn.dataset.bound==="1")return;
+     btn.dataset.bound="1";
+     btn.addEventListener("click",()=>refreshPageData(btn));
+   });
+   return !!b;
  };
- if(!bind())window.addEventListener("load",bind,{once:true});
+ bind();
+ window.addEventListener("load",bind,{once:true});
 }
 function table(h,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return `<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function normalizePhone(v){return String(v||"").replace(/\D/g,"").replace(/^91/,"")}
@@ -1454,24 +1474,23 @@ function getPrintableInvoiceHtml(){
  if(!body)throw new Error("Open a bill before printing.");
  return body;
 }
-let activePrintArea=null;
 function printInvoiceNow(){
  const body=getPrintableInvoiceHtml();
- if(activePrintArea)activePrintArea.remove();
- const area=document.createElement("div");
- area.id="invoicePrintArea";
- area.innerHTML=body;
- document.body.appendChild(area);
- activePrintArea=area;
- document.body.classList.add("printing-invoice");
- const cleanup=()=>{
-   document.body.classList.remove("printing-invoice");
-   window.removeEventListener("afterprint",cleanup);
-   if(activePrintArea){activePrintArea.remove();activePrintArea=null;}
+ const w=window.open("about:blank","_blank","width=900,height=1100");
+ if(!w)throw new Error("Allow pop-ups for CleanCore Manager to print the invoice.");
+ const cssHref=[...document.querySelectorAll('link[rel="stylesheet"]')].find(x=>x.href&&x.href.includes("style.css"))?.href||"style.css";
+ w.document.open();
+ w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>CleanCore Invoice</title><link rel='stylesheet' href='"+String(cssHref).replace(/'/g,"%27")+"'><style>@page{size:A4;margin:10mm}body{margin:0;background:#fff}.invoice-preview{display:block!important;max-width:none!important;width:100%!important}.actions{display:none!important}@media print{html,body{background:#fff!important}.invoice-preview{box-shadow:none!important;border:0!important}}</style></head><body><div id='invoicePrintHost'>"+body+"</div></body></html>");
+ w.document.close();
+ let printed=false;
+ const doPrint=()=>{
+   if(printed||w.closed)return;
+   printed=true;
+   w.focus();
+   setTimeout(()=>w.print(),80);
  };
- window.addEventListener("afterprint",cleanup);
- setTimeout(()=>{window.focus();window.print();},60);
- setTimeout(cleanup,60000);
+ w.addEventListener("load",doPrint,{once:true});
+ setTimeout(doPrint,400);
 }
 $("printInvoice").onclick=e=>{
  e.preventDefault();
@@ -1563,4 +1582,4 @@ async function restoreManagerSession(){
 }
 bindRefreshControls();
 bindWebsiteNotificationUi();
-bootstrapManagerSession();
+restoreManagerSession().catch(err=>console.error('Manager session restore error',err));
