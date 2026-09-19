@@ -1711,7 +1711,7 @@ window.viewInvoice=async id=>{
    const deliveryAddress=inv.delivery_address||"—";
    const metaStatus=isQuotation
      ? "<b>Document Type:</b> Quotation Invoice<br><b>Bill Status:</b> "+esc(inv.bill_status||"Draft")+"<br><b>Delivery:</b> Not applicable<br><b>Payment Status:</b> Not applicable"
-     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Bill Status:</b> "+esc(inv.bill_status||"Confirmed")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Unpaid")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Credit Due:</b> "+money(inv.due_amount)+"<br><b>Delivery:</b> "+esc(inv.delivery_status||"Pending")+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"");
+     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana")+"<br><b>Bill Status:</b> "+esc(inv.bill_status||"Confirmed")+"<br><b>Payment Status:</b> "+esc(inv.payment_status||"Unpaid")+"<br><b>Paid:</b> "+money(inv.paid_amount)+"<br><b>Amount Due:</b> "+money(inv.due_amount)+"<br><b>Delivery:</b> "+esc(inv.delivery_status||"Pending")+(inv.due_date?"<br><b>Due Date:</b> "+isoDate(inv.due_date):"");
    const quoteNote=isQuotation
      ? "<div class='quote-note'><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document is a price quotation and does not record a sale, payment, or stock movement.</div>"
      : "";
@@ -1748,7 +1748,7 @@ function buildCustomerBillMessage(inv,customer,items=[]){
   "GST: "+money(inv.gst_amount||0),
   "Total: "+money(inv.total),
   "Paid: "+money(inv.paid_amount||0),
-  "Credit Due: "+money(inv.due_amount||0),
+  "Amount Due: "+money(inv.due_amount||0),
   "Status: "+(inv.payment_status||"Unpaid"),
   "",
   "CleanCore Chemical & Cleaning",
