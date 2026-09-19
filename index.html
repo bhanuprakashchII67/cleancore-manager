@@ -622,6 +622,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 (function(){
+  if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
   const K="cleancore_manager_cache_reset_420";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
