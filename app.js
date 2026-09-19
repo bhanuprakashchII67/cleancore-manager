@@ -1359,87 +1359,84 @@ $("documentType").onchange=()=>{
 };
 $("billForm").addEventListener("submit",async e=>{
  e.preventDefault();
- const customer=currentBillCustomer();
- if(!customer)return toast("Select an existing customer first. Add the customer in Customers, then create the invoice.",false);
- const name=customer.name||"",business=customer.business_name||"",phone=normalizePhone(customer.phone||""),email=customer.email||"";
- const customerGstin=String(customer.gstin||"").trim().toUpperCase();
- const documentType=$("documentType").value||"SALE";
- const isQuotation=documentType==="QUOTATION";
- const billType=$("billType").value;
- if(!["SALE","QUOTATION"].includes(documentType))return toast("Invalid document type.",false);
- if(!validPhone(phone))return toast("The customer phone number must be exactly 10 digits.",false);
- if(billType==="GST"&&!validGstin(customerGstin))return toast("This customer does not have a valid GSTIN. Add the GSTIN in Customer data first.",false);
- const gstin=billType==="GST"?customerGstin:"";
- const gp=billType==="GST"?(+$("gstPercent").value||0):0;
- if(billType==="GST"&&!(gp>0&&gp<=100))return toast("Enter a valid GST rate for this GST bill.",false);
+ const saveButton=e.submitter||$("saveBillButton");
+ if(saveButton){saveButton.disabled=true;saveButton.dataset.originalText=saveButton.textContent;saveButton.textContent="Generating…";}
+ try{
+   const customer=currentBillCustomer();
+   if(!customer)throw new Error("Select an existing customer first. Add the customer in Customers, then create the bill.");
+   const name=customer.name||"",business=customer.business_name||"",phone=normalizePhone(customer.phone||""),email=customer.email||"";
+   const customerGstin=String(customer.gstin||"").trim().toUpperCase();
+   const documentType=$("documentType").value||"SALE";
+   const isQuotation=documentType==="QUOTATION";
+   const billType=$("billType").value;
+   if(!["SALE","QUOTATION"].includes(documentType))throw new Error("Invalid document type.");
+   if(!validPhone(phone))throw new Error("The customer phone number must be exactly 10 digits.");
+   if(billType==="GST"&&!validGstin(customerGstin))throw new Error("This customer does not have a valid GSTIN. Add the GSTIN in Customer data first.");
+   const gstin=billType==="GST"?customerGstin:"";
+   const gp=billType==="GST"?(+$("gstPercent").value||0):0;
+   if(billType==="GST"&&!(gp>0&&gp<=100))throw new Error("Enter a valid GST rate for this GST bill.");
 
- const items=[...document.querySelectorAll(".line")].map(r=>{
-   const p=products.find(x=>x.id===r.querySelector(".lp").value);
-   return {p,q:+r.querySelector(".lq").value||0,rate:Math.max(0,+r.querySelector(".lr").value||0)};
- }).filter(x=>x.p&&x.q>0);
- if(!items.length)return toast("Add an item",false);
- if(!isQuotation)for(const x of items)if(x.q>x.p.stock)return toast(`${x.p.name}: only ${x.p.stock} cans in stock`,false);
+   const items=[...document.querySelectorAll(".line")].map(r=>{
+     const p=products.find(x=>x.id===r.querySelector(".lp").value);
+     return {p,q:+r.querySelector(".lq").value||0,rate:Math.max(0,+r.querySelector(".lr").value||0)};
+   }).filter(x=>x.p&&x.q>0);
+   if(!items.length)throw new Error("Add at least one item.");
+   if(!isQuotation)for(const x of items)if(x.q>x.p.stock)throw new Error(`${x.p.name}: only ${x.p.stock} cans in stock.`);
 
- const subtotal=items.reduce((a,x)=>a+x.rate*x.q,0);
- const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
- const taxable=subtotal-discount;
- const gst=taxable*gp/100,total=taxable+gst;
- const intraState=gstin?gstin.slice(0,2)==="36":false;
- const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
- const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
- const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
- const profit=items.reduce((a,x)=>a+(x.rate-x.p.cost_price)*x.q,0)-discount;
- const pay=isQuotation?{status:"Quotation",paid:0,due:0,dueDate:null,method:"Quotation"}:paymentState(total);
- const storedProfit=isQuotation?0:profit;
- const stamp=new Date().toISOString().slice(0,10).replaceAll("-","");
- const no=(isQuotation?"QT-":"CC-")+stamp+"-"+String(Date.now()).slice(-5);
+   const subtotal=items.reduce((a,x)=>a+x.rate*x.q,0);
+   const discount=Math.min(subtotal,Math.max(0,+$("discount").value||0));
+   const taxable=subtotal-discount;
+   const gst=taxable*gp/100,total=taxable+gst;
+   const intraState=gstin?gstin.slice(0,2)==="36":false;
+   const cgstPercent=intraState?gp/2:0,cgstAmount=taxable*cgstPercent/100;
+   const sgstPercent=intraState?gp/2:0,sgstAmount=taxable*sgstPercent/100;
+   const igstPercent=(!intraState&&gstin)?gp:0,igstAmount=taxable*igstPercent/100;
+   const profit=items.reduce((a,x)=>a+(x.rate-x.p.cost_price)*x.q,0)-discount;
+   const pay=isQuotation?{status:"Quotation",paid:0,due:0,dueDate:null,method:"Quotation"}:paymentState(total);
+   const storedProfit=isQuotation?0:profit;
+   const stamp=new Date().toISOString().slice(0,10).replaceAll("-","");
+   const no=(isQuotation?"QT-":"CC-")+stamp+"-"+String(Date.now()).slice(-5);
+   const itemPayload=items.map(x=>({product_id:x.p.id,product_name:x.p.name,hsn_code:x.p.hsn_code||"",qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:isQuotation?0:(x.rate-x.p.cost_price)*x.q}));
 
- if(!isAdmin){
-   const payload={
-     invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
-     billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
-     subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit:storedProfit,
-     payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,
-     items:items.map(x=>({product_id:x.p.id,product_name:x.p.name,qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:isQuotation?0:(x.rate-x.p.cost_price)*x.q}))
-   };
-   const ok=await submitChange("billing","invoice_create","invoices",null,payload,isQuotation?"Employee quotation submitted for manager approval":"Employee bill submitted for manager approval");
-   if(ok){$("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();}
-   return;
- }
-
- const inv=await db.from("invoices").insert({
-   invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,customer_business:business,customer_email:email,gstin,
-   billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",
-   subtotal,discount,gst_percent:gp,gst_amount:gst,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,
-   total,profit:storedProfit,payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,
-   bill_status:isQuotation?"Draft":"Confirmed",delivery_status:isQuotation?"Not Applicable":"Pending",source:"Manager"
- }).select().single();
- if(inv.error)return toast(inv.error.message,false);
- if(!isQuotation&&pay.paid>0){
-   const payRow=await db.from("payments").insert({invoice_id:inv.data.id,customer_id:customer.id,amount:pay.paid,payment_date:dateKey(),payment_method:pay.method,notes:"Initial payment"});
-   if(payRow.error)return toast(payRow.error.message,false);
- }
- for(const x of items){
-   const a=await db.from("invoice_items").insert({invoice_id:inv.data.id,product_id:x.p.id,product_name:x.p.name,hsn_code:x.p.hsn_code||"",qty:x.q,unit_price:x.rate,cost_price:x.p.cost_price,line_total:x.rate*x.q,line_profit:isQuotation?0:(x.rate-x.p.cost_price)*x.q});
-   if(a.error)return toast(a.error.message,false);
-   if(!isQuotation){
-     const b=await db.from("products").update({stock:Number(x.p.stock)-x.q}).eq("id",x.p.id);
-     if(b.error)return toast(b.error.message,false);
+   if(!isAdmin){
+     const payload={
+       invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+       billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",subtotal,discount,gst_percent:gp,gst_amount:gst,
+       cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit:storedProfit,
+       payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,items:itemPayload
+     };
+     const ok=await submitChange("billing","invoice_create","invoices",null,payload,isQuotation?"Employee quotation submitted for manager approval":"Employee bill submitted for manager approval");
+     if(ok){
+       $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
+       toast(isQuotation?"Quotation sent for Manager approval.":"Bill sent for Manager approval.");
+     }
+     return;
    }
- }
- const savedInv=inv.data;
- if(isQuotation){
-   toast("Quotation "+no+" saved successfully");
+
+   const invoicePayload={
+     invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+     billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",subtotal,discount,gst_percent:gp,gst_amount:gst,
+     cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,total,profit:storedProfit,
+     paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
+   };
+   const {data,error}=await db.rpc("create_manager_bill",{p_invoice:invoicePayload,p_items:itemPayload});
+   if(error)throw new Error(error.message||"Bill could not be generated.");
+   const billId=data?.id;
+   if(!billId)throw new Error("Bill was not returned by the server. Nothing was marked as generated.");
    await loadAll();
-   rebuildLines();
-   await window.viewInvoice(savedInv.id);
- }else{
-   toast("Invoice "+no+" saved successfully");
-   sendBillToCustomer(savedInv,customer,items);
-   await loadAll();
-   rebuildLines();
+   const savedInv=invoices.find(x=>x.id===billId)||null;
+   $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
+   toast((isQuotation?"Quotation ":"Bill ")+(data.invoice_no||no)+" generated successfully.");
+   if(savedInv){
+     if(isQuotation)await window.viewInvoice(savedInv.id);
+     else sendBillToCustomer(savedInv,customer,items);
+   }
+ }catch(err){
+   console.error("CleanCore bill generation error",err);
+   toast(err?.message||"Bill could not be generated. Nothing was saved.",false);
+ }finally{
+   if(saveButton){saveButton.disabled=false;saveButton.textContent=saveButton.dataset.originalText||"Generate Bill";}
  }
- $("billForm").reset();$("documentType").value="SALE";const paymentBox=document.querySelector(".payment-box");if(paymentBox)paymentBox.classList.remove("hidden");$("lines").innerHTML="";rebuildLines();
 });
 $("salesFrom").onchange=renderSales;$("salesTo").onchange=renderSales;$("clearSalesFilter").onclick=()=>{$("salesFrom").value="";$("salesTo").value="";renderSales()};
 $("addCustomer").onclick=()=>{resetCustomerForm();$("customerDialog").showModal()};
