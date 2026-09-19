@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.13">
+<link rel="stylesheet" href="style.css?v=3.8.14">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -156,15 +156,11 @@
       <label>Discount ₹<input id="discount" type="number" min="0" step="0.01" value="0"></label>
 
       <div class="full payment-box">
-        <div class="panel-head"><b>Payment</b><span id="paymentPreview" class="muted">Select how the money is being collected</span></div>
+        <div class="panel-head"><b>Payment</b><span id="paymentPreview" class="muted">Payment is pending after bill creation</span></div>
         <div class="payment-choice-grid">
-          <label>Payment collection
+          <label>Payment status
             <select id="paymentType">
-              <option value="PENDING">Payment pending — collect later</option>
-              <option value="PAID">Paid now</option>
-              <option value="COD">COD — collect on delivery</option>
-              <option value="CREDIT">Credit — pay later</option>
-              <option value="PART">Part payment</option>
+              <option value="PENDING">Pending — customer has not paid</option>
             </select>
           </label>
           <label id="billPaymentMethodWrap">Payment method
@@ -637,6 +633,6 @@
 <script>
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.2.1",{updateViaCache:"none"}).catch(()=>{}));
 </script>
-<script src="app.js?v=3.8.13"></script>
+<script src="app.js?v=3.8.14"></script>
 </body>
 </html>
