@@ -1827,38 +1827,59 @@ function buildCustomerBillMessage(inv,customer,items=[]){
   "cleancorehyd@gmail.com"
  ].join("\n");
 }
-function sendBillToCustomer(inv,customer,items){
+async function createInvoicePdfFile(inv,customer,items){
+ const host=$("invoicePreview");
+ const previous=host?.innerHTML||"";
+ if(!host)throw new Error("Invoice preview is unavailable.");
+ await window.viewInvoice(inv.id);
+ const preview=host.innerHTML;
+ const pdfLib=window.jspdf?.jsPDF;
+ if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
+ const staging=document.createElement("div");
+ staging.style.position="fixed";staging.style.left="-100000px";staging.style.top="0";staging.style.width="794px";staging.style.background="#fff";
+ staging.innerHTML=preview;document.body.appendChild(staging);
+ try{
+   const pdf=new pdfLib({orientation:"portrait",unit:"pt",format:"a4",compress:true});
+   await pdf.html(staging,{margin:[24,24,24,24],autoPaging:"text",html2canvas:{scale:1,useCORS:true,backgroundColor:"#ffffff"}});
+   const blob=pdf.output("blob");
+   return new File([blob],"CleanCore-"+String(inv.invoice_no||"invoice")+".pdf",{type:"application/pdf"});
+ }finally{staging.remove();host.innerHTML=previous;}
+}
+async function sendBillToCustomer(inv,customer,items){
  const phone=normalizePhone(inv?.customer_phone||customer?.phone||"");
  const msg=buildCustomerBillMessage(inv,customer,items);
  if(!phone){
    toast("Bill saved, but this customer has no valid WhatsApp phone number.",false);
    const n=$("billSendNotice");
-   if(n){
-     n.classList.remove("hidden");
-     n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Add a valid customer phone number to open WhatsApp for this bill.";
-   }
-   const pending=window.__cleancoreBillWhatsAppWindow;
-   window.__cleancoreBillWhatsAppWindow=null;
+   if(n){n.classList.remove("hidden");n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Add a valid customer phone number to open WhatsApp for this bill.";}
+   const pending=window.__cleancoreBillWhatsAppWindow;window.__cleancoreBillWhatsAppWindow=null;
    try{if(pending&&!pending.closed)pending.close();}catch(_){}
    return;
  }
- const encoded=encodeURIComponent(msg);
- const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
- const targetUrl=isMobile
-   ?"https://wa.me/91"+phone+"?text="+encoded
-   :"https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
- let w=window.__cleancoreBillWhatsAppWindow;
- window.__cleancoreBillWhatsAppWindow=null;
+ let pdfFile=null;
+ try{toast("Bill generated. Preparing PDF…");pdfFile=await createInvoicePdfFile(inv,customer,items);}
+ catch(err){console.error("Invoice PDF creation error",err);toast("Bill saved, but the PDF could not be prepared. You can open the bill and use Print / Save PDF.",false);}
+ const encoded=encodeURIComponent(msg),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+ let w=window.__cleancoreBillWhatsAppWindow;window.__cleancoreBillWhatsAppWindow=null;
+ if(pdfFile&&isMobile&&navigator.share&&navigator.canShare){
+   try{
+     if(navigator.canShare({files:[pdfFile]})){
+       if(w&&!w.closed)w.close();
+       await navigator.share({files:[pdfFile],text:msg,title:"CleanCore Invoice "+inv.invoice_no});
+       const n=$("billSendNotice");
+       if(n){n.classList.remove("hidden");n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" PDF is ready to send.</strong> Choose WhatsApp in the share sheet; the PDF is attached.";}
+       return;
+     }
+   }catch(err){if(err?.name==="AbortError")return;console.warn("PDF share failed:",err);}
+ }
+ const targetUrl=isMobile?"https://wa.me/91"+phone+"?text="+encoded:"https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
  if(!w||w.closed)w=window.open(targetUrl,"_blank","noopener,noreferrer");
- else{
-   try{w.location.href=targetUrl;w.focus?.();}catch(_){}
+ else{try{w.location.href=targetUrl;w.focus?.();}catch(_){}}
+ if(pdfFile){
+   const url=URL.createObjectURL(pdfFile),a=document.createElement("a");a.href=url;a.download=pdfFile.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
  }
  const n=$("billSendNotice");
- if(n){
-   n.classList.remove("hidden");
-   const destination=isMobile?"WhatsApp":"WhatsApp Web";
-   n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destination+" opened for customer <b>+91 "+esc(phone)+"</b>. The bill message is ready. The invoice PDF can be opened from Sales → View → Print / Save PDF and attached in that chat.";
- }
+ if(n){n.classList.remove("hidden");const destination=isMobile?"WhatsApp":"WhatsApp Web";n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destination+" opened for customer <b>+91 "+esc(phone)+"</b>. The PDF was downloaded; attach that PDF in the WhatsApp chat and send it.";}
  if(!w)toast("Bill saved, but your browser blocked WhatsApp. Please allow pop-ups for CleanCore Manager.",false);
 }
 function numberToWordsIndian(n){
