@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.33";
+const MANAGER_VERSION="3.8.34";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -845,6 +845,16 @@ function renderQuotations(){
    '<button type="button" class="link view-quotation" data-invoice-id="'+esc(x.id)+'">View / Print</button>'
  ]));
 }
+function renderDashboardPeriods(){
+ const el=$("dashboardPeriods");if(!el)return;
+ const now=new Date();now.setHours(23,59,59,999);
+ const monday=new Date(now);monday.setHours(0,0,0,0);const offset=(monday.getDay()+6)%7;monday.setDate(monday.getDate()-offset);
+ const fmt=d=>d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+ const calc=(start,end)=>{const sales=invoices.filter(x=>isSaleDocument(x)&&new Date(x.created_at)>=start&&new Date(x.created_at)<end);const ex=expenses.filter(x=>{const d=new Date(x.expense_date||x.created_at);return d>=start&&d<end});const salesTotal=sales.reduce((z,x)=>z+Number(x.total||0),0);const gross=sales.reduce((z,x)=>z+Number(x.profit||0),0);const expenseTotal=ex.reduce((z,x)=>z+Number(x.amount||0),0);return [money(salesTotal),money(expenseTotal),money(gross),money(gross-expenseTotal)];};
+ let rows=[];for(let n=0;n<4;n++){const st=new Date(monday);st.setDate(st.getDate()+n*7);const en=new Date(st);en.setDate(en.getDate()+7);const v=calc(st,en);rows.push([fmt(st)+" – "+fmt(new Date(en-1)),...v]);}
+ const monthStart=new Date(now.getFullYear(),now.getMonth(),1);const monthEnd=new Date(now.getFullYear(),now.getMonth()+1,1);const mv=calc(monthStart,monthEnd);
+ el.innerHTML='<div class="dashboard-period-toolbar"><div><h3>Sales, Expenses & Profit</h3><p class="muted">Weekly and monthly figures with dates.</p></div><span class="period-current">'+fmt(monthStart)+' – '+fmt(new Date(monthEnd-1))+'</span></div>'+table(["Period","Sales","Expenses","Gross Profit","Net Profit"],rows)+'<div class="dashboard-period-month"><b>This month</b><span>Sales '+mv[0]+' · Expenses '+mv[1]+' · Gross Profit '+mv[2]+' · Net Profit '+mv[3]+'</span></div>';
+}
 function renderAll(section){
  const active=section||document.querySelector(".section.active")?.id||"dashboard";
  const now=new Date(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mon=new Date(now.getFullYear(),now.getMonth(),1);
@@ -862,7 +872,7 @@ function renderAll(section){
  if($("low"))$("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
 
- if(active==="dashboard"){
+ if(active==="dashboard"){ renderDashboardPeriods();
    if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],paidSales.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.paid_amount||0),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
  }
  if($("investmentFrontTotal"))$("investmentFrontTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
