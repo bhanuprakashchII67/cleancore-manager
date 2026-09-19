@@ -541,3 +541,20 @@ body,input,select,textarea,button{font-family:'Inter',system-ui,-apple-system,'S
 body{background:#f6f8f9;color:#17212b}
 .sidebar,.auth-shell{background:#0b1f33}
 .primary{background:#0b1f33;border-color:#0b1f33}.secondary{background:#e9f7f5;color:#0d746e;border-color:#cfe8e5}
+
+
+/* Final Manager color correction: light background, original readable controls */
+body{background:#f5f8fb!important;color:#122033!important}
+.main{background:#f5f8fb!important}
+.sidebar{background:#071a33!important}
+.auth-shell{background:linear-gradient(135deg,#071a33,#087c83)!important}
+.primary{background:#071a33!important;color:#fff!important;border-color:#071a33!important}
+.secondary{background:#e9fbfb!important;color:#087b7b!important;border-color:#dce5ee!important}
+.btn{background:#fff;color:#122033;border-color:#dce5ee}
+.btn:hover{background:#f8fbfe;color:#122033;border-color:#cbd7e2}
+.nav{color:#c7d6e8}.nav.active,.nav:hover{background:#ffffff12;color:#fff}
+.metric,.panel,.chip,.auth-card,dialog,.investment-modal-card{background:#fff!important;color:#122033!important;border-color:#dce5ee!important}
+input,select,textarea{background:#fff!important;color:#122033!important;border-color:#dce5ee!important}
+.link{color:#087f8f!important}
+.metric strong,.profit-card strong,.investment-summary strong,.investment-front-box strong{color:#0b2039!important}
+.top{background:transparent!important}
