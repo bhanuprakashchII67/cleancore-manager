@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.24";
+const MANAGER_VERSION="3.8.25";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -621,7 +621,7 @@ function scanOperationalNotifications(){
 async function loadAll(){
  const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("id,name,unit,selling_price,cost_price,stock,low_stock_threshold,description,additional_details,image_urls,video_urls,hsn_code").order("name"):null;
  const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source").order("created_at",{ascending:false}):null;
- const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("id,name,phone,gstin,created_at,business_name,email,billing_address,delivery_address,updated_at,auth_user_id,alternate_phone,archived_at,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode").is("archived_at",null).order("name"):null;
+ const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("id,name,phone,gstin,created_at,business_name,email,customer_source,billing_address,delivery_address,updated_at,auth_user_id,alternate_phone,archived_at,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode").is("archived_at",null).order("name"):null;
  const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250):null;
  const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("id,name,unit,cost_per_unit,stock,low_stock_threshold,created_at,updated_at").order("name"):null;
  const qX=(isAdmin||canAccess("expenses"))?db.from("expenses").select("id,expense_date,category,amount,vendor,payment_method,notes,raw_material_id,quantity,unit_cost,created_at,updated_at").order("expense_date",{ascending:false}).order("created_at",{ascending:false}).limit(1000):null;
