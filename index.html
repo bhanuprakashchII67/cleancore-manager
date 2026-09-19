@@ -671,7 +671,7 @@
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
-  const K="cleancore_manager_cache_reset_440";
+  const K="cleancore_manager_cache_reset_441";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
@@ -682,10 +682,10 @@
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.4.0",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.4.1",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.50"></script>
+<script src="app.js?v=3.8.50-refresh1"></script>
 </body>
 </html>
