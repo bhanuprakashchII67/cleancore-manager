@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.27";
+const MANAGER_VERSION="3.8.30";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1231,9 +1231,10 @@ function renderSales(){
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  $("salesSummary").textContent=list.length+" bill"+(list.length===1?"":"s")+" • "+money(list.reduce((a,x)=>a+Number(x.total),0))+" sales";
- $("salesTable").innerHTML=table(["Invoice","Customer","Total","Payment","Due","Payment Method","Delivery","Date","Action"],list.map(x=>[
+ $("salesTable").innerHTML=table(["Invoice","Customer","Total","Payment","Due","Payment Method","Sale From","Delivery","Date","Action"],list.map(x=>[
   esc(x.invoice_no),esc(x.customer_name),money(x.total),
   paymentStatusBadge(x.payment_status),money(x.due_amount),x.payment_method?esc(x.payment_method):"<span class=\"muted\">Pending</span>",
+  "<span class=\"badge "+(x.source==="Website"?"ok":"")+"\">"+esc(x.source||"Offline")+"</span>",
   deliveryStatusBadge(x.delivery_status),new Date(x.created_at).toLocaleString("en-IN"),
   '<button type="button" class="link view-bill" data-invoice-id="'+esc(x.id)+'">View</button> <button type="button" class="link" onclick="openInvoiceStatus(\''+x.id+'\')">Update status</button> <button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>'
  ]));
@@ -1673,6 +1674,7 @@ $("clearBill").onclick=()=>{
  $("billingCustomer").value="";
  $("documentType").value="SALE";
  $("billType").value="NON_GST";
+ $("billSource").value="Offline";
  const paymentBox=document.querySelector(".payment-box"); if(paymentBox)paymentBox.classList.remove("hidden");
  $("paymentType").value="PENDING";
  $("billPaymentMethod").value="Cash";
@@ -1739,7 +1741,7 @@ $("billForm").addEventListener("submit",async e=>{
 
    if(!isAdmin){
      const payload={
-       invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+       invoice_no:no,document_type:documentType,source:$("billSource").value||"Offline",customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
        billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",subtotal,discount,gst_percent:gp,gst_amount:gst,
        cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit:storedProfit,
        payment_status:pay.status,paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method,items:itemPayload
@@ -1753,7 +1755,7 @@ $("billForm").addEventListener("submit",async e=>{
    }
 
    const invoicePayload={
-     invoice_no:no,document_type:documentType,customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
+     invoice_no:no,document_type:documentType,source:$("billSource").value||"Offline",customer_id:customer.id,customer_name:name,customer_phone:phone,gstin,customer_business:business,customer_email:email,
      billing_address:customer.billing_address||"",delivery_address:customer.delivery_address||"",subtotal,discount,gst_percent:gp,gst_amount:gst,
      cgst_percent:cgstPercent,cgst_amount:cgstAmount,sgst_percent:sgstPercent,sgst_amount:sgstAmount,igst_percent:igstPercent,igst_amount:igstAmount,total,profit:storedProfit,
      paid_amount:pay.paid,due_amount:pay.due,due_date:pay.dueDate,payment_method:pay.method
@@ -1911,8 +1913,8 @@ $("export").onclick=()=>{
  if(to){const d=new Date(to+"T23:59:59");list=list.filter(x=>new Date(x.created_at)<=d)}
  if(from&&to&&from>to)return toast("From date cannot be after To date.",false);
  if(!list.length)return toast("No sales found in the selected date range.",false);
- const rows=[["Invoice","Customer","Phone","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],
- ...list.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Unpaid",x.due_date||"",new Date(x.created_at).toLocaleString("en-IN")])];
+ const rows=[["Invoice","Customer","Phone","Sale From","Subtotal","Discount","GST %","GST Amount","Total","Profit","Paid","Credit","Payment Status","Due Date","Date"],
+ ...list.map(x=>[x.invoice_no,x.customer_name,x.customer_phone,x.source||"Offline",x.subtotal,x.discount,x.gst_percent||0,x.gst_amount||0,x.total,x.profit,x.paid_amount||0,x.due_amount||0,x.payment_status||"Unpaid",x.due_date||"",new Date(x.created_at).toLocaleString("en-IN")])];
  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
  const suffix=from&&to?`-${from}-to-${to}`:from?`-from-${from}`:to?`-to-${to}`:"-all-dates";
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`cleancore-sales${suffix}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
