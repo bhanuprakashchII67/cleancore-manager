@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.21";
+const MANAGER_VERSION="3.8.20";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -132,9 +132,25 @@ function bindNotificationSettings(){
  $("testNotificationSoundSettings")?.addEventListener("click",async()=>{unlockNotificationAudio();await playNotificationSound();toast("Notification sound tested");});
 }
 async function maybeBrowserNotify(n,pref){
- if(!notificationAllowed(pref)||notificationPreferences.desktop_enabled!==true)return;
+ if(!notificationAllowed(pref))return;
  if(!("Notification" in window)||Notification.permission!=="granted")return;
- try{new Notification(n?.subject||"CleanCore Manager alert",{body:n?.body||"",icon:"icon-192.svg",tag:n?.id||pref});}catch(e){}
+ try{
+  new Notification(n?.subject||"CleanCore Manager alert",{
+   body:n?.body||"",
+   icon:"icon-192.svg",
+   badge:"icon-192.svg",
+   tag:n?.id||pref,
+   renotify:true,
+   vibrate:[120,70,120]
+  });
+ }catch(e){console.warn("Browser notification failed",e);}
+}
+
+async function ensureManagerNotificationPermission(){
+ if(!("Notification" in window))return false;
+ if(Notification.permission==="granted")return true;
+ if(Notification.permission==="denied")return false;
+ try{return (await Notification.requestPermission())==="granted";}catch(e){return false;}
 }
 function notificationStoreKey(type){return "cleancore_manager_notifications_"+type+"_"+(user?.id||"guest")}
 function isWebsiteManagerNotification(n){return n&&["Website Order","Website Enquiry"].includes(n.notification_type)}
