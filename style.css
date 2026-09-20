@@ -860,3 +860,13 @@ input,select,textarea{background:#fff!important;color:#122033!important;border-c
 .error-ai-result.hidden{display:none}
 .error-log-message{display:block}
 @media(max-width:768px){.error-ai-result{padding:10px;font-size:11px}.error-ai-result pre{font-size:10px}.error-finder-panel .panel-head .actions{width:100%;flex-wrap:wrap}.error-finder-panel .panel-head .actions .btn{flex:1 1 120px}}
+
+
+/* Shared customer website channel settings */
+.website-channel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.channel-card{border:1px solid rgba(120,150,180,.22);border-radius:16px;padding:1rem;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.02));box-shadow:0 12px 30px rgba(0,0,0,.12)}
+.channel-card-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.5rem}
+.channel-card .btn{display:inline-flex;margin-top:.5rem;text-decoration:none}
+.website-shared-features{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+.website-shared-features span{padding:.45rem .7rem;border-radius:999px;background:rgba(40,180,120,.09);border:1px solid rgba(40,180,120,.18);font-size:.82rem}
+@media(max-width:700px){.website-channel-grid{grid-template-columns:1fr}}
