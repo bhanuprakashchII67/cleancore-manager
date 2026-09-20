@@ -1022,7 +1022,7 @@ function renderRecovery(){
      formatAccessDate(r.deleted_at),
      formatAccessDate(r.purge_at),
      days+" day"+(days===1?"":"s"),
-     "<button type='button' class='link' onclick=\"viewDeletedRecord('"+r.id+"')\">View Details</button> <button type='button' class='link' onclick=\"restoreDeletedRecord('"+r.id+"')\">Restore</button>"
+     "<button type='button' class='link' onclick=\"viewDeletedRecord('"+r.id+"')\">View Details</button> <button type='button' class='link' onclick=\"restoreDeletedRecord('"+r.id+"')\">Restore</button> <button type='button' class='link danger' onclick=\"permanentlyDeleteRecovery('"+r.id+"')\">Permanently Delete</button>"
    ];
  });
  $("recoveryTable").innerHTML=table(["Type","Record","Deleted","Auto-delete","Time left","Action"],rows);
@@ -1076,6 +1076,17 @@ window.viewDeletedRecord=function(id){
  $("deletedRecordTitle").textContent=recoveryRecordLabel(r)+" — Recovery Details";
  $("deletedRecordDetails").innerHTML=html;
  $("deletedRecordDialog").showModal();
+};
+window.permanentlyDeleteRecovery=async id=>{
+ if(!isAdmin)return;
+ const rec=deletedRecords.find(x=>x.id===id);if(!rec)return;
+ if(rec.status && rec.status!=="Deleted")return toast("This record is already removed from Recovery.",false);
+ const label=recoveryRecordLabel(rec);
+ if(!confirm("Permanently delete "+label+"? This cannot be undone and the record will be removed from Recovery permanently."))return;
+ const {data,error}=await db.rpc("permanently_delete_recovery_record",{p_deleted_id:id});
+ if(error)return toast(error.message||"Permanent delete failed.",false);
+ toast("Permanently deleted from Recovery");
+ await loadAll();
 };
 window.restoreDeletedRecord=async id=>{
  if(!isAdmin)return;
