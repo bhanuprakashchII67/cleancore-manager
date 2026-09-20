@@ -981,7 +981,7 @@ function renderAll(section){
  if(active==="expenses")renderExpenses();
  if(active==="settings"){loadErrorLogs();if(!errorFinderRefreshTimer)errorFinderRefreshTimer=setInterval(()=>{if(active==="settings")loadErrorLogs();},10000);}else if(errorFinderRefreshTimer){clearInterval(errorFinderRefreshTimer);errorFinderRefreshTimer=null;}
  if(active==="customers")renderCustomers();
- if(active==="website_orders")renderWebsiteOrders();
+ if(active==="website_orders"||active==="enquiries")renderWebsiteOrders();
  if(active==="enquiries"){
    $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
  }
