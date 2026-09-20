@@ -62,9 +62,21 @@ async function registerManagerPush(){
  try{
    const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
    if(permission!=="granted"){toast("Push notification permission was not granted.",false);return false;}
-   const reg=await navigator.serviceWorker.ready;
+   const reg=await navigator.serviceWorker.register("sw.js?v=4.4.2",{updateViaCache:"none"});
+   await reg.update().catch(()=>{});
    let sub=await reg.pushManager.getSubscription();
-   if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushBase64ToBytes(PUSH_VAPID_PUBLIC)});
+   if(!sub){
+     const subscribeOptions={userVisibleOnly:true,applicationServerKey:pushBase64ToBytes(PUSH_VAPID_PUBLIC)};
+     try{
+       sub=await reg.pushManager.subscribe(subscribeOptions);
+     }catch(firstErr){
+       const retryable=firstErr?.name==="AbortError" || /push service error/i.test(String(firstErr?.message||""));
+       if(!retryable)throw firstErr;
+       await new Promise(resolve=>setTimeout(resolve,800));
+       await reg.update().catch(()=>{});
+       sub=await reg.pushManager.subscribe(subscribeOptions);
+     }
+   }
    const {data:{session}}=await db.auth.getSession();
    if(!session?.access_token)throw new Error("Manager session is not available.");
    const {error}=await db.functions.invoke("manager-push",{body:{action:"subscribe",subscription:sub.toJSON(),user_agent:navigator.userAgent}});
@@ -74,8 +86,12 @@ async function registerManagerPush(){
    return true;
  }catch(err){
    console.error("Push subscription error",err);
-   reportClientError(err,{action:"enable_push_notifications"});
-   toast(err?.message||"Unable to enable push notifications.",false);
+   reportClientError(err,{action:"enable_push_notifications",context:{browser: navigator.userAgent,permission:("Notification" in window)?Notification.permission:"unsupported"}});
+   const message=err?.name==="AbortError"
+     ?"Browser push service is unavailable on this device right now. Your Manager in-app notifications will still work."
+     :(err?.message||"Unable to enable push notifications.");
+   const st=$("notificationSettingsStatus");if(st)st.textContent=message;
+   toast(message,false);
    return false;
  }
 }
@@ -302,16 +318,19 @@ function stopWebsiteNotifications(){
 async function startWebsiteNotifications(){
  stopWebsiteNotifications();
  if(!isAdmin)return;
- await ensureManagerNotificationPermission();
- if(Notification.permission==="granted" && notificationPreferences.notifications_enabled!==false){
-   await registerManagerPushForCurrentUser().catch(()=>false);
- }
+ // Push subscription must be started from an explicit user action (Settings → Enable Push Notifications).
+ // Keep the in-app/realtime notification path independent so it still works without OS push.
  await loadWebsiteNotifications(true);
  notificationChannel=db.channel("cleancore-manager-website-alerts")
    .on("postgres_changes",{event:"INSERT",schema:"public",table:"manager_notifications"},payload=>{
      if(isWebsiteManagerNotification(payload.new))announceWebsiteNotification(payload.new);
    })
-   .subscribe();
+   .subscribe((status,err)=>{
+     if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"){
+       console.warn("Manager realtime notification channel:",status,err?.message||"");
+       reportClientError(new Error("Manager realtime notification channel "+status),{action:"manager_notification_realtime",context:{status,error:String(err?.message||"")}});
+     }
+   });
  notificationPollTimer=setInterval(()=>loadWebsiteNotifications(false),60000);
 }
 document.getElementById("testNotificationSound")?.addEventListener("click",async e=>{
