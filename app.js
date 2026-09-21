@@ -969,7 +969,6 @@ function renderAll(section){
      Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
      '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
    ]));
-   $("investmentTable").innerHTML=table(["Date","Amount","Notes",""],investments.map(x=>[isoDate(x.investment_date),money(x.amount),esc(x.notes||"—"),"<button type='button' class='link danger' onclick=\"deleteInvestment('"+x.id+"')\">Delete</button>"]));
    $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
      esc(r.name),esc(r.unit),money(r.cost_per_unit),r.stock,
      Number(r.stock)<=Number(r.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
