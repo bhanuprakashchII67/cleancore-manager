@@ -1282,7 +1282,8 @@ $("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
    const {data:{session}}=await db.auth.getSession();
    const token=session?.access_token;
    if(!token)throw new Error("Your Manager session has expired. Sign in again.");
-   const resp=await fetch(SUPABASE_URL+"/functions/v1/error-finder-ai",{method:"POST",headers:{"Authorization":"Bearer "+token,"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({limit:100})});
+   const btn=$("analyzeErrorsWithAI");if(btn)btn.disabled=true;
+    const resp=await fetch(SUPABASE_URL+"/functions/v1/error-finder-ai",{method:"POST",headers:{"Authorization":"Bearer "+token,"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({limit:30})});
    const raw=await resp.text();
    let data={};try{data=JSON.parse(raw);}catch{}
    if(!resp.ok)throw new Error(data?.error||data?.message||("Edge Function HTTP "+resp.status+": "+raw.slice(0,500)));
