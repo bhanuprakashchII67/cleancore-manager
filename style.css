@@ -870,3 +870,7 @@ input,select,textarea{background:#fff!important;color:#122033!important;border-c
 .website-shared-features{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
 .website-shared-features span{padding:.45rem .7rem;border-radius:999px;background:rgba(40,180,120,.09);border:1px solid rgba(40,180,120,.18);font-size:.82rem}
 @media(max-width:700px){.website-channel-grid{grid-template-columns:1fr}}
+
+/* Restore browser page-level vertical scrolling */
+html{overflow-y:auto!important}
+body{overflow-x:hidden;overflow-y:visible!important}
