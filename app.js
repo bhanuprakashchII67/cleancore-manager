@@ -1287,7 +1287,7 @@ $("analyzeErrorsWithAI")?.addEventListener("click",async()=>{
    const raw=await resp.text();
    let data={};try{data=JSON.parse(raw);}catch{}
    if(!resp.ok)throw new Error(data?.error||data?.message||("Edge Function HTTP "+resp.status+": "+raw.slice(0,500)));
-   if(box){box.innerHTML="<strong>AI Error Analysis</strong><pre>"+esc(data?.analysis||"No analysis returned.")+"</pre>";}
+   if(box){const files=Array.isArray(data?.source_files)&&data.source_files.length?"\n\nSource files inspected:\n"+data.source_files.map(x=>"• "+x).join("\n"):"";box.innerHTML="<strong>AI Error Analysis</strong><pre>"+esc((data?.analysis||"No analysis returned.")+files)+"</pre>";}
    await loadErrorLogs();
  }catch(err){
    console.error("Error Finder AI analysis:",err);
