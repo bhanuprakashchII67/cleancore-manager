@@ -719,6 +719,60 @@ html body dialog#productDialog::-webkit-scrollbar-thumb:hover{
   background:#56636e !important;
 }
 </style>
+<style id="product-popup-smaller-v1">
+/* Product Edit popup ONLY: reduce overall modal footprint */
+html body dialog#productDialog{
+  width:min(560px,calc(100vw - 28px)) !important;
+  max-width:560px !important;
+  max-height:82vh !important;
+  border-radius:20px !important;
+}
+html body dialog#productDialog>.dialog{
+  padding:0 24px 20px !important;
+}
+html body dialog#productDialog .dialog>h3{
+  margin:0 -24px 18px !important;
+  padding:20px 68px 17px 24px !important;
+  font-size:22px !important;
+}
+html body dialog#productDialog .dialog>label{
+  margin-bottom:12px !important;
+}
+html body dialog#productDialog .dialog>label>input,
+html body dialog#productDialog .dialog>label>select{
+  min-height:42px !important;
+}
+html body dialog#productDialog .product-price-grid{
+  padding:12px !important;
+  gap:10px 14px !important;
+  margin:2px 0 12px !important;
+}
+html body dialog#productDialog .product-price-grid input{
+  min-height:42px !important;
+}
+html body dialog#productDialog .actions{
+  margin:14px -24px -20px !important;
+  padding:11px 24px !important;
+}
+@media(max-width:680px){
+  html body dialog#productDialog{
+    width:calc(100vw - 18px) !important;
+    max-height:88vh !important;
+  }
+  html body dialog#productDialog>.dialog{
+    padding:0 16px 16px !important;
+  }
+  html body dialog#productDialog .dialog>h3{
+    margin:0 -16px 16px !important;
+    padding:18px 58px 15px 16px !important;
+    font-size:20px !important;
+  }
+  html body dialog#productDialog .actions{
+    margin:12px -16px -16px !important;
+    padding:10px 16px !important;
+  }
+}
+</style>
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
