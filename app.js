@@ -1,4 +1,4 @@
-const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com", BUSINESS_ADDRESS="Srinivasa Colony, Manikonda, Srinivasa Colony, Manikonda, Hyderabad, Telangana, India, India";
+const SUPABASE_URL="https://rwfamxkfqslorxcryjrp.supabase.co", SUPABASE_PUBLISHABLE_KEY="sb_publishable_tzfe2xVn6OAwF-Mh5_u_zQ_a_bAW7tO"; const BUSINESS_EMAIL="cleancorehyd@gmail.com", BUSINESS_ADDRESS="Srinivasa Colony, Manikonda, Hyderabad, Telangana, India";
 const {createClient}=window.supabase||{};
 if(typeof createClient!=="function")throw new Error("Supabase client library did not load. Please check your internet connection and reload.");
 const db=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
