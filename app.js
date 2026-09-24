@@ -958,7 +958,7 @@ function renderAll(section){
  if($("netProfit"))$("netProfit").textContent=money(grossMonth-monthExpenses);
  if($("low"))$("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
- const stockValueTotal=products.reduce((sum,p)=>sum+(Number(p.stock||0)*Number(p.selling_price||0)),0);
+ const stockValueTotal=products.reduce((sum,p)=>sum+(Number(p.stock||0)*Number(p.final_selling_price||0)),0);
  if($("stockValueTotal"))$("stockValueTotal").textContent=money(stockValueTotal);
 
  if(active==="dashboard"){ bindDashboardMetricLinks(); renderDashboardPeriods();
