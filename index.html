@@ -695,6 +695,30 @@
 #productDialog::-webkit-scrollbar-thumb{background:#8d9aa6;border-radius:8px;border:2px solid #eef2f5}
 #productDialog::-webkit-scrollbar-thumb:hover{background:#687784}
 </style>
+<style id="product-popup-scrollbar-force-v2">
+/* Product Edit popup: force a visible internal vertical scrollbar */
+html body dialog#productDialog{
+  overflow-y:scroll !important;
+  overflow-x:hidden !important;
+  scrollbar-width:auto !important;
+  scrollbar-color:#6f7d88 #e9eef2 !important;
+}
+html body dialog#productDialog::-webkit-scrollbar{
+  width:12px !important;
+  display:block !important;
+}
+html body dialog#productDialog::-webkit-scrollbar-track{
+  background:#e9eef2 !important;
+}
+html body dialog#productDialog::-webkit-scrollbar-thumb{
+  background:#7b8791 !important;
+  border-radius:8px !important;
+  border:2px solid #e9eef2 !important;
+}
+html body dialog#productDialog::-webkit-scrollbar-thumb:hover{
+  background:#56636e !important;
+}
+</style>
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
