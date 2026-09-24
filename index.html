@@ -642,6 +642,46 @@
   #productDialog .actions .btn{width:100% !important}
 }
 </style>
+<style id="product-popup-compact-fields-v1">
+/* Product popup: compact numeric fields only */
+#productDialog .dialog>label:has(#pstock),
+#productDialog .dialog>label:has(#plow){
+  margin:0 !important;
+}
+#productDialog .dialog>label:has(#pstock) > input,
+#productDialog .dialog>label:has(#plow) > input{
+  min-height:46px !important;
+}
+#productDialog .dialog{
+  display:block;
+}
+#productDialog .dialog>label:has(#pstock){
+  display:grid;
+  width:calc(50% - 9px);
+  float:left;
+  margin-right:18px !important;
+}
+#productDialog .dialog>label:has(#plow){
+  display:grid;
+  width:calc(50% - 9px);
+  float:left;
+}
+#productDialog #pstock,
+#productDialog #plow{
+  width:100% !important;
+}
+#productDialog .dialog>label:has(#plow) + label{
+  clear:both;
+}
+@media(max-width:680px){
+  #productDialog .dialog>label:has(#pstock),
+  #productDialog .dialog>label:has(#plow){
+    width:100%;
+    float:none;
+    margin:0 0 14px !important;
+  }
+}
+</style>
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
