@@ -1614,14 +1614,16 @@ if($("investmentDialog"))$("investmentDialog").addEventListener("click",e=>{if(e
 if($("investmentForm"))$("investmentForm").addEventListener("submit",e=>{e.preventDefault();addInvestment()});
 function resetProductForm(){
  editingProductId=null;
- ["pname","punit","phsn","productMrpInput","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
- $("finalSellingCost").value="";$("plow").value=5;$("pimages").value="";$("pvideos").value="";
+ ["pname","punit","phsn","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
+ $("productMrpInput").value="";
+ $("finalSellingCost").value="";
+ $("plow").value=5;$("pimages").value="";$("pvideos").value="";
  $("productMedia").innerHTML="";$("productDialogTitle").textContent="Add New Product";
 }
 $("addProduct").onclick=()=>{resetProductForm();$("productDialog").showModal()};
 window.editProduct=id=>{
  const p=products.find(x=>x.id===id);if(!p)return;editingProductId=id;
- $("pname").value=p.name||"";$("punit").value=p.unit||"";$("phsn").value=p.hsn_code||"";$("finalSellingCost").value=p.selling_price??"";$("productMrpInput").value=p.cost_price??"";$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
+ $("pname").value=p.name||"";$("punit").value=p.unit||"";$("phsn").value=p.hsn_code||"";$("productMrpInput").value=p.mrp??p.cost_price??"";$("finalSellingCost").value=p.selling_price??"";$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
  $("pdesc").value=p.description||"";$("pdetails").value=p.additional_details||"";$("pimages").value="";$("pvideos").value="";
  $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);$("productDialog").showModal()
 }
