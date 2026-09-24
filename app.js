@@ -968,7 +968,7 @@ function renderAll(section){
  if(active==="products"){
    $("productsTable").innerHTML=table(["Product","Unit","MRP","Selling","Final Selling Price","Stock","Status","Action"],products.map(p=>[
      esc(p.name),esc(p.unit),money(p.mrp),money(p.selling_price),money(p.final_selling_price),p.stock,
-     Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
+     Number(p.stock)===0?'<span class="badge danger">Low</span>':(Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>'),
      '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
    ]));
    $("rawTable").innerHTML=table(["Raw material","Unit","Cost / unit","Stock","Status","Action"],rawMaterials.map(r=>[
