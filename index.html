@@ -682,6 +682,19 @@
   }
 }
 </style>
+<style id="product-popup-scrollbar-fix-v1">
+/* Product popup: keep the internal right-side scrollbar */
+#productDialog{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  scrollbar-width:auto !important;
+  scrollbar-color:#8d9aa6 #eef2f5 !important;
+}
+#productDialog::-webkit-scrollbar{width:11px}
+#productDialog::-webkit-scrollbar-track{background:#eef2f5;border-radius:0 26px 26px 0}
+#productDialog::-webkit-scrollbar-thumb{background:#8d9aa6;border-radius:8px;border:2px solid #eef2f5}
+#productDialog::-webkit-scrollbar-thumb:hover{background:#687784}
+</style>
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
