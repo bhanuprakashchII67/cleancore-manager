@@ -1699,7 +1699,10 @@ window.removeProductMedia=async(id,type,encoded)=>{
 }
 function cleanMoneyInput(el){if(!el)return;el.addEventListener("input",()=>{const raw=String(el.value||"");const cleaned=raw.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1");if(el.value!==cleaned)el.value=cleaned;});}
 cleanMoneyInput($("productMrpInput"));
+cleanMoneyInput($("sellingPriceInput"));
 cleanMoneyInput($("finalSellingCost"));
+cleanMoneyInput($("pstock"));
+cleanMoneyInput($("plow"));
 $("productForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const name=$("pname").value.trim(),unit=$("punit").value.trim(),mrp=+$("productMrpInput").value,price=+$("sellingPriceInput").value,finalPrice=+$("finalSellingCost").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
@@ -1716,7 +1719,7 @@ $("productForm").addEventListener("submit",async e=>{
   if($("pimages").files.length)image_urls=image_urls.concat(await uploadFiles($("pimages").files,"images"));
   if($("pvideos").files.length)video_urls=video_urls.concat(await uploadFiles($("pvideos").files,"videos"));
  }catch(err){return toast("Media upload failed: "+err.message,false)}
- const x={name,unit:$("punit").value.trim(),hsn_code:hsn,selling_price:price,cost_price:mrp,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
+ const x={name,unit:$("punit").value.trim(),hsn_code:hsn,mrp,selling_price:price,final_selling_price:finalPrice,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
  const q=editingProductId?db.from("products").update(x).eq("id",editingProductId):db.from("products").insert(x);
  const {error}=await q;if(error)return toast(error.message,false);$("productDialog").close();toast("Product saved");loadAll();
 });
