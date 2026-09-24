@@ -773,6 +773,47 @@ html body dialog#productDialog .actions{
   }
 }
 </style>
+<style id="product-popup-compact-height-v2">
+/* Product Edit popup ONLY: reduce vertical footprint */
+html body dialog#productDialog{
+  max-height:70vh !important;
+}
+html body dialog#productDialog>.dialog{
+  padding-bottom:12px !important;
+}
+html body dialog#productDialog .dialog>h3{
+  padding-top:15px !important;
+  padding-bottom:13px !important;
+  margin-bottom:13px !important;
+}
+html body dialog#productDialog .dialog>label{
+  margin-bottom:8px !important;
+  gap:5px !important;
+}
+html body dialog#productDialog .dialog>label>input,
+html body dialog#productDialog .dialog>label>select{
+  min-height:38px !important;
+  padding:8px 10px !important;
+}
+html body dialog#productDialog .dialog>label>textarea{
+  min-height:70px !important;
+  padding:8px 10px !important;
+}
+html body dialog#productDialog .product-price-grid{
+  padding:9px !important;
+  gap:8px 12px !important;
+  margin:0 0 8px !important;
+}
+html body dialog#productDialog .product-price-grid input{
+  min-height:38px !important;
+  padding:8px 10px !important;
+}
+html body dialog#productDialog .actions{
+  margin-top:9px !important;
+  padding-top:9px !important;
+  padding-bottom:9px !important;
+}
+</style>
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
