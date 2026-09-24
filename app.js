@@ -958,6 +958,8 @@ function renderAll(section){
  if($("netProfit"))$("netProfit").textContent=money(grossMonth-monthExpenses);
  if($("low"))$("low").textContent=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length+rawMaterials.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold)).length;
  if($("websiteOrdersNew"))$("websiteOrdersNew").textContent=websiteOrders.filter(o=>o.status==="New").length;
+ const stockValueTotal=products.reduce((sum,p)=>sum+(Number(p.stock||0)*Number(p.selling_price||0)),0);
+ if($("stockValueTotal"))$("stockValueTotal").textContent=money(stockValueTotal);
 
  if(active==="dashboard"){ bindDashboardMetricLinks(); renderDashboardPeriods();
    if($("recent"))$("recent").innerHTML=table(["Invoice","Customer","Total","Date",""],paidSales.slice(0,8).map(x=>[esc(x.invoice_no),esc(x.customer_name),money(x.paid_amount||0),new Date(x.created_at).toLocaleString("en-IN"),'<button type="button" class="icon-delete-btn" title="Delete invoice" aria-label="Delete invoice" onclick="deleteInvoice(\''+x.id+'\')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6"/></svg></button>']));
