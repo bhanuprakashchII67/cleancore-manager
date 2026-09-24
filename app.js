@@ -1614,14 +1614,14 @@ if($("investmentDialog"))$("investmentDialog").addEventListener("click",e=>{if(e
 if($("investmentForm"))$("investmentForm").addEventListener("submit",e=>{e.preventDefault();addInvestment()});
 function resetProductForm(){
  editingProductId=null;
- ["pname","punit","phsn","pMrp","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
+ ["pname","punit","phsn","productMrpInput","pstock","pdesc","pdetails"].forEach(id=>$(id).value="");
  $("pprice").value=349;$("plow").value=5;$("pimages").value="";$("pvideos").value="";
  $("productMedia").innerHTML="";$("productDialogTitle").textContent="Add New Product";
 }
 $("addProduct").onclick=()=>{resetProductForm();$("productDialog").showModal()};
 window.editProduct=id=>{
  const p=products.find(x=>x.id===id);if(!p)return;editingProductId=id;
- $("pname").value=p.name||"";$("punit").value=p.unit||"";$("phsn").value=p.hsn_code||"";$("pprice").value=p.selling_price??349;$("pMrp").value=p.cost_price??0;$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
+ $("pname").value=p.name||"";$("punit").value=p.unit||"";$("phsn").value=p.hsn_code||"";$("pprice").value=p.selling_price??349;$("productMrpInput").value=p.cost_price??0;$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
  $("pdesc").value=p.description||"";$("pdetails").value=p.additional_details||"";$("pimages").value="";$("pvideos").value="";
  $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);$("productDialog").showModal()
 }
@@ -1670,9 +1670,10 @@ window.removeProductMedia=async(id,type,encoded)=>{
  if(!isAdmin){await submitChange("products","product_media_update","products",id,{[key]:next},"Employee product media change");return;}
  const {error}=await db.from("products").update({[key]:next}).eq("id",id);if(error)return toast(error.message,false);toast("Media removed");await loadAll();const fresh=products.find(x=>x.id===id);if(fresh)renderProductMedia(fresh);
 }
+$("productMrpInput")?.addEventListener("input",e=>{e.target.value=e.target.value.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1");});
 $("productForm").addEventListener("submit",async e=>{
  e.preventDefault();
- const name=$("pname").value.trim(),price=+$("pprice").value,mrp=+$("pMrp").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
+ const name=$("pname").value.trim(),price=+$("pprice").value,mrp=+$("productMrpInput").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
  if(!name)return toast("Enter product name",false);
  const old=editingProductId?products.find(p=>p.id===editingProductId):null;
  let image_urls=mediaUrls(old,"image_urls"),video_urls=mediaUrls(old,"video_urls");
