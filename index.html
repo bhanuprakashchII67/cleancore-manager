@@ -7,14 +7,14 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.59-product-popup">
+<link rel="stylesheet" href="style.css?v=3.8.60-product-popup">
 </head>
 <body>
 <div id="toast" class="toast"></div>
 
 <section id="loginView" class="auth-shell">
   <div class="auth-card">
-    <div class="login-brand"><img class="brand brand-logo" src="logo.svg" alt="CleanCore logo"><div class="login-brand-text"><strong>CleanCore</strong><span>Business Manager</span></div></div><div class="app-version">Version 3.8.56</div>
+    <div class="login-brand"><img class="brand brand-logo" src="logo.svg" alt="CleanCore logo"><div class="login-brand-text"><strong>CleanCore</strong><span>Business Manager</span></div></div><div class="app-version">Version 3.8.60</div>
     <form id="loginForm">
       <label>LOGIN ID
         <input id="loginIdentifier" type="text" autocomplete="username" placeholder="Enter username or email address" required>
@@ -30,7 +30,7 @@
 
 <section id="appView" class="app hidden">
 <aside class="sidebar">
-  <div class="side-brand"><img class="brand small brand-logo" src="logo.svg" alt="CleanCore logo"><div><b>CleanCore</b><span>Manager</span></div></div><div class="side-version">v3.8.55</div>
+  <div class="side-brand"><img class="brand small brand-logo" src="logo.svg" alt="CleanCore logo"><div><b>CleanCore</b><span>Manager</span></div></div><div class="side-version">v3.8.60</div>
   <nav>
     <button type="button" class="nav active" data-section="dashboard">Dashboard</button>
     <button type="button" class="nav" data-section="products">Products & Stock</button>
@@ -835,12 +835,12 @@ html body dialog#productDialog .actions{
   </label>
   <label>HSN / SAC code<input id="phsn" maxlength="8" inputmode="numeric" placeholder="e.g. 3402"></label>
   <div class="product-price-grid">
-    <label>MRP ₹<input id="productMrpInput" name="mrp" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
-    <label>Selling Price ₹<input id="sellingPriceInput" name="selling_price" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
-    <label class="full">Final Selling Price ₹<input id="finalSellingCost" name="final_selling_price" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+    <label>MRP ₹<input id="productMrpInput" name="mrp" type="number" inputmode="decimal" min="0" step="0.01" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+    <label>Selling Price ₹<input id="sellingPriceInput" name="selling_price" type="number" inputmode="decimal" min="0" step="0.01" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+    <label class="full">Final Selling Price ₹<input id="finalSellingCost" name="final_selling_price" type="number" inputmode="decimal" min="0" step="0.01" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
   </div>
-  <label>Stock<input id="pstock" type="text" inputmode="decimal" min="0" required></label>
-  <label>Low-stock alert<input id="plow" type="text" inputmode="decimal" min="0" value="5" required></label>
+  <label>Stock<input id="pstock" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+  <label>Low-stock alert<input id="plow" type="number" inputmode="decimal" min="0" step="0.01" value="5" required></label>
   <label>Description<textarea id="pdesc" rows="4" placeholder="Product description"></textarea></label>
   <label>Additional details<textarea id="pdetails" rows="4" placeholder="Specifications, usage, pack details, etc."></textarea></label>
   <label>Photos <input id="pimages" type="file" accept="image/*" multiple></label>
@@ -1005,13 +1005,13 @@ html body dialog#productDialog .actions{
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
-  const K="cleancore_manager_cache_reset_441";
+  const K="cleancore_manager_cache_reset_442";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
       "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
       "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
-    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=440"));
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=441"));
   }
 })();
 </script>
@@ -1020,6 +1020,6 @@ if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.ser
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.58"></script>
+<script src="app.js?v=3.8.60"></script>
 </body>
 </html>
