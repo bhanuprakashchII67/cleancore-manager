@@ -1670,7 +1670,9 @@ window.removeProductMedia=async(id,type,encoded)=>{
  if(!isAdmin){await submitChange("products","product_media_update","products",id,{[key]:next},"Employee product media change");return;}
  const {error}=await db.from("products").update({[key]:next}).eq("id",id);if(error)return toast(error.message,false);toast("Media removed");await loadAll();const fresh=products.find(x=>x.id===id);if(fresh)renderProductMedia(fresh);
 }
-function cleanMoneyInput(el){if(!el)return;el.addEventListener("input",()=>{const raw=String(el.value||"");const cleaned=raw.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1");if(el.value!==cleaned)el.value=cleaned;});}\ncleanMoneyInput($("productMrpInput"));\ncleanMoneyInput($("finalSellingCost"));
+function cleanMoneyInput(el){if(!el)return;el.addEventListener("input",()=>{const raw=String(el.value||"");const cleaned=raw.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1");if(el.value!==cleaned)el.value=cleaned;});}
+cleanMoneyInput($("productMrpInput"));
+cleanMoneyInput($("finalSellingCost"));
 $("productForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const name=$("pname").value.trim(),price=+$("finalSellingCost").value,mrp=+$("productMrpInput").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
