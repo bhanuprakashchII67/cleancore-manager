@@ -882,3 +882,6 @@ body{overflow-x:hidden;overflow-y:visible!important}
 .product-price-grid input{width:100%;box-sizing:border-box}
 #punitSelect,#punitCustom{width:100%;box-sizing:border-box}
 #punitCustom[hidden]{display:none}
+
+/* Product edit numeric fields: explicitly keep all price/stock inputs interactive. */
+#productForm #productMrpInput,#productForm #sellingPriceInput,#productForm #finalSellingCost,#productForm #pstock,#productForm #plow{pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;cursor:text!important;opacity:1!important;}
