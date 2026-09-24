@@ -638,7 +638,7 @@ function scanOperationalNotifications(){
  localStorage.setItem(operationalSeenKey("LowStockState"),JSON.stringify(current));
 }
 async function loadAll(){
- const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("id,name,unit,mrp,selling_price,cost_price,stock,low_stock_threshold,description,additional_details,image_urls,video_urls,hsn_code").order("name"):null;
+ const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("id,name,unit,mrp,selling_price,final_selling_price,cost_price,stock,low_stock_threshold,description,additional_details,image_urls,video_urls,hsn_code").order("name"):null;
  const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source").order("created_at",{ascending:false}):null;
  const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("id,name,phone,gstin,created_at,business_name,email,customer_source,billing_address,delivery_address,updated_at,auth_user_id,alternate_phone,archived_at,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode").is("archived_at",null).order("name"):null;
  const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250):null;
@@ -967,7 +967,7 @@ function renderAll(section){
  if($("investmentFrontTotal"))$("investmentFrontTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
  if(active==="products"){
    $("productsTable").innerHTML=table(["Product","Unit","MRP","Selling","Final Selling","Stock","Status","Action"],products.map(p=>[
-     esc(p.name),esc(p.unit),money(p.mrp),money(p.selling_price),money(p.cost_price),p.stock,
+     esc(p.name),esc(p.unit),money(p.mrp),money(p.selling_price),money(p.final_selling_price),p.stock,
      Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
      '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
    ]));
@@ -1648,7 +1648,7 @@ $("punitCustom").addEventListener("input",syncProductUnit);
 $("addProduct").onclick=()=>{resetProductForm();$("productDialog").showModal()};
 window.editProduct=id=>{
  const p=products.find(x=>x.id===id);if(!p)return;editingProductId=id;
- $("pname").value=p.name||"";setProductUnit(p.unit);$("phsn").value=p.hsn_code||"";$("productMrpInput").value=p.mrp??"";$("sellingPriceInput").value=p.selling_price??"";$("finalSellingCost").value=p.cost_price??"";$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
+ $("pname").value=p.name||"";setProductUnit(p.unit);$("phsn").value=p.hsn_code||"";$("productMrpInput").value=p.mrp??"";$("sellingPriceInput").value=p.selling_price??"";$("finalSellingCost").value=p.final_selling_price??"";$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
  $("pdesc").value=p.description||"";$("pdetails").value=p.additional_details||"";$("pimages").value="";$("pvideos").value="";
  $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);$("productDialog").showModal()
 }
@@ -1707,7 +1707,7 @@ $("productForm").addEventListener("submit",async e=>{
  const old=editingProductId?products.find(p=>p.id===editingProductId):null;
  let image_urls=mediaUrls(old,"image_urls"),video_urls=mediaUrls(old,"video_urls");
  if(!isAdmin){
-   const x={name,unit,hsn_code:hsn,mrp,selling_price:price,cost_price:finalPrice,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
+   const x={name,unit,hsn_code:hsn,mrp,selling_price:price,final_selling_price:finalPrice,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
    const ok=await submitChange("products",editingProductId?"product_update":"product_create","products",editingProductId,x,"Employee product change");
    if(ok)$("productDialog").close();
    return;
