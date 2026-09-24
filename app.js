@@ -966,7 +966,7 @@ function renderAll(section){
  }
  if($("investmentFrontTotal"))$("investmentFrontTotal").textContent=money(investments.reduce((sum,x)=>sum+Number(x.amount||0),0));
  if(active==="products"){
-   $("productsTable").innerHTML=table(["Product","Unit","MRP","Selling","Final Selling","Stock","Status","Action"],products.map(p=>[
+   $("productsTable").innerHTML=table(["Product","Unit","MRP","Selling","Final Selling Price","Stock","Status","Action"],products.map(p=>[
      esc(p.name),esc(p.unit),money(p.mrp),money(p.selling_price),money(p.final_selling_price),p.stock,
      Number(p.stock)<=Number(p.low_stock_threshold)?'<span class="badge warn">Low</span>':'<span class="badge ok">OK</span>',
      '<button class="link" onclick="editProduct(\''+p.id+'\')">Edit</button> <button class="link danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>'
