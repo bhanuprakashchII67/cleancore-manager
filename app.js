@@ -1721,8 +1721,8 @@ function addLine(){
  const r=document.createElement("div");
  r.className="line modern-line";
  r.innerHTML=`<select class="lp">${products.map(p=>`<option value="${p.id}">${esc(p.name)} — ${money(p.selling_price)} (${p.stock} in stock)</option>`).join("")}</select>
-   <input class="lq" type="number" min="1" step="1" value="1" aria-label="Quantity">
-   <input class="lr" type="number" min="0" step="0.01" value="${products[0]?.selling_price||0}" aria-label="Bill price">
+   <input class="lq" type="text" inputmode="decimal" min="1" step="1" value="1" aria-label="Quantity">
+   <input class="lr" type="text" inputmode="decimal" min="0" step="0.01" value="${products[0]?.selling_price||0}" aria-label="Bill price">
    <span class="lv">₹0</span>
    <button type="button" class="remove" aria-label="Remove item">×</button>`;
  $("lines").appendChild(r);
