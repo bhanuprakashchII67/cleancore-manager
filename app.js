@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.52";
+const MANAGER_VERSION="3.8.60";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -1645,10 +1645,15 @@ function resetProductForm(){
 }
 $("punitSelect").addEventListener("change",syncProductUnit);
 $("punitCustom").addEventListener("input",syncProductUnit);
+configureProductNumberFields();
 $("addProduct").onclick=()=>{resetProductForm();$("productDialog").showModal();unlockProductNumberFields()};
-function unlockProductNumberFields(){
+function configureProductNumberFields(){
  ["productMrpInput","sellingPriceInput","finalSellingCost","pstock","plow"].forEach(id=>{
    const el=$(id);if(!el)return;
+   el.type="number";
+   el.inputMode="decimal";
+   el.min="0";
+   el.step="0.01";
    el.removeAttribute("readonly");
    el.removeAttribute("disabled");
    el.style.pointerEvents="auto";
@@ -1656,11 +1661,12 @@ function unlockProductNumberFields(){
    el.tabIndex=0;
  });
 }
+function unlockProductNumberFields(){configureProductNumberFields();}
 window.editProduct=id=>{
  const p=products.find(x=>x.id===id);if(!p)return;editingProductId=id;
  $("pname").value=p.name||"";setProductUnit(p.unit);$("phsn").value=p.hsn_code||"";$("productMrpInput").value=p.mrp??"";$("sellingPriceInput").value=p.selling_price??"";$("finalSellingCost").value=p.final_selling_price??"";$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
  $("pdesc").value=p.description||"";$("pdetails").value=p.additional_details||"";$("pimages").value="";$("pvideos").value="";
- $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);$("productDialog").showModal();unlockProductNumberFields();
+ $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);configureProductNumberFields();$("productDialog").showModal();unlockProductNumberFields();
 }
 function renderProductMedia(p){
  const imgs=mediaUrls(p,"image_urls"),vids=mediaUrls(p,"video_urls");
@@ -1707,16 +1713,17 @@ window.removeProductMedia=async(id,type,encoded)=>{
  if(!isAdmin){await submitChange("products","product_media_update","products",id,{[key]:next},"Employee product media change");return;}
  const {error}=await db.from("products").update({[key]:next}).eq("id",id);if(error)return toast(error.message,false);toast("Media removed");await loadAll();const fresh=products.find(x=>x.id===id);if(fresh)renderProductMedia(fresh);
 }
-function cleanMoneyInput(el){if(!el)return;el.addEventListener("input",()=>{const raw=String(el.value||"");const cleaned=raw.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1");if(el.value!==cleaned)el.value=cleaned;});}
-cleanMoneyInput($("productMrpInput"));
-cleanMoneyInput($("sellingPriceInput"));
-cleanMoneyInput($("finalSellingCost"));
-cleanMoneyInput($("pstock"));
-cleanMoneyInput($("plow"));
+configureProductNumberFields();
+["productMrpInput","sellingPriceInput","finalSellingCost","pstock","plow"].forEach(id=>{
+ const el=$(id);
+ if(el)el.addEventListener("input",()=>{if(el.value!==""&&!Number.isFinite(el.valueAsNumber))el.value="";});
+});
 $("productForm").addEventListener("submit",async e=>{
  e.preventDefault();
- const name=$("pname").value.trim(),unit=$("punit").value.trim(),mrp=+$("productMrpInput").value,price=+$("sellingPriceInput").value,finalPrice=+$("finalSellingCost").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
+ const name=$("pname").value.trim(),unit=$("punit").value.trim(),mrp=$("productMrpInput").valueAsNumber,price=$("sellingPriceInput").valueAsNumber,finalPrice=$("finalSellingCost").valueAsNumber,stock=$("pstock").valueAsNumber,low=$("plow").valueAsNumber,hsn=$("phsn").value.trim();
  if(!name)return toast("Enter product name",false);
+ if(![mrp,price,finalPrice,stock,low].every(Number.isFinite))return toast("Enter valid numbers in MRP, Selling Price, Final Selling Price, Stock and Low-stock alert.",false);
+ if([mrp,price,finalPrice,stock,low].some(v=>v<0))return toast("Numeric product values cannot be negative.",false);
  const old=editingProductId?products.find(p=>p.id===editingProductId):null;
  let image_urls=mediaUrls(old,"image_urls"),video_urls=mediaUrls(old,"video_urls");
  if(!isAdmin){
