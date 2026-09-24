@@ -521,10 +521,27 @@
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
   <label>Product name<input id="pname" required></label>
-  <label>Unit / pack size<input id="punit" value="5 Litre Can" required></label>
+  <label>Unit / Packing Size
+    <select id="punitSelect" required>
+      <option value="500 ml">500 ml</option>
+      <option value="750 ml">750 ml</option>
+      <option value="1 Litre">1 Litre</option>
+      <option value="2 Litre">2 Litre</option>
+      <option value="3 Litre">3 Litre</option>
+      <option value="5 Litre Can" selected>5 Litre Can</option>
+      <option value="10 Litre">10 Litre</option>
+      <option value="20 Litre">20 Litre</option>
+      <option value="__custom__">Other / Custom</option>
+    </select>
+    <input id="punitCustom" type="text" placeholder="Enter custom packing size" autocomplete="off" hidden>
+    <input id="punit" type="hidden" value="5 Litre Can">
+  </label>
   <label>HSN / SAC code<input id="phsn" maxlength="8" inputmode="numeric" placeholder="e.g. 3402"></label>
-  <label>MRP ₹<input id="productMrpInput" name="mrp" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
-  <label>Final Selling Cost ₹<input id="finalSellingCost" name="final_selling_cost" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+  <div class="product-price-grid">
+    <label>MRP ₹<input id="productMrpInput" name="mrp" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+    <label>Selling Price ₹<input id="sellingPriceInput" name="selling_price" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+    <label class="full">Final Selling Price ₹<input id="finalSellingCost" name="final_selling_price" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" value="" required></label>
+  </div>
   <label>Stock<input id="pstock" type="text" inputmode="decimal" min="0" required></label>
   <label>Low-stock alert<input id="plow" type="text" inputmode="decimal" min="0" value="5" required></label>
   <label>Description<textarea id="pdesc" rows="4" placeholder="Product description"></textarea></label>
