@@ -875,3 +875,10 @@ input,select,textarea{background:#fff!important;color:#122033!important;border-c
 html{overflow-y:auto!important}
 body{overflow-x:hidden;overflow-y:visible!important}
 
+
+/* Product pricing layout */
+.product-price-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;grid-column:1/-1}
+.product-price-grid .full{grid-column:1/-1}
+.product-price-grid input{width:100%;box-sizing:border-box}
+#punitSelect,#punitCustom{width:100%;box-sizing:border-box}
+#punitCustom[hidden]{display:none}
