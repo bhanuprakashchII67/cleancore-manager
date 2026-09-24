@@ -875,7 +875,3 @@ input,select,textarea{background:#fff!important;color:#122033!important;border-c
 html{overflow-y:auto!important}
 body{overflow-x:hidden;overflow-y:visible!important}
 
-/* Hide native number-input steppers throughout the app. */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button{appearance:none;-webkit-appearance:none;margin:0}
-input[type="number"]{appearance:textfield;-moz-appearance:textfield}
