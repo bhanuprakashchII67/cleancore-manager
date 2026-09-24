@@ -1672,12 +1672,12 @@ window.removeProductMedia=async(id,type,encoded)=>{
 }
 $("productForm").addEventListener("submit",async e=>{
  e.preventDefault();
- const name=$("pname").value.trim(),price=+$("pprice").value,mrp=+$("pcost").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
+ const name=$("pname").value.trim(),price=+$("pprice").value,mrp=+$("pMrp").value,cost=+$("pcost").value,stock=+$("pstock").value,low=+$("plow").value,hsn=$("phsn").value.trim();
  if(!name)return toast("Enter product name",false);
  const old=editingProductId?products.find(p=>p.id===editingProductId):null;
  let image_urls=mediaUrls(old,"image_urls"),video_urls=mediaUrls(old,"video_urls");
  if(!isAdmin){
-   const x={name,unit:$("punit").value.trim(),hsn_code:hsn,selling_price:price,cost_price:mrp,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
+   const x={name,unit:$("punit").value.trim(),hsn_code:hsn,selling_price:price,cost_price:cost,mrp:mrp,stock,low_stock_threshold:low,description:$("pdesc").value.trim(),additional_details:$("pdetails").value.trim(),image_urls,video_urls};
    const ok=await submitChange("products",editingProductId?"product_update":"product_create","products",editingProductId,x,"Employee product change");
    if(ok)$("productDialog").close();
    return;
