@@ -885,3 +885,124 @@ body{overflow-x:hidden;overflow-y:visible!important}
 
 /* Product edit numeric fields: explicitly keep all price/stock inputs interactive. */
 #productForm #productMrpInput,#productForm #sellingPriceInput,#productForm #finalSellingCost,#productForm #pstock,#productForm #plow{pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;cursor:text!important;opacity:1!important;}
+
+
+/* Product Add/Edit popup ONLY — outer shell redesign. No other UI selectors are changed. */
+#productDialog{
+  width:min(660px,calc(100vw - 28px));
+  max-width:660px;
+  max-height:min(88vh,820px);
+  padding:0;
+  border:1px solid #d6e2ea;
+  border-radius:24px;
+  background:#fff;
+  box-shadow:0 30px 90px rgba(7,26,51,.26),0 4px 18px rgba(7,26,51,.08);
+  overflow:auto;
+  scrollbar-width:thin;
+  scrollbar-color:#aebecb transparent;
+}
+#productDialog::backdrop{
+  background:rgba(7,26,51,.62);
+  backdrop-filter:blur(2px);
+}
+#productDialog .dialog{
+  position:relative;
+  padding:0 30px 24px;
+  background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);
+}
+#productDialog .dialog>h3{
+  margin:0 -30px 22px;
+  padding:24px 78px 18px 30px;
+  border-bottom:1px solid #e3ebf1;
+  color:#0b1f33;
+  font-size:24px;
+  line-height:1.2;
+  letter-spacing:-.025em;
+  font-weight:850;
+  background:#fff;
+}
+#productDialog .dialog>label{
+  gap:7px;
+  margin:0 0 16px;
+  font-size:12px;
+  color:#173149;
+}
+#productDialog .dialog>label>input,
+#productDialog .dialog>label>select,
+#productDialog .dialog>label>textarea,
+#productDialog #punitCustom{
+  border-color:#d9e5ec!important;
+  border-radius:12px;
+  background:#fff!important;
+  box-shadow:0 1px 1px rgba(7,26,51,.02);
+}
+#productDialog .dialog>label>input,
+#productDialog .dialog>label>select{
+  min-height:46px;
+}
+#productDialog .product-price-grid{
+  gap:14px 18px;
+  margin:2px 0 2px;
+  padding:16px;
+  border:1px solid #e0e9ef;
+  border-radius:16px;
+  background:#f8fbfd;
+}
+#productDialog .product-price-grid label{margin:0;color:#173149}
+#productDialog .product-price-grid input{min-height:46px;border-radius:11px}
+#productDialog .actions{
+  position:sticky;
+  bottom:-24px;
+  margin:20px -30px -24px;
+  padding:14px 30px;
+  border-top:1px solid #e3ebf1;
+  background:rgba(255,255,255,.96);
+  backdrop-filter:blur(8px);
+  box-shadow:0 -8px 24px rgba(7,26,51,.05);
+  justify-content:flex-end;
+  z-index:4;
+}
+#productDialog .actions .btn{
+  min-width:112px;
+  min-height:42px;
+  border-radius:11px;
+}
+#productDialog>.dialog-x{
+  right:18px;
+  top:16px;
+  width:42px;
+  height:42px;
+  min-height:42px;
+  border:1px solid #e0e8ee;
+  background:#f3f6f8;
+  color:#415466;
+  font-size:25px;
+  line-height:1;
+  box-shadow:0 2px 7px rgba(7,26,51,.04);
+}
+#productDialog>.dialog-x:hover{background:#e8eef2;border-color:#d2dfe7;color:#0b1f33}
+#productDialog .dialog>label input:focus,
+#productDialog .dialog>label select:focus,
+#productDialog .dialog>label textarea:focus,
+#productDialog #punitCustom:focus{
+  outline:2px solid rgba(15,159,146,.14);
+  border-color:#78b9b3!important;
+  box-shadow:0 0 0 3px rgba(15,159,146,.06);
+}
+@media(max-width:680px){
+  #productDialog{width:calc(100vw - 18px);max-width:none;max-height:90vh;border-radius:20px}
+  #productDialog .dialog{padding:0 18px 18px}
+  #productDialog .dialog>h3{margin:0 -18px 18px;padding:20px 64px 16px 18px;font-size:21px}
+  #productDialog .product-price-grid{grid-template-columns:1fr;gap:12px;padding:14px;border-radius:14px}
+  #productDialog .product-price-grid .full{grid-column:1}
+  #productDialog .actions{bottom:-18px;margin:18px -18px -18px;padding:12px 18px;flex-direction:column-reverse}
+  #productDialog .actions .btn{width:100%;min-height:42px}
+  #productDialog>.dialog-x{right:11px;top:11px;width:38px;height:38px;min-height:38px;font-size:23px}
+}
+@media(max-width:420px){
+  #productDialog{width:calc(100vw - 12px);border-radius:18px}
+  #productDialog .dialog{padding:0 14px 14px}
+  #productDialog .dialog>h3{margin:0 -14px 16px;padding:18px 56px 14px 14px;font-size:20px}
+  #productDialog .product-price-grid{padding:12px}
+  #productDialog .actions{bottom:-14px;margin:16px -14px -14px;padding:10px 14px}
+}
