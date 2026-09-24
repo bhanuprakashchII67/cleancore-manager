@@ -814,6 +814,43 @@ html body dialog#productDialog .actions{
   padding-bottom:9px !important;
 }
 </style>
+<style id="product-popup-button-fix-v1">
+/* Product Edit popup ONLY: keep action buttons fully inside the footer */
+html body dialog#productDialog .actions{
+  clear:both !important;
+  bottom:0 !important;
+  margin-left:-24px !important;
+  margin-right:-24px !important;
+  margin-bottom:0 !important;
+  padding-left:24px !important;
+  padding-right:24px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:12px !important;
+  flex-wrap:nowrap !important;
+  box-sizing:border-box !important;
+}
+html body dialog#productDialog .actions .btn{
+  flex:0 0 auto !important;
+  width:auto !important;
+  box-sizing:border-box !important;
+  white-space:nowrap !important;
+}
+@media(max-width:680px){
+  html body dialog#productDialog .actions{
+    bottom:0 !important;
+    margin-left:-16px !important;
+    margin-right:-16px !important;
+    margin-bottom:0 !important;
+    padding-left:16px !important;
+    padding-right:16px !important;
+  }
+  html body dialog#productDialog .actions .btn{
+    width:100% !important;
+  }
+}
+</style>
 <dialog id="productDialog">
 <form method="dialog" id="productForm" class="dialog">
   <h3 id="productDialogTitle">Add New Product</h3><input id="pid" type="hidden">
