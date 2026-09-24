@@ -1645,12 +1645,22 @@ function resetProductForm(){
 }
 $("punitSelect").addEventListener("change",syncProductUnit);
 $("punitCustom").addEventListener("input",syncProductUnit);
-$("addProduct").onclick=()=>{resetProductForm();$("productDialog").showModal()};
+$("addProduct").onclick=()=>{resetProductForm();$("productDialog").showModal();unlockProductNumberFields()};
+function unlockProductNumberFields(){
+ ["productMrpInput","sellingPriceInput","finalSellingCost","pstock","plow"].forEach(id=>{
+   const el=$(id);if(!el)return;
+   el.removeAttribute("readonly");
+   el.removeAttribute("disabled");
+   el.style.pointerEvents="auto";
+   el.style.userSelect="text";
+   el.tabIndex=0;
+ });
+}
 window.editProduct=id=>{
  const p=products.find(x=>x.id===id);if(!p)return;editingProductId=id;
  $("pname").value=p.name||"";setProductUnit(p.unit);$("phsn").value=p.hsn_code||"";$("productMrpInput").value=p.mrp??"";$("sellingPriceInput").value=p.selling_price??"";$("finalSellingCost").value=p.final_selling_price??"";$("pstock").value=p.stock??0;$("plow").value=p.low_stock_threshold??5;
  $("pdesc").value=p.description||"";$("pdetails").value=p.additional_details||"";$("pimages").value="";$("pvideos").value="";
- $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);$("productDialog").showModal()
+ $("productDialogTitle").textContent="Edit Product";renderProductMedia(p);$("productDialog").showModal();unlockProductNumberFields();
 }
 function renderProductMedia(p){
  const imgs=mediaUrls(p,"image_urls"),vids=mediaUrls(p,"video_urls");
