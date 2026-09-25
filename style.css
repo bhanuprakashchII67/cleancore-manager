@@ -1010,3 +1010,34 @@ body{overflow-x:hidden;overflow-y:visible!important}
 
 /* Enquiry source badges */
 #enquiriesTable .badge{display:inline-flex;align-items:center;justify-content:center;min-width:74px}
+
+
+/* Lead quotation flow */
+.lead-quotation-customer-card{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  padding:14px;
+  margin:4px 0 12px;
+  border:1px solid #dce5ee;
+  border-radius:12px;
+  background:#f8fbfe;
+}
+.lead-quotation-customer-card div{display:grid;gap:4px}
+.lead-quotation-customer-card span{font-size:11px;color:#6c7a8d;text-transform:uppercase;letter-spacing:.05em}
+.lead-quotation-customer-card strong{font-size:13px;word-break:break-word}
+#leadQuotationDialog{width:min(760px,calc(100vw - 24px));max-width:760px}
+.lead-quotation-items-head{margin-top:4px}
+.lead-quotation-line{grid-template-columns:minmax(0,1fr) 90px 120px 100px 38px}
+.lead-quotation-line .lv{text-align:right;font-weight:800}
+.quote-note.compact{display:flex;gap:8px;align-items:flex-start;padding:11px 13px;border:1px solid #dce5ee;border-radius:10px;background:#f8fbfe;margin:12px 0}
+.quote-note.compact span{color:#6c7a8d;font-size:12px}
+@media(max-width:700px){
+  .lead-quotation-customer-card{grid-template-columns:1fr 1fr}
+  #leadQuotationDialog{width:calc(100vw - 12px)}
+  .lead-quotation-line{grid-template-columns:minmax(0,1fr) 68px 88px 86px 38px;gap:6px}
+}
+@media(max-width:480px){
+  .lead-quotation-customer-card{grid-template-columns:1fr}
+  .lead-quotation-line{grid-template-columns:minmax(0,1fr) 62px 78px 74px 36px}
+}
