@@ -50,7 +50,7 @@ function renderNotificationSettings(){
  Object.entries(map).forEach(([id,key])=>{const el=$(id);if(el)el.checked=notificationPreferences[key]!==false;});
  const st=$("notificationSettingsStatus");if(st)st.textContent=notificationPreferences.desktop_enabled?"Desktop notifications enabled.":"Desktop notifications off.";
 }
-// Browser push/Pusher integration intentionally disabled. In-app notifications remain enabled.
+// In-app notifications only.
 async function ensureManagerNotificationPermission(){
  if(!("Notification" in window))return false;
  if(Notification.permission==="granted")return true;
