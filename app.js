@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.63";
+const MANAGER_VERSION="3.8.65";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -543,12 +543,19 @@ $("loginForm").addEventListener("submit",async e=>{
    if(error)return toast("Login failed: "+error.message,false);
    if(!data?.session)return toast("Login failed: No session returned.",false);
    user=data.user;
+
+   // Switch to the Manager immediately after authentication succeeds.
+   // Never leave a valid authenticated user staring at the login form because
+   // a secondary startup/data request failed.
+   $("loginView").classList.add("hidden");
+   $("appView").classList.remove("hidden");
    startManagerLoginWindow();
    try{
      await enter();
    }catch(err){
      console.error("CleanCore Manager startup error",err);
-     return toast(err?.message||"Unable to open the Manager.",false);
+     reportClientError(err,{action:"manager_startup_after_login"});
+     toast(err?.message||"Manager opened with limited data. Use Refresh to retry.",false);
    }
  }catch(err){
    console.error("CleanCore login error",err);
