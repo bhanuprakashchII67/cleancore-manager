@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.61";
+const MANAGER_VERSION="3.8.62";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -283,7 +283,7 @@ function announceWebsiteNotification(n){
      const en=await db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250);
      if(en.error)throw en.error;
      enquiries=en.data||[];
-     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date","Documents",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),enquiryDocumentLinks(x),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
    }
  };
  refresh().catch(err=>console.warn("Manager alert refresh:",err.message));
@@ -872,6 +872,24 @@ function bindDashboardMetricLinks(){
 
 function isSaleDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="SALE";}
 function isQuotationDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="QUOTATION";}
+function enquiryDocumentLinks(x){
+  const normalize=v=>String(v||"").replace(/\\D/g,"");
+  const phone=normalize(x.phone);
+  const name=String(x.name||"").trim().toLowerCase();
+  const business=String(x.business||"").trim().toLowerCase();
+  const matches=invoices.filter(inv=>{
+    const invPhone=normalize(inv.customer_phone);
+    const invName=String(inv.customer_name||"").trim().toLowerCase();
+    const invBusiness=String(inv.customer_business||"").trim().toLowerCase();
+    return (phone&&invPhone===phone) || (name&&invName===name&&(!business||!invBusiness||invBusiness===business));
+  }).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const sale=matches.find(isSaleDocument);
+  const quote=matches.find(isQuotationDocument);
+  const links=[];
+  if(sale)links.push("<button type='button' class='link' onclick=\"viewInvoice('"+esc(sale.id)+"')\">Invoice</button>");
+  if(quote)links.push("<button type='button' class='link' onclick=\"viewInvoice('"+esc(quote.id)+"')\">Quotation</button>");
+  return links.length?links.join(" "):"<span class='muted'>—</span>";
+}
 function documentLabel(inv){return isQuotationDocument(inv)?"QUOTATION INVOICE":(Number(inv?.gst_amount||0)>0?"TAX INVOICE":"INVOICE");}
 function renderQuotations(){
  const list=invoices.filter(isQuotationDocument).slice(0,20);
@@ -985,7 +1003,7 @@ function renderAll(section){
  if(active==="website_orders"||active==="enquiries")renderWebsiteOrders();
 const formatEnquirySource=x=>{const source=String(x.source||"manager").trim();if(source==="manager"||source==="offline"||source==="Offline")return "Offline";if(source==="Website"||source==="website"||source==="website_order")return source==="website_order"?"Website Order":"Website";return source||"Offline"};
  if(active==="enquiries"){
-   $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+   $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date","Documents",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),enquiryDocumentLinks(x),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
  }
  if($("websiteOrdersPanel"))$("websiteOrdersPanel").style.display=(isAdmin||canAccess("website_orders"))?"":"none";
  if($("enquiriesPanel"))$("enquiriesPanel").style.display=(isAdmin||canAccess("enquiries"))?"":"none";
