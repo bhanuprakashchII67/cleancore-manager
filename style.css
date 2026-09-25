@@ -1006,3 +1006,7 @@ body{overflow-x:hidden;overflow-y:visible!important}
   #productDialog .product-price-grid{padding:12px}
   #productDialog .actions{bottom:-14px;margin:16px -14px -14px;padding:10px 14px}
 }
+
+
+/* Enquiry source badges */
+#enquiriesTable .badge{display:inline-flex;align-items:center;justify-content:center;min-width:74px}
