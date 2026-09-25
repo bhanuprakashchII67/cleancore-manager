@@ -1093,3 +1093,53 @@ body{overflow-x:hidden;overflow-y:visible!important}
   #invoiceDialog.invoice-viewer-panel>.actions{padding:10px!important}
   #invoiceDialog.invoice-viewer-panel>.actions .btn{flex:1 1 100%!important}
 }
+
+/* Dedicated quotation viewer: stays in the Enquiries section, never the Sales viewer. */
+#quotationDialog.quotation-viewer-panel{
+  position:fixed!important;
+  top:12px!important;
+  right:12px!important;
+  left:auto!important;
+  bottom:auto!important;
+  z-index:10001!important;
+  width:min(760px,calc(100vw - 24px))!important;
+  max-width:760px!important;
+  max-height:calc(100vh - 24px)!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+  border:1px solid #dce5ee!important;
+  border-radius:16px!important;
+  background:#fff!important;
+  box-shadow:0 24px 80px rgba(7,26,51,.24)!important;
+}
+#quotationDialog.quotation-viewer-panel[hidden]{display:none!important}
+#quotationDialog.quotation-viewer-panel #quotationPreview{
+  max-height:calc(100vh - 110px)!important;
+  overflow:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+#quotationDialog.quotation-viewer-panel>.actions{
+  display:flex!important;
+  gap:10px!important;
+  padding:12px 16px 16px!important;
+  border-top:1px solid #e4ebf0!important;
+  background:#fff!important;
+  position:sticky!important;
+  bottom:0!important;
+  z-index:2!important;
+}
+#quotationDialog.quotation-viewer-panel>.actions .btn{flex:1 1 180px!important}
+@media(max-width:700px){
+  #quotationDialog.quotation-viewer-panel{
+    top:8px!important;
+    right:8px!important;
+    width:calc(100vw - 16px)!important;
+    max-width:none!important;
+    max-height:calc(100vh - 16px)!important;
+  }
+  #quotationDialog.quotation-viewer-panel #quotationPreview{max-height:calc(100vh - 105px)!important}
+  #quotationDialog.quotation-viewer-panel>.actions{padding:10px!important}
+  #quotationDialog.quotation-viewer-panel>.actions .btn{flex:1 1 100%!important}
+}
