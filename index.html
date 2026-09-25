@@ -1112,7 +1112,7 @@ html body dialog#productDialog .actions .btn{
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
-  const K="cleancore_manager_cache_reset_443";
+  const K="cleancore_manager_cache_reset_444";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
@@ -1121,9 +1121,6 @@ html body dialog#productDialog .actions .btn{
     ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=442"));
   }
 })();
-</script>
-<script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.4.4",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1150,7 +1147,7 @@ if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.ser
     if(window.__CLEANCORE_APP_LOADING||window.__CLEANCORE_APP_READY)return;
     window.__CLEANCORE_APP_LOADING=true;
     const s=document.createElement("script");
-    s.src="app-3.8.68.js?v=3.8.68";
+    s.src="app.js?v=3.8.69";
     s.onload=function(){
       setTimeout(function(){
         if(!window.__CLEANCORE_APP_READY)bootMessage("The Manager script loaded but did not initialize. Open the browser console and reload once.");
