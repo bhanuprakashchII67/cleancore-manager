@@ -364,6 +364,75 @@
   </div>
 </section>
 
+
+<dialog id="leadQuotationDialog">
+  <form id="leadQuotationForm" class="dialog">
+    <div class="panel-head">
+      <div>
+        <h3 id="leadQuotationTitle">Create Quotation</h3>
+        <p id="leadQuotationLeadMeta" class="muted"></p>
+      </div>
+      <button type="button" id="closeLeadQuotation" class="btn small">Close</button>
+    </div>
+
+    <div id="leadQuotationCustomerCard" class="lead-quotation-customer-card"></div>
+
+    <div class="grid">
+      <label>Bill type
+        <select id="leadQuotationBillType">
+          <option value="NON_GST">Non-GST Quotation</option>
+          <option value="GST">GST Quotation</option>
+        </select>
+      </label>
+      <label id="leadQuotationGstRateWrap" class="hidden">GST rate %
+        <input id="leadQuotationGstPercent" type="text" inputmode="decimal" value="18">
+      </label>
+      <label id="leadQuotationGstinWrap" class="hidden full">Customer GSTIN
+        <input id="leadQuotationGstin" type="text" maxlength="15" autocomplete="off">
+      </label>
+      <label>Discount ₹
+        <input id="leadQuotationDiscount" type="text" inputmode="decimal" value="0">
+      </label>
+      <label>Quotation source
+        <select id="leadQuotationSource">
+          <option value="Offline">Offline</option>
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="Website">Website</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="panel-head lead-quotation-items-head">
+      <div>
+        <b>Items</b>
+        <span class="muted tiny">Set the quoted selling price and quantity.</span>
+      </div>
+      <button type="button" id="leadQuotationAddLine" class="btn small">+ Add item</button>
+    </div>
+    <div id="leadQuotationLines"></div>
+
+    <div id="leadQuotationTax" class="tax-breakdown hidden"></div>
+
+    <div class="total">
+      <div>
+        <div>Subtotal: <strong id="leadQuotationSubtotal">₹0.00</strong></div>
+        <div>Discount: <strong id="leadQuotationDiscountShow">₹0.00</strong></div>
+        <div>GST: <strong id="leadQuotationGstShow">0% • ₹0.00</strong></div>
+      </div>
+      <strong id="leadQuotationTotal">₹0.00</strong>
+    </div>
+
+    <div class="quote-note compact">
+      <b>QUOTATION ONLY</b>
+      <span>This creates a quotation linked to the lead. It does not create a payment, sale, or stock movement.</span>
+    </div>
+
+    <div class="actions">
+      <button type="submit" id="leadQuotationSave" class="btn primary">Generate Quotation</button>
+    </div>
+  </form>
+</dialog>
+
 <section id="expenses" class="section">
   <div class="section-toolbar"><span>Expenses</span><button type="button" class="btn small page-refresh" data-page-refresh="expenses">↻ Refresh</button></div>
   <div class="section-toolbar"><span>Expense data</span></div>
