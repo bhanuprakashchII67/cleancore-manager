@@ -582,7 +582,7 @@ function scanOperationalNotifications(){
 }
 async function loadAll(){
  const qP=(isAdmin||canAccess("products")||canAccess("billing"))?db.from("products").select("id,name,unit,mrp,selling_price,final_selling_price,cost_price,stock,low_stock_threshold,description,additional_details,image_urls,video_urls,hsn_code").order("name"):null;
- const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source").order("created_at",{ascending:false}):null;
+ const qI=(isAdmin||canAccess("billing")||canAccess("sales"))?db.from("invoices").select("id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source,quotation_notes").order("created_at",{ascending:false}):null;
  const qC=(isAdmin||canAccess("customers")||canAccess("billing"))?db.from("customers").select("id,name,phone,gstin,created_at,business_name,email,customer_source,billing_address,delivery_address,updated_at,auth_user_id,alternate_phone,archived_at,billing_shop_no,billing_colony,billing_city,billing_state,billing_pincode,delivery_shop_no,delivery_colony,delivery_city,delivery_state,delivery_pincode").is("archived_at",null).order("name"):null;
  const qE=(isAdmin||canAccess("enquiries"))?db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250):null;
  const qR=(isAdmin||canAccess("products"))?db.from("raw_materials").select("id,name,unit,cost_per_unit,stock,low_stock_threshold,created_at,updated_at").order("name"):null;
@@ -2154,7 +2154,7 @@ window.viewLeadQuotation=async function(invoiceId){
   try{
     let inv=cached;
     if(!inv){
-      const q=await db.from('invoices').select('id,invoice_no,customer_name,customer_phone,customer_email,customer_business,gstin,billing_address,delivery_address,subtotal,discount,total,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,created_at,document_type').eq('id',id).maybeSingle();
+      const q=await db.from('invoices').select('id,invoice_no,customer_name,customer_phone,customer_email,customer_business,gstin,billing_address,delivery_address,subtotal,discount,total,quotation_notes,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,created_at,document_type').eq('id',id).maybeSingle();
       if(q.error)throw q.error;
       inv=q.data;
       if(!inv)throw new Error('Quotation not found.');
@@ -2185,6 +2185,7 @@ function renderLeadQuotationPreview(inv,items){
     (Number(inv.discount||0)>0?'<tr><td colspan="5">Discount</td><td>- '+money(inv.discount)+'</td></tr>':'')+
     '<tr><td colspan="5">Taxable Value</td><td>'+money(taxable)+'</td></tr>'+taxRows+
     '<tr class="grand-total"><td colspan="5">TOTAL</td><td>'+money(inv.total)+'</td></tr></tbody></table>'+
+    (inv.quotation_notes?'<div class="quotation-custom-notes"><b>TERMS &amp; CONDITIONS / NOTES</b><div>'+esc(inv.quotation_notes).replaceAll('\n','<br>')+'</div></div>':'')+
     '<div class="quote-note"><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document does not record a sale, payment, or stock movement.</div>'+
     '</div>';
 }
@@ -2199,7 +2200,7 @@ async function editLeadQuotation(invoiceId){
   $('leadQuotationTitle').textContent='Edit Quotation '+(inv.invoice_no||'');
   $('leadQuotationLeadMeta').textContent=(lead.business||'No business')+' • '+(lead.phone||'No phone')+' • '+isoDate(lead.created_at);
   $('leadQuotationCustomerCard').innerHTML='<div><span>Name</span><strong>'+esc(lead.name||'—')+'</strong></div><div><span>Business</span><strong>'+esc(lead.business||'—')+'</strong></div><div><span>Phone</span><strong>'+esc(lead.phone||'—')+'</strong></div><div><span>Email</span><strong>'+esc(lead.email||'—')+'</strong></div><div><span>Product requested</span><strong>'+esc(lead.product_name||'—')+'</strong></div><div><span>Quantity requested</span><strong>'+esc(lead.quantity??'—')+'</strong></div>';
-  const gstPercent=Number(inv.gst_percent||0);$('leadQuotationBillType').value=gstPercent>0?'GST':'NON_GST';$('leadQuotationGstin').value=inv.gstin||'';$('leadQuotationGstPercent').value=String(gstPercent||18);$('leadQuotationDiscount').value=String(Number(inv.discount||0));$('leadQuotationSource').value=leadQuotationSourceForLead({source:inv.source||lead.source});
+  const gstPercent=Number(inv.gst_percent||0);$('leadQuotationBillType').value=gstPercent>0?'GST':'NON_GST';$('leadQuotationGstin').value=inv.gstin||'';$('leadQuotationGstPercent').value=String(gstPercent||18);$('leadQuotationDiscount').value=String(Number(inv.discount||0));$('leadQuotationSource').value=leadQuotationSourceForLead({source:inv.source||lead.source});$('leadQuotationNotes').value=inv.quotation_notes||'';
   $('leadQuotationLines').innerHTML='';
   iq.data.forEach(item=>{addLeadQuotationLine(item.product_id);const rows=[...document.querySelectorAll('#leadQuotationLines .lead-quotation-line')],row=rows[rows.length-1];if(row){row.querySelector('.lqq').value=String(item.qty||1);row.querySelector('.lqr').value=Number(item.unit_price||0).toFixed(2);}});
   calcLeadQuotation();$('leadQuotationDialog').showModal();
@@ -2221,7 +2222,7 @@ window.createQuotationForLead=async function(id){
   leadQuotationEnquiryId=id;leadQuotationEditingInvoiceId=null;$('leadQuotationTitle').textContent='Quotation for '+(lead.name||'Lead');
   $('leadQuotationLeadMeta').textContent=(lead.business||'No business')+' • '+(lead.phone||'No phone')+' • '+isoDate(lead.created_at);
   $('leadQuotationCustomerCard').innerHTML='<div><span>Name</span><strong>'+esc(lead.name||'—')+'</strong></div><div><span>Business</span><strong>'+esc(lead.business||'—')+'</strong></div><div><span>Phone</span><strong>'+esc(lead.phone||'—')+'</strong></div><div><span>Email</span><strong>'+esc(lead.email||'—')+'</strong></div><div><span>Product requested</span><strong>'+esc(lead.product_name||'—')+'</strong></div><div><span>Quantity requested</span><strong>'+esc(lead.quantity??'—')+'</strong></div>';
-  $('leadQuotationBillType').value='NON_GST';$('leadQuotationGstin').value='';$('leadQuotationGstPercent').value='18';$('leadQuotationDiscount').value='0';$('leadQuotationSource').value=leadQuotationSourceForLead(lead);$('leadQuotationLines').innerHTML='';addLeadQuotationLine();calcLeadQuotation();$('leadQuotationDialog').showModal();
+  $('leadQuotationBillType').value='NON_GST';$('leadQuotationGstin').value='';$('leadQuotationGstPercent').value='18';$('leadQuotationDiscount').value='0';$('leadQuotationSource').value=leadQuotationSourceForLead(lead);$('leadQuotationNotes').value='';$('leadQuotationLines').innerHTML='';addLeadQuotationLine();calcLeadQuotation();$('leadQuotationDialog').showModal();
 };
 $('leadQuotationAddLine')?.addEventListener('click',()=>addLeadQuotationLine());$('leadQuotationBillType')?.addEventListener('change',calcLeadQuotation);$('leadQuotationDiscount')?.addEventListener('input',calcLeadQuotation);$('leadQuotationGstPercent')?.addEventListener('input',calcLeadQuotation);
 $('leadQuotationGstin')?.addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase().slice(0,15);calcLeadQuotation();});$('closeLeadQuotation')?.addEventListener('click',()=>$('leadQuotationDialog')?.close());
@@ -2234,7 +2235,7 @@ $('leadQuotationForm')?.addEventListener('submit',async e=>{
   if(billType==='GST'&&(!gstPercent||gstPercent<=0||gstPercent>100))return toast('Enter a valid GST rate.',false);
   if(billType==='GST'&&!validGstin(gstin))return toast('Enter a valid 15-character GSTIN for a GST quotation.',false);
   const discount=Math.max(0,Number($('leadQuotationDiscount').value||0)),stamp=new Date().toISOString().slice(0,10).replaceAll('-',''),no='QT-'+stamp+'-'+String(Date.now()).slice(-5);
-  const invoicePayload={invoice_no:no,document_type:'QUOTATION',source:$('leadQuotationSource').value,customer_id:null,customer_name:lead.name||'',customer_phone:normalizePhone(lead.phone||''),customer_business:lead.business||'',customer_email:lead.email||'',gstin:gstin,billing_address:'',delivery_address:'',gst_percent:gstPercent,discount};
+  const invoicePayload={invoice_no:no,document_type:'QUOTATION',source:$('leadQuotationSource').value,customer_id:null,customer_name:lead.name||'',customer_phone:normalizePhone(lead.phone||''),customer_business:lead.business||'',customer_email:lead.email||'',gstin:gstin,billing_address:'',delivery_address:'',gst_percent:gstPercent,discount,quotation_notes:String($('leadQuotationNotes')?.value||'').trim()};
   const editingId=leadQuotationEditingInvoiceId;
   const button=$('leadQuotationSave');if(button){button.disabled=true;button.textContent=editingId?'Saving…':'Generating…';}
   try{
