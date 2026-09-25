@@ -86,8 +86,6 @@ function bindNotificationSettings(){
    renderNotificationVolume();
  });
  ["notifEnabled","notifSound","notifDesktop","notifWebsiteOrders","notifWebsiteEnquiries","notifEmployeeAccess","notifEmployeeChanges","notifRestrictedAccess","notifLowStock","notifPayments","notifCreditDue"].forEach(id=>$(id)?.addEventListener("change",saveNotificationPreferences));
- $("enablePushNotifications")?.addEventListener("click",registerManagerPush);
- $("testPushNotification")?.addEventListener("click",testManagerPush);
  $("enableDesktopNotifications")?.addEventListener("click",async()=>{
    if(!("Notification" in window)){toast("Desktop notifications are not supported by this browser.",false);return;}
    const p=await Notification.requestPermission();
@@ -112,12 +110,7 @@ async function maybeBrowserNotify(n,pref){
  }catch(e){console.warn("Browser notification failed",e);}
 }
 
-async function ensureManagerNotificationPermission(){
- if(!("Notification" in window))return false;
- if(Notification.permission==="granted")return true;
- if(Notification.permission==="denied")return false;
- try{return (await Notification.requestPermission())==="granted";}catch(e){return false;}
-}
+
 function notificationStoreKey(type){return "cleancore_manager_notifications_"+type+"_"+(user?.id||"guest")}
 function isWebsiteManagerNotification(n){return n&&["Website Order","Website Enquiry"].includes(n.notification_type)}
 function notificationTime(v){return v?new Date(v).toLocaleString("en-IN"):"—"}
@@ -162,7 +155,7 @@ document.addEventListener("pointerdown",unlockNotificationAudio,{once:true,captu
 function notificationReadAt(){return Number(localStorage.getItem(notificationStoreKey("read"))||0)}
 function notificationAlertedAt(){return Number(localStorage.getItem(notificationStoreKey("alerted"))||0)}
 function setNotificationTimestamp(type,v){localStorage.setItem(notificationStoreKey(type),String(v))}
-function formatPushNotification(n){
+function formatNotification(n){
  const type=n?.notification_type||"Notification";
  const isOrder=type==="Website Order";
  const title=isOrder?"New Website Order":"New Website Enquiry";
@@ -170,7 +163,7 @@ function formatPushNotification(n){
  return {title,body,icon:"icon-192.svg",badge:"icon-192.svg"};
 }
 function showInPageNotification(n){
- const d=formatPushNotification(n);
+ const d=formatNotification(n);
  toast((d.title==="New Website Order"?"🛒 ":"✉️ ")+d.title);
 }
 function renderWebsiteNotifications(){
