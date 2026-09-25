@@ -2139,7 +2139,14 @@ window.viewLeadQuotation=async function(invoiceId){
   }else{
     renderLeadQuotationPreview(cached,[]);
   }
-  try{dialog.hidden=false;dialog.setAttribute('data-invoice-open','1');}catch(err){return toast(err?.message||'Unable to open quotation.',false);}
+  try{
+    dialog.hidden=false;
+    dialog.setAttribute('data-invoice-open','1');
+    dialog.classList.add('invoice-viewer-panel');
+    dialog.setAttribute('aria-hidden','false');
+  }catch(err){
+    return toast(err?.message||'Unable to open quotation.',false);
+  }
 
   try{
     let inv=cached;
