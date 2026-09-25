@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.73";
+const MANAGER_VERSION="3.8.74";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -2139,7 +2139,7 @@ window.viewLeadQuotation=async function(invoiceId){
   }else{
     renderLeadQuotationPreview(cached,[]);
   }
-  try{if(dialog.open)dialog.close();dialog.showModal();}catch(err){return toast(err?.message||'Unable to open quotation.',false);}
+  try{if(dialog.open)dialog.close();dialog.show();}catch(err){return toast(err?.message||'Unable to open quotation.',false);}
 
   try{
     let inv=cached;
