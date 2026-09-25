@@ -2243,8 +2243,6 @@ window.viewInvoice=async id=>{
     if(inv)invoices.push(inv);
   }
   if(!inv)return toast("Invoice/quotation not found. Refresh Manager data and try again.",false);
- const inv=invoices.find(x=>x.id===id);
- if(!inv)return toast("Invoice not found. Refresh Manager data and try again.",false);
  try{
    const items=await loadInvoiceItemsForView(inv);
    const hasGst=Number(inv.gst_amount||0)>0;
