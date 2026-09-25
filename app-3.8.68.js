@@ -2179,7 +2179,7 @@ function calcLeadQuotation(){
   let subtotal=0;
   document.querySelectorAll('#leadQuotationLines .lead-quotation-line').forEach(row=>{
     const qty=Math.max(0,Math.floor(Number(row.querySelector('.lqq')?.value||0)));
-    const rate=Math.max(0,Number(row.querySelector('.lqr')?.value||0)));
+    const rate=Math.max(0,Number(row.querySelector('.lqr')?.value||0));
     const lineTotal=qty*rate;subtotal+=lineTotal;row.querySelector('.lv').textContent=money(lineTotal);
   });
   const discount=Math.min(subtotal,Math.max(0,Number($('leadQuotationDiscount')?.value||0)));
