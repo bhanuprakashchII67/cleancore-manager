@@ -873,7 +873,7 @@ function bindDashboardMetricLinks(){
 function isSaleDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="SALE";}
 function isQuotationDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="QUOTATION";}
 function enquiryDocumentLinks(x){
-  const normalize=v=>String(v||"").replace(/\\D/g,"");
+  const normalize=v=>String(v||"").replace(/\D/g,"");
   const phone=normalize(x.phone);
   const name=String(x.name||"").trim().toLowerCase();
   const business=String(x.business||"").trim().toLowerCase();
