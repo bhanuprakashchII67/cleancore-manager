@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.62";
+const MANAGER_VERSION="3.8.63";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -2204,52 +2204,15 @@ async function loadInvoiceItemsForView(invoice){
   return [];
 }
 window.viewInvoice=async id=>{
- const inv=invoices.find(x=>x.id===id);
- if(!inv)return toast("Invoice not found. Refresh Manager data and try again.",false);
- try{
-   const items=await loadInvoiceItemsForView(inv);
-   const hasGst=Number(inv.gst_amount||0)>0;
-   const isQuotation=isQuotationDocument(inv);
-   const intra=Number(inv.cgst_amount||0)>0 || Number(inv.sgst_amount||0)>0;
-   const cgst=Number(inv.cgst_amount||0),sgst=Number(inv.sgst_amount||0),igst=Number(inv.igst_amount||0);
-   const taxRows=intra
-    ? "<tr><td colspan='5' class='tax-label'>CGST ("+Number(inv.cgst_percent||0)+"%)</td><td>"+money(cgst)+"</td></tr><tr><td colspan='5' class='tax-label'>SGST ("+Number(inv.sgst_percent||0)+"%)</td><td>"+money(sgst)+"</td></tr>"
-    : (igst>0 ? "<tr><td colspan='5' class='tax-label'>IGST ("+Number(inv.igst_percent||0)+"%)</td><td>"+money(igst)+"</td></tr>" : "");
-   const rows=items.map((it,n)=>"<tr><td>"+(n+1)+"</td><td>"+esc(it.product_name)+"</td><td>"+esc(it.hsn_code||"—")+"</td><td>"+it.qty+"</td><td>"+money(it.unit_price)+"</td><td>"+money(it.line_total)+"</td></tr>").join("");
-   const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
-   const date=new Date(inv.created_at);
-   const gstLabel=documentLabel(inv);
-   const billingAddress=inv.billing_address||"—";
-   const deliveryAddress=inv.delivery_address||"—";
-   const invGstin=String(inv.gstin||"").trim();
-   const isGstBill=Number(inv.gst_percent||0)>0 || Number(inv.gst_amount||0)>0;
-   const customerGstin=isGstBill ? (invGstin && invGstin.toLowerCase()!=="na" ? invGstin : "NA") : "";
-   const businessName=String(inv.customer_business||"").trim();
-   const hasBusiness=businessName && businessName.toLowerCase()!=="na";
-   const metaStatus=isQuotation
-     ? "<b>Document Type:</b> Quotation Invoice"
-     : "<b>Place of Supply:</b> "+esc(inv.place_of_supply||"Telangana");
-   const quoteNote=isQuotation
-     ? "<div class='quote-note'><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document is a price quotation and does not record a sale, payment, or stock movement.</div>"
-     : "";
-   const terms=isQuotation
-     ? "<b>Quotation Terms</b><p>Prices are quoted for the listed items and quantities.<br>This quotation is subject to final confirmation before sale.</p>"
-     : "<b>Terms & Conditions</b><p>Goods once sold will not be taken back unless agreed in writing.<br>Payment as per agreed business terms.<br>Subject to Hyderabad, Telangana jurisdiction.</p>";
-   const footerMark=isQuotation?"FOR QUOTATION":"ORIGINAL FOR RECIPIENT";
-   $("invoicePreview").innerHTML="<div class='invoice-preview'>"+
-    "<div class='inv-header'><div><img class='invoice-logo' src='logo.svg' alt='CleanCore logo'><div class='inv-brand'>CleanCore Chemical & Cleaning</div><div class='inv-sub'>Manufacturing & Supply of Cleaning Chemicals</div><div>Srinivasa Colony, Manikonda, Hyderabad, Telangana, India, India</div><div>Phone: +91 91827 25773</div><div>Email: "+BUSINESS_EMAIL+"</div></div><div class='inv-title'><b>"+gstLabel+"</b><span>"+footerMark+"</span></div></div>"+
-    "<div class='inv-meta'><div><b>Bill No:</b> "+esc(inv.invoice_no)+"<br><b>Date:</b> "+date.toLocaleDateString("en-IN")+"</div><div>"+metaStatus+"</div></div>"+
-    "<div class='inv-parties'><div><b>BILL FROM</b><p><strong>CleanCore Chemical & Cleaning</strong><br>Srinivasa Colony, Manikonda, Hyderabad, Telangana, India<br>Phone: +91 91827 25773<br>Email: "+BUSINESS_EMAIL+"</p></div><div><b>BILL TO</b><p>"+(hasBusiness?"<b>Business Name:</b> "+esc(businessName)+"<br>":"")+(inv.customer_name?"<b>Customer Name:</b> "+esc(inv.customer_name)+"<br>":"")+"<b>Phone:</b> "+esc(inv.customer_phone||"—")+"<br>"+(inv.customer_email?"<b>Email:</b> "+esc(inv.customer_email)+"<br>":"")+(isGstBill?"<b>GSTIN:</b> "+esc(customerGstin)+"<br>":"")+"<span class='invoice-address-label'><b>Billing Address:</b></span><br>"+esc(billingAddress)+"<br><span class='invoice-address-label'><b>Delivery Address:</b></span><br>"+esc(deliveryAddress)+"</p></div></div>"+
-    "<table class='invoice-items'><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Taxable Value</th></tr></thead><tbody>"+rows+
-    "<tr class='subtotal-row'><td colspan='5'>Subtotal</td><td>"+money(inv.subtotal)+"</td></tr>"+(Number(inv.discount||0)>0?"<tr><td colspan='5' class='tax-label'>Discount</td><td>- "+money(inv.discount)+"</td></tr>":"")+"<tr><td colspan='5' class='tax-label'>Taxable Value</td><td>"+money(taxable)+"</td></tr>"+taxRows+
-    "<tr class='grand-total'><td colspan='5'>TOTAL</td><td>"+money(inv.total)+"</td></tr></tbody></table>"+
-    quoteNote+
-    "<div class='amount-words'><b>Total in words:</b> "+esc(numberToWordsIndian(Number(inv.total||0)))+" ONLY</div>"+
-    "<div class='inv-bottom'><div>"+terms+"</div><div class='signature'><span>For CleanCore Chemical & Cleaning</span><br><br><b>Authorised Signature</b></div></div>"+
-    "</div>";
-   const dialog=$("invoiceDialog");
-   if(dialog){
-     try{if(dialog.open)dialog.close();}catch(_){}
+  let inv=invoices.find(x=>x.id===id);
+  if(!inv){
+    const q=await db.from("invoices").select("*").eq("id",id).maybeSingle();
+    if(q.error)return toast(q.error.message||"Unable to load invoice.",false);
+    inv=q.data;
+    if(inv)invoices.push(inv);
+  }
+  if(!inv)return toast("Invoice/quotation not found. Refresh Manager data and try again.",false);
+  try{if(dialog.open)dialog.close();}catch(_){}
      dialog.showModal();
      dialog.setAttribute("data-invoice-open","1");
    }
