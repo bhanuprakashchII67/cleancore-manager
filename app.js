@@ -2090,6 +2090,7 @@ $("customerForm").addEventListener("submit",async e=>{
 
 
 let leadQuotationEnquiryId=null;
+let leadQuotationEditingInvoiceId=null;
 let leadQuotationTotal=0;
 function leadQuotationCurrentLead(){return enquiries.find(x=>x.id===leadQuotationEnquiryId)||null;}
 function leadQuotationSourceForLead(lead){const s=String(lead?.source||'Offline');return ['Website','WhatsApp','Offline'].includes(s)?s:'Offline';}
@@ -2143,6 +2144,7 @@ window.viewLeadQuotation=async function(invoiceId){
   try{
     dialog.hidden=false;
     dialog.setAttribute('data-invoice-open','1');
+    dialog.setAttribute('data-quotation-id',id);
     dialog.classList.add('quotation-viewer-panel');
     dialog.setAttribute('aria-hidden','false');
   }catch(err){
@@ -2159,7 +2161,7 @@ window.viewLeadQuotation=async function(invoiceId){
       invoices=[inv,...invoices.filter(x=>x.id!==id)];
     }
     renderLeadQuotationPreview(inv,[]);
-    const iq=await db.from('invoice_items').select('product_name,hsn_code,qty,unit_price,line_total').eq('invoice_id',id).order('created_at');
+    const iq=await db.from('invoice_items').select('product_id,product_name,hsn_code,qty,unit_price,line_total').eq('invoice_id',id).order('created_at');
     if(iq.error)throw iq.error;
     renderLeadQuotationPreview(inv,iq.data||[]);
   }catch(err){
@@ -2186,11 +2188,37 @@ function renderLeadQuotationPreview(inv,items){
     '<div class="quote-note"><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document does not record a sale, payment, or stock movement.</div>'+
     '</div>';
 }
+async function editLeadQuotation(invoiceId){
+  if(!isAdmin)return toast('Only the Manager can edit quotations.',false);
+  const id=String(invoiceId||'').trim(),inv=invoices.find(x=>x.id===id);
+  if(!inv||!isQuotationDocument(inv))return toast('Quotation not found.',false);
+  const lead=enquiries.find(x=>x.invoice_id===id);if(!lead)return toast('Linked enquiry not found.',false);
+  const iq=await db.from('invoice_items').select('product_id,qty,unit_price').eq('invoice_id',id).order('created_at');
+  if(iq.error)return toast(iq.error.message,false);if(!iq.data?.length)return toast('Quotation has no items to edit.',false);
+  leadQuotationEnquiryId=lead.id;leadQuotationEditingInvoiceId=id;
+  $('leadQuotationTitle').textContent='Edit Quotation '+(inv.invoice_no||'');
+  $('leadQuotationLeadMeta').textContent=(lead.business||'No business')+' • '+(lead.phone||'No phone')+' • '+isoDate(lead.created_at);
+  $('leadQuotationCustomerCard').innerHTML='<div><span>Name</span><strong>'+esc(lead.name||'—')+'</strong></div><div><span>Business</span><strong>'+esc(lead.business||'—')+'</strong></div><div><span>Phone</span><strong>'+esc(lead.phone||'—')+'</strong></div><div><span>Email</span><strong>'+esc(lead.email||'—')+'</strong></div><div><span>Product requested</span><strong>'+esc(lead.product_name||'—')+'</strong></div><div><span>Quantity requested</span><strong>'+esc(lead.quantity??'—')+'</strong></div>';
+  const gstPercent=Number(inv.gst_percent||0);$('leadQuotationBillType').value=gstPercent>0?'GST':'NON_GST';$('leadQuotationGstin').value=inv.gstin||'';$('leadQuotationGstPercent').value=String(gstPercent||18);$('leadQuotationDiscount').value=String(Number(inv.discount||0));$('leadQuotationSource').value=leadQuotationSourceForLead({source:inv.source||lead.source});
+  $('leadQuotationLines').innerHTML='';
+  iq.data.forEach(item=>{addLeadQuotationLine(item.product_id);const rows=[...document.querySelectorAll('#leadQuotationLines .lead-quotation-line')],row=rows[rows.length-1];if(row){row.querySelector('.lqq').value=String(item.qty||1);row.querySelector('.lqr').value=Number(item.unit_price||0).toFixed(2);}});
+  calcLeadQuotation();$('leadQuotationDialog').showModal();
+}
+window.deleteLeadQuotation=async function(invoiceId){
+  if(!isAdmin)return toast('Only the Manager can delete quotations.',false);
+  const id=String(invoiceId||'').trim(),inv=invoices.find(x=>x.id===id);
+  if(!inv||!isQuotationDocument(inv))return toast('Quotation not found.',false);
+  if(!confirm('Delete quotation '+(inv.invoice_no||'')+'? The quotation will be moved to Recovery and the enquiry will remain available for a new quotation.'))return;
+  const {error}=await db.rpc('delete_quotation_with_recovery',{p_invoice_id:id});
+  if(error)return toast(error.message||'Unable to delete quotation.',false);
+  const d=$('quotationDialog');if(d)d.hidden=true;
+  await loadAll();toast('Quotation deleted and moved to Recovery.');
+}
 window.createQuotationForLead=async function(id){
   if(!isAdmin)return toast('Only the Manager can create quotations from leads.',false);
   const lead=enquiries.find(x=>x.id===id);if(!lead)return toast('Lead not found. Refresh the Leads page.',false);
   if(lead.invoice_id)return window.viewLeadQuotation(lead.invoice_id);if(!products.length)return toast('Add products before creating a quotation.',false);
-  leadQuotationEnquiryId=id;$('leadQuotationTitle').textContent='Quotation for '+(lead.name||'Lead');
+  leadQuotationEnquiryId=id;leadQuotationEditingInvoiceId=null;$('leadQuotationTitle').textContent='Quotation for '+(lead.name||'Lead');
   $('leadQuotationLeadMeta').textContent=(lead.business||'No business')+' • '+(lead.phone||'No phone')+' • '+isoDate(lead.created_at);
   $('leadQuotationCustomerCard').innerHTML='<div><span>Name</span><strong>'+esc(lead.name||'—')+'</strong></div><div><span>Business</span><strong>'+esc(lead.business||'—')+'</strong></div><div><span>Phone</span><strong>'+esc(lead.phone||'—')+'</strong></div><div><span>Email</span><strong>'+esc(lead.email||'—')+'</strong></div><div><span>Product requested</span><strong>'+esc(lead.product_name||'—')+'</strong></div><div><span>Quantity requested</span><strong>'+esc(lead.quantity??'—')+'</strong></div>';
   $('leadQuotationBillType').value='NON_GST';$('leadQuotationGstin').value='';$('leadQuotationGstPercent').value='18';$('leadQuotationDiscount').value='0';$('leadQuotationSource').value=leadQuotationSourceForLead(lead);$('leadQuotationLines').innerHTML='';addLeadQuotationLine();calcLeadQuotation();$('leadQuotationDialog').showModal();
@@ -2198,16 +2226,30 @@ window.createQuotationForLead=async function(id){
 $('leadQuotationAddLine')?.addEventListener('click',()=>addLeadQuotationLine());$('leadQuotationBillType')?.addEventListener('change',calcLeadQuotation);$('leadQuotationDiscount')?.addEventListener('input',calcLeadQuotation);$('leadQuotationGstPercent')?.addEventListener('input',calcLeadQuotation);
 $('leadQuotationGstin')?.addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase().slice(0,15);calcLeadQuotation();});$('closeLeadQuotation')?.addEventListener('click',()=>$('leadQuotationDialog')?.close());
 $('leadQuotationForm')?.addEventListener('submit',async e=>{
-  e.preventDefault();const lead=leadQuotationCurrentLead();if(!lead)return;if(lead.invoice_id)return toast('This lead already has a quotation. Use View quotation.',false);
+  e.preventDefault();const lead=leadQuotationCurrentLead();if(!lead)return;
+  if(!leadQuotationEditingInvoiceId&&lead.invoice_id)return toast('This lead already has a quotation. Use View quotation.',false);
   const items=[...document.querySelectorAll('#leadQuotationLines .lead-quotation-line')].map(row=>{const p=products.find(x=>x.id===row.querySelector('.lqp')?.value);const qty=Math.max(0,Math.floor(Number(row.querySelector('.lqq')?.value||0)));const rate=Math.max(0,Number(row.querySelector('.lqr')?.value||0));return p&&qty>0?{product_id:p.id,qty,unit_price:rate}:null;}).filter(Boolean);
-  if(!items.length)return toast('Add at least one quotation item.',false);const billType=$('leadQuotationBillType').value,gstPercent=billType==='GST'?Number($('leadQuotationGstPercent').value||0):0,gstin=String($('leadQuotationGstin').value||'').trim().toUpperCase();
-  if(billType==='GST'&&(!gstPercent||gstPercent<=0||gstPercent>100))return toast('Enter a valid GST rate.',false);if(billType==='GST'&&!validGstin(gstin))return toast('Enter a valid 15-character GSTIN for a GST quotation.',false);
+  if(!items.length)return toast('Add at least one quotation item.',false);
+  const billType=$('leadQuotationBillType').value,gstPercent=billType==='GST'?Number($('leadQuotationGstPercent').value||0):0,gstin=String($('leadQuotationGstin').value||'').trim().toUpperCase();
+  if(billType==='GST'&&(!gstPercent||gstPercent<=0||gstPercent>100))return toast('Enter a valid GST rate.',false);
+  if(billType==='GST'&&!validGstin(gstin))return toast('Enter a valid 15-character GSTIN for a GST quotation.',false);
   const discount=Math.max(0,Number($('leadQuotationDiscount').value||0)),stamp=new Date().toISOString().slice(0,10).replaceAll('-',''),no='QT-'+stamp+'-'+String(Date.now()).slice(-5);
   const invoicePayload={invoice_no:no,document_type:'QUOTATION',source:$('leadQuotationSource').value,customer_id:null,customer_name:lead.name||'',customer_phone:normalizePhone(lead.phone||''),customer_business:lead.business||'',customer_email:lead.email||'',gstin:gstin,billing_address:'',delivery_address:'',gst_percent:gstPercent,discount};
-  const button=$('leadQuotationSave');if(button){button.disabled=true;button.textContent='Generating…';}
-  try{const {data,error}=await db.rpc('create_quotation_from_enquiry',{p_enquiry_id:lead.id,p_invoice:invoicePayload,p_items:items});if(error)throw error;if(!data?.id)throw new Error('Quotation was not created.');$('leadQuotationDialog').close();await loadAll();toast('Quotation '+(data.invoice_no||no)+' created.');setTimeout(()=>window.viewLeadQuotation(data.id),50);}
-  catch(err){toast(err?.message||'Unable to create quotation.',false);reportClientError(err instanceof Error?err:new Error(String(err?.message||err)),{action:'create_lead_quotation',context:{enquiry_id:lead.id}});}
-  finally{if(button){button.disabled=false;button.textContent='Generate Quotation';}}
+  const editingId=leadQuotationEditingInvoiceId;
+  const button=$('leadQuotationSave');if(button){button.disabled=true;button.textContent=editingId?'Saving…':'Generating…';}
+  try{
+    const result=editingId
+      ?await db.rpc('update_quotation_from_enquiry',{p_invoice_id:editingId,p_invoice:invoicePayload,p_items:items})
+      :await db.rpc('create_quotation_from_enquiry',{p_enquiry_id:lead.id,p_invoice:invoicePayload,p_items:items});
+    if(result.error)throw result.error;
+    if(!result.data?.id)throw new Error(editingId?'Quotation was not updated.':'Quotation was not created.');
+    const id=result.data.id;$('leadQuotationDialog').close();leadQuotationEditingInvoiceId=null;await loadAll();
+    toast('Quotation '+(result.data.invoice_no||no)+(editingId?' updated.':' created.'));
+    setTimeout(()=>window.viewLeadQuotation(id),50);
+  }catch(err){
+    toast(err?.message||'Unable to save quotation.',false);
+    reportClientError(err instanceof Error?err:new Error(String(err?.message||err)),{action:editingId?'update_lead_quotation':'create_lead_quotation',context:{enquiry_id:lead.id,invoice_id:editingId||null}});
+  }finally{if(button){button.disabled=false;button.textContent='Generate Quotation';}}
 });
 
 $("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
@@ -2461,9 +2503,11 @@ $("printInvoice").onclick=e=>{
  try{printInvoiceNow();}
  catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
 };
+$("editQuotation").onclick=()=>{const id=$("quotationDialog")?.getAttribute("data-quotation-id");$("quotationDialog").hidden=true;if(id)editLeadQuotation(id);};
+$("deleteQuotation").onclick=()=>{const id=$("quotationDialog")?.getAttribute("data-quotation-id");if(id)window.deleteLeadQuotation(id);};
 $("closeQuotation").onclick=()=>{
  const d=$("quotationDialog");
- if(d){d.hidden=true;d.removeAttribute("data-quotation-open");}
+ if(d){d.hidden=true;d.removeAttribute("data-quotation-open");d.removeAttribute("data-quotation-id");}
  document.body.classList.remove("invoice-open");
  document.documentElement.classList.remove("invoice-open");
 };
