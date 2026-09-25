@@ -10,4 +10,3 @@ self.addEventListener('fetch',e=>{
  }
  e.respondWith(fetch(r).catch(()=>caches.match(r)));
 });
-self.addEventListener('push',e=>e.stopImmediatePropagation());
