@@ -2230,7 +2230,7 @@ document.addEventListener("click",e=>{
  const btn=e.target.closest?.(".view-bill");
  if(btn){e.preventDefault();window.viewInvoice(btn.dataset.invoiceId);return;}
  const quoteBtn=e.target.closest?.(".view-quotation");
- if(quoteBtn){e.preventDefault();window.viewInvoice(quoteBtn.dataset.invoiceId);return;}
+ if(quoteBtn){e.preventDefault();window.viewLeadQuotation(quoteBtn.dataset.invoiceId);return;}
  const leadQuote=e.target.closest?.(".view-lead-quotation");
  if(leadQuote){e.preventDefault();window.viewLeadQuotation(leadQuote.dataset.invoiceId);return;}
  const leadCreate=e.target.closest?.(".create-lead-quotation");
