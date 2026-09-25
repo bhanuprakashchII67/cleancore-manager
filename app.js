@@ -283,7 +283,7 @@ function announceWebsiteNotification(n){
      const en=await db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250);
      if(en.error)throw en.error;
      enquiries=en.data||[];
-     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date","Documents",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),enquiryDocumentLinks(x),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
    }
  };
  refresh().catch(err=>console.warn("Manager alert refresh:",err.message));
@@ -483,11 +483,6 @@ async function submitChange(module,action,targetTable,targetId,payload,reason=""
 }
 async function enter(){
  await loadAccess();
-
- // Do not block the Manager shell on a secondary data query.
- // Authentication + access verification are the gate; dashboard data can load
- // afterward. Previously, one failing table query in loadAll() left the login
- // screen visible and made a successful login look like a dead Sign in button.
  $("loginView").classList.add("hidden");
  $("appView").classList.remove("hidden");
  $("profileEmail").textContent=isAdmin?user.email:(employee.alert_email||("Username: "+employee.username));
@@ -495,29 +490,19 @@ async function enter(){
  if($("profileRole"))$("profileRole").textContent=isAdmin?"Administrator":("Employee • "+employee.team);
  if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
  applyAccess();
-
- // Load preferences/data without preventing the authenticated UI from opening.
  try{
    if(isAdmin)await loadNotificationPreferences();
- }catch(err){
-   console.error("Manager notification preferences load failed",err);
-   reportClientError(err,{action:"load_notification_preferences"});
- }
+ }catch(err){console.error("Manager notification preferences load failed",err);}
  try{
    await loadAll();
  }catch(err){
    console.error("CleanCore Manager data load failed",err);
    reportClientError(err,{action:"load_manager_data"});
-   toast("Manager opened, but some data could not be loaded. Use Refresh after checking your connection.",false);
+   toast("Manager opened, but some data could not be loaded. Use Refresh to retry.",false);
  }
  if(isAdmin)startWebsiteNotifications();
  const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
- try{
-   await go(first);
- }catch(err){
-   console.error("CleanCore Manager initial page load failed",err);
-   reportClientError(err,{action:"load_initial_page",context:{section:first}});
- }
+ try{await go(first);}catch(err){console.error("CleanCore Manager initial page load failed",err);reportClientError(err,{action:"load_initial_page"});}
 }
 $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();
@@ -543,19 +528,13 @@ $("loginForm").addEventListener("submit",async e=>{
    if(error)return toast("Login failed: "+error.message,false);
    if(!data?.session)return toast("Login failed: No session returned.",false);
    user=data.user;
-
-   // Switch to the Manager immediately after authentication succeeds.
-   // Never leave a valid authenticated user staring at the login form because
-   // a secondary startup/data request failed.
-   $("loginView").classList.add("hidden");
-   $("appView").classList.remove("hidden");
+   $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
    startManagerLoginWindow();
    try{
      await enter();
    }catch(err){
      console.error("CleanCore Manager startup error",err);
-     reportClientError(err,{action:"manager_startup_after_login"});
-     toast(err?.message||"Manager opened with limited data. Use Refresh to retry.",false);
+     return toast(err?.message||"Unable to open the Manager.",false);
    }
  }catch(err){
    console.error("CleanCore login error",err);
@@ -903,24 +882,6 @@ function bindDashboardMetricLinks(){
 
 function isSaleDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="SALE";}
 function isQuotationDocument(inv){return String(inv?.document_type||"SALE").toUpperCase()==="QUOTATION";}
-function enquiryDocumentLinks(x){
-  const normalize=v=>String(v||"").replace(/\D/g,"");
-  const phone=normalize(x.phone);
-  const name=String(x.name||"").trim().toLowerCase();
-  const business=String(x.business||"").trim().toLowerCase();
-  const matches=invoices.filter(inv=>{
-    const invPhone=normalize(inv.customer_phone);
-    const invName=String(inv.customer_name||"").trim().toLowerCase();
-    const invBusiness=String(inv.customer_business||"").trim().toLowerCase();
-    return (phone&&invPhone===phone) || (name&&invName===name&&(!business||!invBusiness||invBusiness===business));
-  }).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  const sale=matches.find(isSaleDocument);
-  const quote=matches.find(isQuotationDocument);
-  const links=[];
-  if(sale)links.push("<button type='button' class='link' onclick=\"viewInvoice('"+esc(sale.id)+"')\">Invoice</button>");
-  if(quote)links.push("<button type='button' class='link' onclick=\"viewInvoice('"+esc(quote.id)+"')\">Quotation</button>");
-  return links.length?links.join(" "):"<span class='muted'>—</span>";
-}
 function documentLabel(inv){return isQuotationDocument(inv)?"QUOTATION INVOICE":(Number(inv?.gst_amount||0)>0?"TAX INVOICE":"INVOICE");}
 function renderQuotations(){
  const list=invoices.filter(isQuotationDocument).slice(0,20);
@@ -2184,15 +2145,9 @@ $("customerForm").addEventListener("submit",async e=>{
  toast("Customer saved");
  await loadAll();
 });
-$("addEnquiry").onclick=()=>{$("enquiryForm").reset();$("estatus").value="New";$("enquiryDialog").showModal()};
-$("enquiryForm").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value,source:"manager"};
-  if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return;}
-  const {error}=await db.from("enquiries").insert(payload);
-  if(error)return toast(error.message,false);
-  $("enquiryDialog").close();toast("Enquiry saved as Offline lead");await loadAll();
-});
+$("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
+$("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value,source:"manager"};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
+$("export").onclick=()=>{
  const from=$("salesFrom")?.value,to=$("salesTo")?.value;
  let list=invoices.filter(isSaleDocument);
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
