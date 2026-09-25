@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.67";
+const MANAGER_VERSION="3.8.68";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -2180,7 +2180,7 @@ function calcLeadQuotation(){
   let subtotal=0;
   document.querySelectorAll('#leadQuotationLines .lead-quotation-line').forEach(row=>{
     const qty=Math.max(0,Math.floor(Number(row.querySelector('.lqq')?.value||0)));
-    const rate=Math.max(0,Number(row.querySelector('.lqr')?.value||0)));
+    const rate=Math.max(0,Number(row.querySelector('.lqr')?.value||0));
     const lineTotal=qty*rate;subtotal+=lineTotal;row.querySelector('.lv').textContent=money(lineTotal);
   });
   const discount=Math.min(subtotal,Math.max(0,Number($('leadQuotationDiscount')?.value||0)));
