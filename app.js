@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.71";
+const MANAGER_VERSION="3.8.72";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -2130,12 +2130,41 @@ function calcLeadQuotation(){
 window.viewLeadQuotation=async function(invoiceId){
   const id=String(invoiceId||'').trim();
   if(!id)return toast('Quotation ID is missing.',false);
-  const q=await db.from('invoices').select('id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source').eq('id',id).maybeSingle();
-  if(q.error)return toast(q.error.message||'Unable to load quotation.',false);
-  const inv=q.data||null;
-  if(!inv)return toast('Quotation not found. Refresh Manager data and try again.',false);
-  invoices=[inv,...invoices.filter(x=>x.id!==inv.id)];
-  await window.viewInvoice(inv.id);
+  try{
+    const q=await db.from('invoices').select('id,invoice_no,customer_name,customer_phone,customer_email,customer_business,gstin,billing_address,delivery_address,subtotal,discount,total,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,created_at,document_type').eq('id',id).maybeSingle();
+    if(q.error)throw q.error;
+    const inv=q.data;
+    if(!inv)throw new Error('Quotation not found.');
+    const iq=await db.from('invoice_items').select('product_name,hsn_code,qty,unit_price,line_total').eq('invoice_id',id).order('created_at');
+    if(iq.error)throw iq.error;
+    const items=iq.data||[];
+    const rows=items.map((it,n)=>'<tr><td>'+(n+1)+'</td><td>'+esc(it.product_name||'')+'</td><td>'+esc(it.hsn_code||'—')+'</td><td>'+esc(it.qty)+'</td><td>'+money(it.unit_price)+'</td><td>'+money(it.line_total)+'</td></tr>').join('');
+    const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
+    const taxes=Number(inv.cgst_amount||0)+Number(inv.sgst_amount||0)+Number(inv.igst_amount||0);
+    const taxRows=taxes>0
+      ? '<tr><td colspan="5">GST</td><td>'+money(taxes)+'</td></tr>'
+      : '';
+    const preview=$('invoicePreview');
+    if(!preview)throw new Error('Quotation viewer is unavailable on this page.');
+    preview.innerHTML='<div class="invoice-preview">'+
+      '<div class="inv-header"><div><div class="inv-brand">CleanCore Chemical & Cleaning</div><div class="inv-sub">Quotation</div><div>Srinivasa Colony, Manikonda, Hyderabad, Telangana, India</div><div>Phone: +91 91827 25773</div><div>Email: '+esc(BUSINESS_EMAIL)+'</div></div><div class="inv-title"><b>QUOTATION</b><span>FOR QUOTATION</span></div></div>'+
+      '<div class="inv-meta"><div><b>Quotation No:</b> '+esc(inv.invoice_no||'')+'<br><b>Date:</b> '+new Date(inv.created_at).toLocaleDateString('en-IN')+'</div><div><b>Document Type:</b> Quotation</div></div>'+
+      '<div class="inv-parties"><div><b>QUOTATION FROM</b><p>CleanCore Chemical & Cleaning</p></div><div><b>QUOTATION TO</b><p>'+(inv.customer_business?'<b>Business:</b> '+esc(inv.customer_business)+'<br>':'')+'<b>Name:</b> '+esc(inv.customer_name||'—')+'<br><b>Phone:</b> '+esc(inv.customer_phone||'—')+'<br>'+(inv.customer_email?'<b>Email:</b> '+esc(inv.customer_email)+'<br>':'')+(inv.gstin?'<b>GSTIN:</b> '+esc(inv.gstin)+'<br>':'')+'</p></div></div>'+
+      '<table class="invoice-items"><thead><tr><th>S.No.</th><th>Product / Service</th><th>HSN / SAC</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>'+rows+
+      '<tr class="subtotal-row"><td colspan="5">Subtotal</td><td>'+money(inv.subtotal)+'</td></tr>'+
+      (Number(inv.discount||0)>0?'<tr><td colspan="5">Discount</td><td>- '+money(inv.discount)+'</td></tr>':'')+
+      '<tr><td colspan="5">Taxable Value</td><td>'+money(taxable)+'</td></tr>'+taxRows+
+      '<tr class="grand-total"><td colspan="5">TOTAL</td><td>'+money(inv.total)+'</td></tr></tbody></table>'+
+      '<div class="quote-note"><b>QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.</b><br>This document does not record a sale, payment, or stock movement.</div>'+
+      '</div>';
+    const dialog=$('invoiceDialog');
+    if(!dialog)throw new Error('Quotation dialog is unavailable.');
+    if(dialog.open)dialog.close();
+    dialog.showModal();
+  }catch(err){
+    console.error('Quotation viewer error',err);
+    toast(err?.message||'Unable to open quotation.',false);
+  }
 };
 window.createQuotationForLead=async function(id){
   if(!isAdmin)return toast('Only the Manager can create quotations from leads.',false);
