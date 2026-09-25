@@ -2479,6 +2479,7 @@ async function restoreManagerSession(){
    toast(err?.message||"Unable to restore the Manager session.",false);
  }
 }
+window.__CLEANCORE_APP_READY=true;
 bindRefreshControls();
 bindNotificationSettings();
 bindWebsiteNotificationUi();
