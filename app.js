@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.70";
+const MANAGER_VERSION="3.8.71";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -931,8 +931,8 @@ function renderAll(section){
      esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),
      esc(x.status),
      x.invoice_id
-       ? "<button type='button' class='link' onclick=\"viewLeadQuotation('"+x.invoice_id+"')\">View quotation</button>"
-       : "<button type='button' class='link' onclick=\"createQuotationForLead('"+x.id+"')\">Create quotation</button>",
+       ? "<button type='button' class='link view-lead-quotation' data-invoice-id='"+esc(x.invoice_id)+"'>View quotation</button>"
+       : "<button type='button' class='link create-lead-quotation' data-enquiry-id='"+esc(x.id)+"'>Create quotation</button>",
      isoDate(x.created_at),
      "<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6 v6'/></svg></button>"
    ]));
@@ -2128,9 +2128,14 @@ function calcLeadQuotation(){
   else if(billType==='GST')$('leadQuotationTax').innerHTML='<div class="tax-warning">GST quotation selected — a valid customer GSTIN is required.</div>';else $('leadQuotationTax').innerHTML='';
 }
 window.viewLeadQuotation=async function(invoiceId){
-  let inv=invoices.find(x=>x.id===invoiceId)||null;
-  if(!inv){const q=await db.from('invoices').select('id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source').eq('id',invoiceId).maybeSingle();if(q.error)return toast(q.error.message||'Unable to load quotation.',false);inv=q.data||null;if(inv)invoices=[inv,...invoices.filter(x=>x.id!==inv.id)];}
-  if(!inv)return toast('Quotation not found.',false);await window.viewInvoice(inv.id);
+  const id=String(invoiceId||'').trim();
+  if(!id)return toast('Quotation ID is missing.',false);
+  const q=await db.from('invoices').select('id,invoice_no,customer_id,customer_name,customer_phone,gstin,customer_business,customer_email,billing_address,delivery_address,subtotal,discount,total,profit,created_at,gst_percent,gst_amount,cgst_percent,cgst_amount,sgst_percent,sgst_amount,igst_percent,igst_amount,payment_status,paid_amount,due_amount,due_date,payment_method,place_of_supply,document_type,bill_status,delivery_status,source').eq('id',id).maybeSingle();
+  if(q.error)return toast(q.error.message||'Unable to load quotation.',false);
+  const inv=q.data||null;
+  if(!inv)return toast('Quotation not found. Refresh Manager data and try again.',false);
+  invoices=[inv,...invoices.filter(x=>x.id!==inv.id)];
+  await window.viewInvoice(inv.id);
 };
 window.createQuotationForLead=async function(id){
   if(!isAdmin)return toast('Only the Manager can create quotations from leads.',false);
@@ -2175,9 +2180,13 @@ $("applySalesFilter").onclick=renderSales;
 
 document.addEventListener("click",e=>{
  const btn=e.target.closest?.(".view-bill");
- if(btn){e.preventDefault();window.viewInvoice(btn.dataset.invoiceId);}
+ if(btn){e.preventDefault();window.viewInvoice(btn.dataset.invoiceId);return;}
  const quoteBtn=e.target.closest?.(".view-quotation");
- if(quoteBtn){e.preventDefault();window.viewInvoice(quoteBtn.dataset.invoiceId);}
+ if(quoteBtn){e.preventDefault();window.viewInvoice(quoteBtn.dataset.invoiceId);return;}
+ const leadQuote=e.target.closest?.(".view-lead-quotation");
+ if(leadQuote){e.preventDefault();window.viewLeadQuotation(leadQuote.dataset.invoiceId);return;}
+ const leadCreate=e.target.closest?.(".create-lead-quotation");
+ if(leadCreate){e.preventDefault();window.createQuotationForLead(leadCreate.dataset.enquiryId);return;}
 });
 async function loadInvoiceItemsForView(invoice){
   let q=await db.from("invoice_items").select("*").eq("invoice_id",invoice.id).order("created_at");
