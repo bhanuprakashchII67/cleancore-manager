@@ -1143,3 +1143,20 @@ body{overflow-x:hidden;overflow-y:visible!important}
   #quotationDialog.quotation-viewer-panel>.actions{padding:10px!important}
   #quotationDialog.quotation-viewer-panel>.actions .btn{flex:1 1 100%!important}
 }
+
+
+.quotation-custom-notes{
+  margin-top:14px;
+  padding:14px 16px;
+  border:1px solid #dce5ee;
+  border-radius:10px;
+  background:#f8fafc;
+  font-size:13px;
+  line-height:1.55;
+}
+.quotation-custom-notes b{
+  display:block;
+  margin-bottom:7px;
+  font-size:12px;
+  letter-spacing:.04em;
+}
