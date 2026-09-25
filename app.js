@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.60";
+const MANAGER_VERSION="3.8.61";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -283,7 +283,7 @@ function announceWebsiteNotification(n){
      const en=await db.from("enquiries").select("id,name,phone,business,message,status,created_at,source,product_name,quantity,email,website_order_id,invoice_id,source_detail").neq("source","website_order").order("created_at",{ascending:false}).limit(250);
      if(en.error)throw en.error;
      enquiries=en.data||[];
-     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+     $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
    }
  };
  refresh().catch(err=>console.warn("Manager alert refresh:",err.message));
@@ -983,8 +983,9 @@ function renderAll(section){
  if(active==="settings"){loadErrorLogs();if(!errorFinderRefreshTimer)errorFinderRefreshTimer=setInterval(()=>{if(active==="settings")loadErrorLogs();},10000);}else if(errorFinderRefreshTimer){clearInterval(errorFinderRefreshTimer);errorFinderRefreshTimer=null;}
  if(active==="customers")renderCustomers();
  if(active==="website_orders"||active==="enquiries")renderWebsiteOrders();
+const formatEnquirySource=x=>{const source=String(x.source||"manager").trim();if(source==="manager"||source==="offline"||source==="Offline")return "Offline";if(source==="Website"||source==="website"||source==="website_order")return source==="website_order"?"Website Order":"Website";return source||"Offline"};
  if(active==="enquiries"){
-   $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),esc(x.source||"manager"),esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
+   $("enquiriesTable").innerHTML=table(["Name","Phone","Business","Email","Product","Qty","Source","Message","Status","Date",""],enquiries.map(x=>[esc(x.name),esc(x.phone),esc(x.business),esc(x.email),esc(x.product_name||"—"),esc(x.quantity??"—"),"<span class='badge "+(formatEnquirySource(x)==="Offline"?"":"ok")+"'>"+esc(formatEnquirySource(x))+"</span>",esc(x.message),esc(x.status),isoDate(x.created_at),"<button type='button' class='icon-delete-btn' title='Delete enquiry' aria-label='Delete enquiry' onclick=\"deleteEnquiry('"+x.id+"')\"><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6'/></svg></button>"]));
  }
  if($("websiteOrdersPanel"))$("websiteOrdersPanel").style.display=(isAdmin||canAccess("website_orders"))?"":"none";
  if($("enquiriesPanel"))$("enquiriesPanel").style.display=(isAdmin||canAccess("enquiries"))?"":"none";
@@ -2135,9 +2136,15 @@ $("customerForm").addEventListener("submit",async e=>{
  toast("Customer saved");
  await loadAll();
 });
-$("addEnquiry").onclick=()=>$("enquiryDialog").showModal();
-$("enquiryForm").addEventListener("submit",async e=>{e.preventDefault();const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value,source:"manager"};if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return} const {error}=await db.from("enquiries").insert(payload);if(error)return toast(error.message,false);$("enquiryDialog").close();toast("Enquiry saved");loadAll()});
-$("export").onclick=()=>{
+$("addEnquiry").onclick=()=>{$("enquiryForm").reset();$("estatus").value="New";$("enquiryDialog").showModal()};
+$("enquiryForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const payload={name:$("ename").value.trim(),phone:$("ephone").value.trim(),business:$("ebusiness").value.trim(),message:$("emessage").value.trim(),status:$("estatus").value,source:"manager"};
+  if(!isAdmin){const ok=await submitChange("enquiries","enquiry_create","enquiries",null,payload,"Employee lead/enquiry change");if(ok)$("enquiryDialog").close();return;}
+  const {error}=await db.from("enquiries").insert(payload);
+  if(error)return toast(error.message,false);
+  $("enquiryDialog").close();toast("Enquiry saved as Offline lead");await loadAll();
+});
  const from=$("salesFrom")?.value,to=$("salesTo")?.value;
  let list=invoices.filter(isSaleDocument);
  if(from){const d=new Date(from+"T00:00:00");list=list.filter(x=>new Date(x.created_at)>=d)}
