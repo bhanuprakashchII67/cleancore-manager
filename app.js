@@ -483,17 +483,41 @@ async function submitChange(module,action,targetTable,targetId,payload,reason=""
 }
 async function enter(){
  await loadAccess();
- if(isAdmin)await loadNotificationPreferences();
- $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
+
+ // Do not block the Manager shell on a secondary data query.
+ // Authentication + access verification are the gate; dashboard data can load
+ // afterward. Previously, one failing table query in loadAll() left the login
+ // screen visible and made a successful login look like a dead Sign in button.
+ $("loginView").classList.add("hidden");
+ $("appView").classList.remove("hidden");
  $("profileEmail").textContent=isAdmin?user.email:(employee.alert_email||("Username: "+employee.username));
  if($("profileName"))$("profileName").textContent=isAdmin?"CleanCore Admin":employee.full_name;
  if($("profileRole"))$("profileRole").textContent=isAdmin?"Administrator":("Employee • "+employee.team);
  if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
  applyAccess();
- await loadAll();
+
+ // Load preferences/data without preventing the authenticated UI from opening.
+ try{
+   if(isAdmin)await loadNotificationPreferences();
+ }catch(err){
+   console.error("Manager notification preferences load failed",err);
+   reportClientError(err,{action:"load_notification_preferences"});
+ }
+ try{
+   await loadAll();
+ }catch(err){
+   console.error("CleanCore Manager data load failed",err);
+   reportClientError(err,{action:"load_manager_data"});
+   toast("Manager opened, but some data could not be loaded. Use Refresh after checking your connection.",false);
+ }
  if(isAdmin)startWebsiteNotifications();
  const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
- await go(first);
+ try{
+   await go(first);
+ }catch(err){
+   console.error("CleanCore Manager initial page load failed",err);
+   reportClientError(err,{action:"load_initial_page",context:{section:first}});
+ }
 }
 $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();
