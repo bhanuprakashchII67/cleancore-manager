@@ -1543,4 +1543,278 @@ begin
   return jsonb_build_object('status','Approved','request_id',r.id,'created_id',v_payment_id,'invoice_id',v_invoice.id,'paid',v_paid,'due',v_due);
 end;
 $function$;
-grant execute on function public.review_payment_change_request(uuid,boolean,text) to authenticated;
+grant execute on function public.review_payment_change_request(uuid,boolean,text) to authenticated;\n\n-- Lead quotation invoice support
+-- Quotations created from a lead are linked to enquiries.invoice_id, never recorded as sales,
+-- never create payments, and never reduce product stock.
+
+create or replace function public.create_quotation_from_enquiry(
+  p_enquiry_id uuid,
+  p_invoice jsonb,
+  p_items jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  e public.enquiries%rowtype;
+  v_invoice_id uuid;
+  v_item jsonb;
+  v_product public.products%rowtype;
+  v_qty integer;
+  v_rate numeric;
+  v_subtotal numeric := 0;
+  v_discount numeric := 0;
+  v_taxable numeric := 0;
+  v_gst_percent numeric := 0;
+  v_gst_amount numeric := 0;
+  v_cgst_percent numeric := 0;
+  v_cgst_amount numeric := 0;
+  v_sgst_percent numeric := 0;
+  v_sgst_amount numeric := 0;
+  v_igst_percent numeric := 0;
+  v_igst_amount numeric := 0;
+  v_total numeric := 0;
+  v_gstin text;
+  v_source text;
+  v_customer_name text;
+  v_customer_phone text;
+  v_customer_business text;
+  v_customer_email text;
+begin
+  if not public.is_admin() then
+    raise exception 'Manager access required';
+  end if;
+
+  if coalesce(jsonb_array_length(p_items), 0) = 0 then
+    raise exception 'Add at least one item';
+  end if;
+
+  select *
+    into e
+  from public.enquiries
+  where id = p_enquiry_id
+  for update;
+
+  if e.id is null then
+    raise exception 'Enquiry not found';
+  end if;
+
+  if e.invoice_id is not null then
+    raise exception 'A quotation is already linked to this lead';
+  end if;
+
+  v_customer_name := coalesce(nullif(trim(p_invoice->>'customer_name'), ''), e.name);
+  v_customer_phone := coalesce(nullif(trim(p_invoice->>'customer_phone'), ''), e.phone);
+  v_customer_business := coalesce(nullif(trim(p_invoice->>'customer_business'), ''), e.business);
+  v_customer_email := nullif(trim(p_invoice->>'customer_email'), '');
+  v_gstin := nullif(upper(trim(p_invoice->>'gstin')), '');
+  v_source := case
+    when p_invoice->>'source' in ('Website', 'WhatsApp', 'Offline') then p_invoice->>'source'
+    else 'Offline'
+  end;
+
+  v_gst_percent := greatest(coalesce((p_invoice->>'gst_percent')::numeric, 0), 0);
+  if v_gst_percent > 100 then
+    raise exception 'Invalid GST rate';
+  end if;
+
+  if v_gst_percent > 0 then
+    if v_gstin is null or v_gstin !~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$' then
+      raise exception 'A valid GSTIN is required for a GST quotation';
+    end if;
+  end if;
+
+  for v_item in
+    select value
+    from jsonb_array_elements(p_items)
+  loop
+    v_qty := coalesce((v_item->>'qty')::integer, 0);
+    v_rate := greatest(coalesce((v_item->>'unit_price')::numeric, 0), 0);
+
+    if v_qty <= 0 then
+      raise exception 'Quotation quantity must be greater than zero';
+    end if;
+
+    if (v_item->>'product_id') is null or (v_item->>'product_id') = '' then
+      raise exception 'Each quotation item must have a product';
+    end if;
+
+    select *
+      into v_product
+    from public.products
+    where id = (v_item->>'product_id')::uuid;
+
+    if v_product.id is null then
+      raise exception 'Quotation product not found';
+    end if;
+
+    v_subtotal := v_subtotal + (v_rate * v_qty);
+  end loop;
+
+  v_discount := least(
+    v_subtotal,
+    greatest(coalesce((p_invoice->>'discount')::numeric, 0), 0)
+  );
+  v_taxable := greatest(v_subtotal - v_discount, 0);
+  v_gst_amount := v_taxable * v_gst_percent / 100;
+
+  if v_gst_percent > 0 and substring(v_gstin, 1, 2) = '36' then
+    v_cgst_percent := v_gst_percent / 2;
+    v_cgst_amount := v_taxable * v_cgst_percent / 100;
+    v_sgst_percent := v_gst_percent / 2;
+    v_sgst_amount := v_taxable * v_sgst_percent / 100;
+  elsif v_gst_percent > 0 then
+    v_igst_percent := v_gst_percent;
+    v_igst_amount := v_taxable * v_igst_percent / 100;
+  end if;
+
+  v_total := v_taxable + v_gst_amount;
+
+  insert into public.invoices(
+    invoice_no,
+    document_type,
+    customer_id,
+    customer_name,
+    customer_phone,
+    gstin,
+    customer_business,
+    customer_email,
+    billing_address,
+    delivery_address,
+    subtotal,
+    discount,
+    total,
+    profit,
+    gst_percent,
+    gst_amount,
+    cgst_percent,
+    cgst_amount,
+    sgst_percent,
+    sgst_amount,
+    igst_percent,
+    igst_amount,
+    payment_status,
+    paid_amount,
+    due_amount,
+    due_date,
+    payment_method,
+    bill_status,
+    delivery_status,
+    source
+  )
+  values(
+    p_invoice->>'invoice_no',
+    'QUOTATION',
+    nullif(p_invoice->>'customer_id', '')::uuid,
+    v_customer_name,
+    v_customer_phone,
+    v_gstin,
+    v_customer_business,
+    v_customer_email,
+    coalesce(p_invoice->>'billing_address', ''),
+    coalesce(p_invoice->>'delivery_address', ''),
+    v_subtotal,
+    v_discount,
+    v_total,
+    0,
+    v_gst_percent,
+    v_gst_amount,
+    v_cgst_percent,
+    v_cgst_amount,
+    v_sgst_percent,
+    v_sgst_amount,
+    v_igst_percent,
+    v_igst_amount,
+    'Not Applicable',
+    0,
+    0,
+    null,
+    'Quotation',
+    'Draft',
+    'Not Applicable',
+    v_source
+  )
+  returning id into v_invoice_id;
+
+  for v_item in
+    select value
+    from jsonb_array_elements(p_items)
+  loop
+    select *
+      into v_product
+    from public.products
+    where id = (v_item->>'product_id')::uuid;
+
+    v_qty := (v_item->>'qty')::integer;
+    v_rate := greatest(coalesce((v_item->>'unit_price')::numeric, 0), 0);
+
+    insert into public.invoice_items(
+      invoice_id,
+      product_id,
+      product_name,
+      hsn_code,
+      qty,
+      unit_price,
+      cost_price,
+      line_total,
+      line_profit
+    )
+    values(
+      v_invoice_id,
+      v_product.id,
+      v_product.name,
+      v_product.hsn_code,
+      v_qty,
+      v_rate,
+      coalesce(v_product.cost_price, 0),
+      v_rate * v_qty,
+      0
+    );
+  end loop;
+
+  update public.enquiries
+     set invoice_id = v_invoice_id,
+         status = 'Quoted'
+   where id = e.id;
+
+  insert into public.audit_logs(
+    actor_user_id,
+    actor_type,
+    event_type,
+    module,
+    action,
+    target_table,
+    target_id,
+    metadata
+  )
+  values(
+    auth.uid(),
+    'admin',
+    'QUOTATION_CREATED',
+    'billing',
+    'quotation_create',
+    'invoices',
+    v_invoice_id,
+    jsonb_build_object(
+      'enquiry_id', e.id,
+      'invoice_no', p_invoice->>'invoice_no',
+      'subtotal', v_subtotal,
+      'discount', v_discount,
+      'gst_amount', v_gst_amount,
+      'total', v_total
+    )
+  );
+
+  return jsonb_build_object(
+    'id', v_invoice_id,
+    'invoice_no', p_invoice->>'invoice_no',
+    'enquiry_id', e.id,
+    'total', v_total
+  );
+end;
+$function$;
+
+revoke all on function public.create_quotation_from_enquiry(uuid, jsonb, jsonb) from public;
+grant execute on function public.create_quotation_from_enquiry(uuid, jsonb, jsonb) to authenticated;\n
