@@ -409,6 +409,9 @@
           <option value="Website">Website</option>
         </select>
       </label>
+      <label class="full">Terms &amp; Conditions / Notes
+        <textarea id="leadQuotationNotes" rows="5" placeholder="Enter terms, payment conditions, validity, delivery details, warranty, notes, or any other quotation information..."></textarea>
+      </label>
     </div>
 
     <div class="panel-head lead-quotation-items-head">
@@ -1156,7 +1159,7 @@ html body dialog#productDialog .actions .btn{
     if(window.__CLEANCORE_APP_LOADING||window.__CLEANCORE_APP_READY)return;
     window.__CLEANCORE_APP_LOADING=true;
     const s=document.createElement("script");
-    s.src="app.js?v=3.8.77";
+    s.src="app.js?v=3.8.78";
     s.onload=function(){
       setTimeout(function(){
         if(!window.__CLEANCORE_APP_READY)bootMessage("The Manager script loaded but did not initialize. Open the browser console and reload once.");
