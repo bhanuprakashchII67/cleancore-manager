@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.68";
+const MANAGER_VERSION="3.8.69";
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -50,69 +50,13 @@ function renderNotificationSettings(){
  Object.entries(map).forEach(([id,key])=>{const el=$(id);if(el)el.checked=notificationPreferences[key]!==false;});
  const st=$("notificationSettingsStatus");if(st)st.textContent=notificationPreferences.desktop_enabled?"Desktop notifications enabled.":"Desktop notifications off.";
 }
-const PUSH_VAPID_PUBLIC="BPVwjcyzMJqv8f0xKT0RmAGcIWDcLeARDnBv1_zzqnEOGW2M43pq8WovsPX5dxo8SOKauK0LW4w_WuXdZPbc-zk";
-function pushBase64ToBytes(base64){
- const pad="=".repeat((4-base64.length%4)%4);
- const raw=atob((base64+pad).replace(/-/g,"+").replace(/_/g,"/"));
- return Uint8Array.from(raw,c=>c.charCodeAt(0));
+// Browser push/Pusher integration intentionally disabled. In-app notifications remain enabled.
+async function ensureManagerNotificationPermission(){
+ if(!("Notification" in window))return false;
+ if(Notification.permission==="granted")return true;
+ if(Notification.permission==="denied")return false;
+ try{return (await Notification.requestPermission())==="granted";}catch(e){return false;}
 }
-async function registerManagerPush(){
- if(!isAdmin||!user?.id)return false;
- if(!("serviceWorker" in navigator)||!("PushManager" in window)){toast("Push notifications are not supported on this device/browser.",false);return false;}
- try{
-   const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
-   if(permission!=="granted"){toast("Push notification permission was not granted.",false);return false;}
-   const reg=await navigator.serviceWorker.register("sw.js?v=4.4.2",{updateViaCache:"none"});
-   await reg.update().catch(()=>{});
-   let sub=await reg.pushManager.getSubscription();
-   if(!sub){
-     const subscribeOptions={userVisibleOnly:true,applicationServerKey:pushBase64ToBytes(PUSH_VAPID_PUBLIC)};
-     try{
-       sub=await reg.pushManager.subscribe(subscribeOptions);
-     }catch(firstErr){
-       const retryable=firstErr?.name==="AbortError" || /push service error/i.test(String(firstErr?.message||""));
-       if(!retryable)throw firstErr;
-       await new Promise(resolve=>setTimeout(resolve,800));
-       await reg.update().catch(()=>{});
-       sub=await reg.pushManager.subscribe(subscribeOptions);
-     }
-   }
-   const {data:{session}}=await db.auth.getSession();
-   if(!session?.access_token)throw new Error("Manager session is not available.");
-   const {error}=await db.functions.invoke("manager-push",{body:{action:"subscribe",subscription:sub.toJSON(),user_agent:navigator.userAgent}});
-   if(error)throw error;
-   const st=$("notificationSettingsStatus");if(st)st.textContent="Push notifications enabled on this device.";
-   toast("Push notifications enabled.");
-   return true;
- }catch(err){
-   console.error("Push subscription error",err);
-   reportClientError(err,{action:"enable_push_notifications",context:{browser: navigator.userAgent,permission:("Notification" in window)?Notification.permission:"unsupported"}});
-   const message=err?.name==="AbortError"
-     ?"Browser push service is unavailable on this device right now. Your Manager in-app notifications will still work."
-     :(err?.message||"Unable to enable push notifications.");
-   const st=$("notificationSettingsStatus");if(st)st.textContent=message;
-   toast(message,false);
-   return false;
- }
-}
-async function testManagerPush(){
- try{
-   const {data:{session}}=await db.auth.getSession();
-   if(!session?.access_token)throw new Error("Manager session is not available.");
-   const {data,error}=await db.functions.invoke("manager-push",{
-     body:{action:"test"},
-     headers:{Authorization:"Bearer "+session.access_token}
-   });
-   if(error)throw error;
-   if(!data?.sent)throw new Error("No push subscription is registered on this device.");
-   toast("Test push sent.");
- }catch(err){
-   console.error("Push test error",err);
-   reportClientError(err,{action:"test_push_notification"});
-   toast(err?.message||"Push test failed.",false);
- }
-}
-
 async function loadNotificationPreferences(){
  if(!isAdmin||!user?.id)return;
  const {data,error}=await db.from("manager_notification_preferences").select("*").eq("manager_user_id",user.id).maybeSingle();
@@ -173,10 +117,6 @@ async function ensureManagerNotificationPermission(){
  if(Notification.permission==="granted")return true;
  if(Notification.permission==="denied")return false;
  try{return (await Notification.requestPermission())==="granted";}catch(e){return false;}
-}
-async function registerManagerPushForCurrentUser(){
- if(!isAdmin||!user?.id)return false;
- return registerManagerPush();
 }
 function notificationStoreKey(type){return "cleancore_manager_notifications_"+type+"_"+(user?.id||"guest")}
 function isWebsiteManagerNotification(n){return n&&["Website Order","Website Enquiry"].includes(n.notification_type)}
