@@ -7,14 +7,14 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="logo.svg">
 <title>CleanCore Business Manager</title>
-<link rel="stylesheet" href="style.css?v=3.8.65">
+<link rel="stylesheet" href="style.css?v=3.8.66">
 </head>
 <body>
 <div id="toast" class="toast"></div>
 
 <section id="loginView" class="auth-shell">
   <div class="auth-card">
-    <div class="login-brand"><img class="brand brand-logo" src="logo.svg" alt="CleanCore logo"><div class="login-brand-text"><strong>CleanCore</strong><span>Business Manager</span></div></div><div class="app-version">Version 3.8.65</div>
+    <div class="login-brand"><img class="brand brand-logo" src="logo.svg" alt="CleanCore logo"><div class="login-brand-text"><strong>CleanCore</strong><span>Business Manager</span></div></div><div class="app-version">Version 3.8.66</div>
     <form id="loginForm">
       <label>LOGIN ID
         <input id="loginIdentifier" type="text" autocomplete="username" placeholder="Enter username or email address" required>
@@ -30,7 +30,7 @@
 
 <section id="appView" class="app hidden">
 <aside class="sidebar">
-  <div class="side-brand"><img class="brand small brand-logo" src="logo.svg" alt="CleanCore logo"><div><b>CleanCore</b><span>Manager</span></div></div><div class="side-version">v3.8.65</div>
+  <div class="side-brand"><img class="brand small brand-logo" src="logo.svg" alt="CleanCore logo"><div><b>CleanCore</b><span>Manager</span></div></div><div class="side-version">v3.8.66</div>
   <nav>
     <button type="button" class="nav active" data-section="dashboard">Dashboard</button>
     <button type="button" class="nav" data-section="products">Products & Stock</button>
@@ -1043,21 +1043,58 @@ html body dialog#productDialog .actions .btn{
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
-  const K="cleancore_manager_cache_reset_442";
+  const K="cleancore_manager_cache_reset_443";
   if(localStorage.getItem(K)!=="1"){
     localStorage.setItem(K,"1");
     Promise.all([
       "serviceWorker" in navigator ? navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))) : Promise.resolve(),
       "caches" in window ? caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))) : Promise.resolve()
-    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=441"));
+    ]).finally(()=>location.replace(location.href.split("#")[0]+"?app_refresh=442"));
   }
 })();
 </script>
 <script>
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.4.2",{updateViaCache:"none"}).catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4.4.4",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=3.8.65"></script>
+<script>
+(function(){
+  function bootMessage(message,detail){
+    let box=document.getElementById("bootError");
+    if(!box){
+      box=document.createElement("div");
+      box.id="bootError";
+      box.style.cssText="position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;background:#fff3cd;color:#5c4500;border:1px solid #e0b84b;border-radius:12px;padding:14px 16px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.16)";
+      document.body.appendChild(box);
+    }
+    box.innerHTML="<b>CleanCore Manager could not start.</b><br>"+String(message||"JavaScript failed to load.")+(detail?"<br><small>"+String(detail)+"</small>":"");
+  }
+  function loadApp(){
+    if(window.__CLEANCORE_APP_LOADING||window.__CLEANCORE_APP_READY)return;
+    window.__CLEANCORE_APP_LOADING=true;
+    const s=document.createElement("script");
+    s.src="app.js?v=3.8.66";
+    s.onload=function(){
+      setTimeout(function(){
+        if(!window.__CLEANCORE_APP_READY)bootMessage("The Manager script loaded but did not initialize. Open the browser console and reload once.");
+      },2500);
+    };
+    s.onerror=function(){bootMessage("app.js failed to load. This is a deployment/network problem, not a password problem.","Try reloading once; the page will also show the exact startup failure when available.")};
+    document.body.appendChild(s);
+  }
+  if(window.supabase&&typeof window.supabase.createClient==="function"){
+    loadApp();
+    return;
+  }
+  const fallback=document.createElement("script");
+  fallback.src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+  fallback.onload=loadApp;
+  fallback.onerror=function(){
+    bootMessage("Supabase client failed to load from both CDNs.","Primary: jsDelivr • Fallback: unpkg");
+  };
+  document.head.appendChild(fallback);
+})();
+</script>
 </body>
 </html>
