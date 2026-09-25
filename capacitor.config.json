@@ -1,0 +1,8 @@
+{
+  "appId": "com.cleancore.businessmanager",
+  "appName": "CleanCore Business Manager",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  }
+}
