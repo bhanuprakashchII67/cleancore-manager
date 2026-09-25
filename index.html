@@ -1070,6 +1070,13 @@ if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.ser
     }
     box.innerHTML="<b>CleanCore Manager could not start.</b><br>"+String(message||"JavaScript failed to load.")+(detail?"<br><small>"+String(detail)+"</small>":"");
   }
+  window.addEventListener("error",function(e){
+    bootMessage("Manager JavaScript error: "+String(e.error?.message||e.message||"Unknown error"),
+      (e.filename||"")+(e.lineno?":"+e.lineno:"")+(e.colno?":"+e.colno:""));
+  });
+  window.addEventListener("unhandledrejection",function(e){
+    bootMessage("Manager startup promise failed: "+String(e.reason?.message||e.reason||"Unknown rejection"));
+  });
   function loadApp(){
     if(window.__CLEANCORE_APP_LOADING||window.__CLEANCORE_APP_READY)return;
     window.__CLEANCORE_APP_LOADING=true;
