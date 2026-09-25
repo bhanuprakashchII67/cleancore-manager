@@ -2130,7 +2130,8 @@ function calcLeadQuotation(){
 window.viewLeadQuotation=async function(invoiceId){
   const id=String(invoiceId||'').trim();
   if(!id)return toast('Quotation ID is missing.',false);
-  const dialog=$('invoiceDialog'),preview=$('invoicePreview');
+  if(!$('enquiries')?.classList.contains('active')){try{await go('enquiries');}catch(err){return toast(err?.message||'Unable to open Enquiries.',false);}}
+  const dialog=$('quotationDialog'),preview=$('quotationPreview');
   if(!dialog||!preview)return toast('Quotation viewer is unavailable.',false);
 
   const cached=invoices.find(x=>x.id===id)||null;
@@ -2142,7 +2143,7 @@ window.viewLeadQuotation=async function(invoiceId){
   try{
     dialog.hidden=false;
     dialog.setAttribute('data-invoice-open','1');
-    dialog.classList.add('invoice-viewer-panel');
+    dialog.classList.add('quotation-viewer-panel');
     dialog.setAttribute('aria-hidden','false');
   }catch(err){
     return toast(err?.message||'Unable to open quotation.',false);
@@ -2168,7 +2169,7 @@ window.viewLeadQuotation=async function(invoiceId){
 };
 
 function renderLeadQuotationPreview(inv,items){
-  const preview=$('invoicePreview');if(!preview)return;
+  const preview=$('quotationPreview');if(!preview)return;
   const rows=items.map((it,n)=>'<tr><td>'+(n+1)+'</td><td>'+esc(it.product_name||'')+'</td><td>'+esc(it.hsn_code||'—')+'</td><td>'+esc(it.qty)+'</td><td>'+money(it.unit_price)+'</td><td>'+money(it.line_total)+'</td></tr>').join('');
   const taxable=Number(inv.subtotal||0)-Number(inv.discount||0);
   const taxes=Number(inv.cgst_amount||0)+Number(inv.sgst_amount||0)+Number(inv.igst_amount||0);
@@ -2421,25 +2422,29 @@ function numberToWordsIndian(n){
  if(n)s+=two(n);
  return s.trim()+" RUPEES";
 }
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("invoiceDialog")?.hidden)$("closeInvoice")?.click();});
+document.addEventListener("keydown",e=>{
+ if(e.key!=="Escape")return;
+ if(!$("invoiceDialog")?.hidden)$("closeInvoice")?.click();
+ if(!$("quotationDialog")?.hidden)$("closeQuotation")?.click();
+});
 $("closeInvoice").onclick=()=>{
  const d=$("invoiceDialog");
  if(d){d.hidden=true;d.removeAttribute("data-invoice-open");}
  document.body.classList.remove("invoice-open");
  document.documentElement.classList.remove("invoice-open");
 };
-function getPrintableInvoiceHtml(){
- const body=$("invoicePreview")?.innerHTML?.trim();
- if(!body)throw new Error("Open a bill before printing.");
+function getPrintableInvoiceHtml(previewId="invoicePreview",emptyMessage="Open a bill before printing."){
+ const body=$(previewId)?.innerHTML?.trim();
+ if(!body)throw new Error(emptyMessage);
  return body;
 }
-function printInvoiceNow(){
- const body=getPrintableInvoiceHtml();
+function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
+ const body=getPrintableInvoiceHtml(previewId,title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
  const w=window.open("about:blank","_blank","width=900,height=1100");
  if(!w)throw new Error("Allow pop-ups for CleanCore Manager to print the invoice.");
  const cssHref=[...document.querySelectorAll('link[rel="stylesheet"]')].find(x=>x.href&&x.href.includes("style.css"))?.href||"style.css";
  w.document.open();
- w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>CleanCore Invoice</title><link rel='stylesheet' href='"+String(cssHref).replace(/'/g,"%27")+"'><style>@page{size:A4;margin:10mm}body{margin:0;background:#fff}.invoice-preview{display:block!important;max-width:none!important;width:100%!important}.actions{display:none!important}@media print{html,body{background:#fff!important}.invoice-preview{box-shadow:none!important;border:0!important}}</style></head><body><div id='invoicePrintHost'>"+body+"</div></body></html>");
+ w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>"+title+"</title><link rel='stylesheet' href='"+String(cssHref).replace(/'/g,"%27")+"'><style>@page{size:A4;margin:10mm}body{margin:0;background:#fff}.invoice-preview{display:block!important;max-width:none!important;width:100%!important}.actions{display:none!important}@media print{html,body{background:#fff!important}.invoice-preview{box-shadow:none!important;border:0!important}}</style></head><body><div id='invoicePrintHost'>"+body+"</div></body></html>");
  w.document.close();
  let printed=false;
  const doPrint=()=>{
@@ -2455,6 +2460,17 @@ $("printInvoice").onclick=e=>{
  e.preventDefault();
  try{printInvoiceNow();}
  catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
+};
+$("closeQuotation").onclick=()=>{
+ const d=$("quotationDialog");
+ if(d){d.hidden=true;d.removeAttribute("data-quotation-open");}
+ document.body.classList.remove("invoice-open");
+ document.documentElement.classList.remove("invoice-open");
+};
+$("printQuotation").onclick=e=>{
+ e.preventDefault();
+ try{printInvoiceNow("quotationPreview","CleanCore Quotation");}
+ catch(err){console.error("Quotation print error",err);toast(err?.message||"Unable to print quotation.",false);}
 };
 $("profileBtn").onclick=()=>{
  $("notificationMenu")?.classList.add("hidden");
