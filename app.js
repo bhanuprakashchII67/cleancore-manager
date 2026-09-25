@@ -2165,20 +2165,20 @@ function leadQuotationSourceForLead(lead){
   return ["Website","WhatsApp","Offline"].includes(s)?s:"Offline";
 }
 function leadQuotationProductOptions(selectedId){
-  return products.map(p=>"<option value=\""+esc(p.id)+"\""+(p.id===selectedId?" selected":"")+">"+esc(p.name)+" — "+money(p.selling_price)+" ("+esc(p.stock)+" in stock)</option>").join("");
+  return products.map(p=>"<option value=""+esc(p.id)+"""+(p.id===selectedId?" selected":"")+">"+esc(p.name)+" — "+money(p.selling_price)+" ("+esc(p.stock)+" in stock)</option>").join("");
 }
 function addLeadQuotationLine(selectedId){
-  const wrap=$(\"leadQuotationLines\");
+  const wrap=$("leadQuotationLines");
   if(!wrap||!products.length)return toast("Add at least one product before creating a quotation.",false);
   const p=products.find(x=>x.id===(selectedId||products[0]?.id))||products[0];
   const row=document.createElement("div");
   row.className="line lead-quotation-line";
   row.innerHTML=
-    "<select class=\"lqp\">"+leadQuotationProductOptions(p?.id||"")+"</select>"+
-    "<input class=\"lqq\" type=\"text\" inputmode=\"numeric\" value=\"1\" aria-label=\"Quoted quantity\">"+
-    "<input class=\"lqr\" type=\"text\" inputmode=\"decimal\" value=\""+Number(p?.selling_price||0).toFixed(2)+"\" aria-label=\"Quoted price\">"+
-    "<span class=\"lv\">₹0.00</span>"+
-    "<button type=\"button\" class=\"remove\" aria-label=\"Remove quotation item\">×</button>";
+    "<select class="lqp">"+leadQuotationProductOptions(p?.id||"")+"</select>"+
+    "<input class="lqq" type="text" inputmode="numeric" value="1" aria-label="Quoted quantity">"+
+    "<input class="lqr" type="text" inputmode="decimal" value=""+Number(p?.selling_price||0).toFixed(2)+"" aria-label="Quoted price">"+
+    "<span class="lv">₹0.00</span>"+
+    "<button type="button" class="remove" aria-label="Remove quotation item">×</button>";
   wrap.appendChild(row);
   const select=row.querySelector(".lqp"),rate=row.querySelector(".lqr");
   select.onchange=()=>{
@@ -2200,29 +2200,29 @@ function calcLeadQuotation(){
     subtotal+=lineTotal;
     row.querySelector(".lv").textContent=money(lineTotal);
   });
-  const discount=Math.min(subtotal,Math.max(0,Number($(\"leadQuotationDiscount\")?.value||0)));
-  const billType=$(\"leadQuotationBillType\")?.value||\"NON_GST\";
-  const gstPercent=billType===\"GST\"?Math.max(0,Number($(\"leadQuotationGstPercent\")?.value||0)):0;
+  const discount=Math.min(subtotal,Math.max(0,Number($("leadQuotationDiscount")?.value||0)));
+  const billType=$("leadQuotationBillType")?.value||"NON_GST";
+  const gstPercent=billType==="GST"?Math.max(0,Number($("leadQuotationGstPercent")?.value||0)):0;
   const taxable=Math.max(0,subtotal-discount);
   const gstAmount=taxable*gstPercent/100;
   const total=taxable+gstAmount;
   leadQuotationTotal=total;
-  $(\"leadQuotationSubtotal\").textContent=money(subtotal);
-  $(\"leadQuotationDiscountShow\").textContent=money(discount);
-  $(\"leadQuotationGstShow\").textContent=gstPercent.toFixed(2).replace(/\.00$/,"")+"% • "+money(gstAmount);
-  $(\"leadQuotationTotal\").textContent=money(total);
-  $(\"leadQuotationGstRateWrap\")?.classList.toggle("hidden",billType!==\"GST\");
-  $(\"leadQuotationGstinWrap\")?.classList.toggle("hidden",billType!==\"GST\");
-  $(\"leadQuotationTax\")?.classList.toggle("hidden",billType!==\"GST\");
-  const gstin=String($(\"leadQuotationGstin\")?.value||"").trim().toUpperCase();
-  if(billType===\"GST\"&&gstin){
-    const intra=gstin.slice(0,2)===\"36\";
-    $(\"leadQuotationTax\").innerHTML=intra
+  $("leadQuotationSubtotal").textContent=money(subtotal);
+  $("leadQuotationDiscountShow").textContent=money(discount);
+  $("leadQuotationGstShow").textContent=gstPercent.toFixed(2).replace(/\.00$/,"")+"% • "+money(gstAmount);
+  $("leadQuotationTotal").textContent=money(total);
+  $("leadQuotationGstRateWrap")?.classList.toggle("hidden",billType!=="GST");
+  $("leadQuotationGstinWrap")?.classList.toggle("hidden",billType!=="GST");
+  $("leadQuotationTax")?.classList.toggle("hidden",billType!=="GST");
+  const gstin=String($("leadQuotationGstin")?.value||"").trim().toUpperCase();
+  if(billType==="GST"&&gstin){
+    const intra=gstin.slice(0,2)==="36";
+    $("leadQuotationTax").innerHTML=intra
       ?"<div>CGST "+(gstPercent/2)+"%: <strong>"+money(gstAmount/2)+"</strong></div><div>SGST "+(gstPercent/2)+"%: <strong>"+money(gstAmount/2)+"</strong></div>"
       :"<div>IGST "+gstPercent+"%: <strong>"+money(gstAmount)+"</strong></div>";
-  }else if(billType===\"GST"){
-    $(\"leadQuotationTax\").innerHTML="<div class='tax-warning'>GST quotation selected — a valid customer GSTIN is required.</div>";
-  }else $(\"leadQuotationTax\").innerHTML="";
+  }else if(billType==="GST"){
+    $("leadQuotationTax").innerHTML="<div class='tax-warning'>GST quotation selected — a valid customer GSTIN is required.</div>";
+  }else $("leadQuotationTax").innerHTML="";
 }
 window.viewLeadQuotation=async function(invoiceId){
   let inv=invoices.find(x=>x.id===invoiceId)||null;
@@ -2243,32 +2243,32 @@ window.createQuotationForLead=async function(id){
   if(!products.length)return toast("Add products before creating a quotation.",false);
 
   leadQuotationEnquiryId=id;
-  $(\"leadQuotationTitle\").textContent="Quotation for "+(lead.name||"Lead");
-  $(\"leadQuotationLeadMeta\").textContent=(lead.business||"No business")+\" • \"+(lead.phone||"No phone")+\" • \"+isoDate(lead.created_at);
-  $(\"leadQuotationCustomerCard\").innerHTML=
+  $("leadQuotationTitle").textContent="Quotation for "+(lead.name||"Lead");
+  $("leadQuotationLeadMeta").textContent=(lead.business||"No business")+" • "+(lead.phone||"No phone")+" • "+isoDate(lead.created_at);
+  $("leadQuotationCustomerCard").innerHTML=
     "<div><span>Name</span><strong>"+esc(lead.name||"—")+"</strong></div>"+
     "<div><span>Business</span><strong>"+esc(lead.business||"—")+"</strong></div>"+
     "<div><span>Phone</span><strong>"+esc(lead.phone||"—")+"</strong></div>"+
     "<div><span>Email</span><strong>"+esc(lead.email||"—")+"</strong></div>"+
     "<div><span>Product requested</span><strong>"+esc(lead.product_name||"—")+"</strong></div>"+
     "<div><span>Quantity requested</span><strong>"+esc(lead.quantity??"—")+"</strong></div>";
-  $(\"leadQuotationBillType\").value="NON_GST";
-  $(\"leadQuotationGstin\").value="";
-  $(\"leadQuotationGstPercent\").value="18";
-  $(\"leadQuotationDiscount\").value="0";
-  $(\"leadQuotationSource\").value=leadQuotationSourceForLead(lead);
-  $(\"leadQuotationLines\").innerHTML="";
+  $("leadQuotationBillType").value="NON_GST";
+  $("leadQuotationGstin").value="";
+  $("leadQuotationGstPercent").value="18";
+  $("leadQuotationDiscount").value="0";
+  $("leadQuotationSource").value=leadQuotationSourceForLead(lead);
+  $("leadQuotationLines").innerHTML="";
   addLeadQuotationLine();
   calcLeadQuotation();
-  $(\"leadQuotationDialog\").showModal();
+  $("leadQuotationDialog").showModal();
 };
-$(\"leadQuotationAddLine\")?.addEventListener("click",()=>addLeadQuotationLine());
-$(\"leadQuotationBillType\")?.addEventListener("change",calcLeadQuotation);
-$(\"leadQuotationDiscount\")?.addEventListener("input",calcLeadQuotation);
-$(\"leadQuotationGstPercent\")?.addEventListener("input",calcLeadQuotation);
-$(\"leadQuotationGstin\")?.addEventListener("input",e=>{e.target.value=e.target.value.toUpperCase().slice(0,15);calcLeadQuotation();});
-$(\"closeLeadQuotation\")?.addEventListener("click",()=>$(\"leadQuotationDialog\")?.close());
-$(\"leadQuotationForm\")?.addEventListener("submit",async e=>{
+$("leadQuotationAddLine")?.addEventListener("click",()=>addLeadQuotationLine());
+$("leadQuotationBillType")?.addEventListener("change",calcLeadQuotation);
+$("leadQuotationDiscount")?.addEventListener("input",calcLeadQuotation);
+$("leadQuotationGstPercent")?.addEventListener("input",calcLeadQuotation);
+$("leadQuotationGstin")?.addEventListener("input",e=>{e.target.value=e.target.value.toUpperCase().slice(0,15);calcLeadQuotation();});
+$("closeLeadQuotation")?.addEventListener("click",()=>$("leadQuotationDialog")?.close());
+$("leadQuotationForm")?.addEventListener("submit",async e=>{
   e.preventDefault();
   const lead=leadQuotationCurrentLead();
   if(!lead)return;
@@ -2280,18 +2280,18 @@ $(\"leadQuotationForm\")?.addEventListener("submit",async e=>{
     return p&&qty>0?{product_id:p.id,qty,unit_price:rate}:null;
   }).filter(Boolean);
   if(!items.length)return toast("Add at least one quotation item.",false);
-  const billType=$(\"leadQuotationBillType\").value;
-  const gstPercent=billType===\"GST\"?Number($(\"leadQuotationGstPercent\").value||0):0;
-  const gstin=String($(\"leadQuotationGstin\").value||"").trim().toUpperCase();
-  if(billType===\"GST\"&&(!gstPercent||gstPercent<=0||gstPercent>100))return toast("Enter a valid GST rate.",false);
-  if(billType===\"GST\"&&!validGstin(gstin))return toast("Enter a valid 15-character GSTIN for a GST quotation.",false);
-  const discount=Math.max(0,Number($(\"leadQuotationDiscount\").value||0));
+  const billType=$("leadQuotationBillType").value;
+  const gstPercent=billType==="GST"?Number($("leadQuotationGstPercent").value||0):0;
+  const gstin=String($("leadQuotationGstin").value||"").trim().toUpperCase();
+  if(billType==="GST"&&(!gstPercent||gstPercent<=0||gstPercent>100))return toast("Enter a valid GST rate.",false);
+  if(billType==="GST"&&!validGstin(gstin))return toast("Enter a valid 15-character GSTIN for a GST quotation.",false);
+  const discount=Math.max(0,Number($("leadQuotationDiscount").value||0));
   const stamp=new Date().toISOString().slice(0,10).replaceAll("-","");
   const no="QT-"+stamp+"-"+String(Date.now()).slice(-5);
   const invoicePayload={
     invoice_no:no,
     document_type:"QUOTATION",
-    source:$(\"leadQuotationSource\").value,
+    source:$("leadQuotationSource").value,
     customer_id:null,
     customer_name:lead.name||"",
     customer_phone:normalizePhone(lead.phone||""),
@@ -2303,12 +2303,12 @@ $(\"leadQuotationForm\")?.addEventListener("submit",async e=>{
     gst_percent:gstPercent,
     discount
   };
-  const button=$(\"leadQuotationSave\");if(button){button.disabled=true;button.textContent="Generating…";}
+  const button=$("leadQuotationSave");if(button){button.disabled=true;button.textContent="Generating…";}
   try{
     const {data,error}=await db.rpc("create_quotation_from_enquiry",{p_enquiry_id:lead.id,p_invoice:invoicePayload,p_items:items});
     if(error)throw error;
     if(!data?.id)throw new Error("Quotation was not created.");
-    $(\"leadQuotationDialog\").close();
+    $("leadQuotationDialog").close();
     await loadAll();
     toast("Quotation "+(data.invoice_no||no)+" created.");
     setTimeout(()=>window.viewLeadQuotation(data.id),50);
