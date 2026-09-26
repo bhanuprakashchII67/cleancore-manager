@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.80";
+const MANAGER_VERSION="3.8.81";
 const APP_UPDATE_MANIFEST_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/latest.json";
 const APP_UPDATE_APK_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk";
 let latestAppUpdate=null;
@@ -2623,7 +2623,7 @@ async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoi
 }
 $("printInvoice").onclick=e=>{
  e.preventDefault();
- try{printInvoiceNow();}
+ try{await printInvoiceNow();}
  catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
 };
 $("editQuotation").onclick=()=>{const id=$("quotationDialog")?.getAttribute("data-quotation-id");$("quotationDialog").hidden=true;if(id)editLeadQuotation(id);};
@@ -2636,7 +2636,7 @@ $("closeQuotation").onclick=()=>{
 };
 $("printQuotation").onclick=e=>{
  e.preventDefault();
- try{printInvoiceNow("quotationPreview","CleanCore Quotation");}
+ try{await printInvoiceNow("quotationPreview","CleanCore Quotation");}
  catch(err){console.error("Quotation print error",err);toast(err?.message||"Unable to print quotation.",false);}
 };
 $("profileBtn").onclick=()=>{
@@ -2692,6 +2692,7 @@ async function restoreManagerSession(){
 }
 window.__CLEANCORE_APP_READY=true;
 bindRefreshControls();
+bindAppUpdateControls();
 bindNotificationSettings();
 bindWebsiteNotificationUi();
 restoreManagerSession().catch(err=>console.error('Manager session restore error',err));
