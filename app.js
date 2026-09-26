@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.85";
+const MANAGER_VERSION="3.8.86";
 const APP_UPDATE_MANIFEST_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/latest.json";
 const APP_UPDATE_APK_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk";
 let latestAppUpdate=null;
@@ -2649,94 +2649,142 @@ function getPrintableInvoiceHtml(previewId="invoicePreview",emptyMessage="Open a
  if(!body)throw new Error(emptyMessage);
  return body;
 }
-async function createPrintablePdfFile(previewId,title,fileName){
- const body=getPrintableInvoiceHtml(previewId,title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
- if(typeof window.html2pdf!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
- const source=document.createElement("div");
- source.style.cssText="position:fixed;left:-100000px;top:0;width:794px;background:#fff;padding:0";
- source.innerHTML=body;
- document.body.appendChild(source);
- try{
-   const worker=window.html2pdf().set({
-     margin:[10,10,10,10],
-     filename:fileName,
-     image:{type:"jpeg",quality:0.98},
-     html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
-     jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
-     pagebreak:{mode:["css","legacy"]}
-   }).from(source).toPdf();
-   const pdf=await worker.get("pdf");
-   const blob=pdf.output("blob");
-   return new File([blob],fileName,{type:"application/pdf"});
- }finally{source.remove();}
+function validatePdfBlob(blob,fileName){
+ if(!blob || blob.size<1000) throw new Error("PDF generation produced an empty file.");
+ return blob.arrayBuffer().then(buffer=>{
+   const bytes=new Uint8Array(buffer);
+   const signature=String.fromCharCode(...bytes.slice(0,5));
+   if(signature!=="%PDF-") throw new Error("Generated PDF is invalid.");
+   if(bytes.length<1000) throw new Error("Generated PDF is unexpectedly small.");
+   return {blob,byteLength:bytes.length,signature};
+ });
 }
-async function rememberSavedPdf(meta){
- try{
-   const key="cleancore_saved_invoice_files";
-   const current=JSON.parse(localStorage.getItem(key)||"[]");
-   const list=Array.isArray(current)?current:[];
-   const next=[meta,...list.filter(x=>x?.path!==meta.path)].slice(0,50);
-   localStorage.setItem(key,JSON.stringify(next));
- }catch(_){}
+async function blobToBase64(blob){
+ return await new Promise((resolve,reject)=>{
+   const reader=new FileReader();
+   reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
+   reader.onerror=reject;
+   reader.readAsDataURL(blob);
+ });
+}
+async function createNativeInvoicePdfFile(inv,items,title,fileName){
+ const pdfLib=window.jspdf?.jsPDF;
+ if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
+ const pdf=new pdfLib({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+ const pageW=210,pageH=297,left=12,right=198,bottom=280,usableW=186;
+ const docTitle=title || (isQuotationDocument(inv)?"CleanCore Quotation":"CleanCore Invoice");
+ const isQuote=isQuotationDocument(inv);
+ const safeItems=(Array.isArray(items)?items:[]).map((it,n)=>{
+   const p=it?.p||{};
+   const qty=Number(it?.q??it?.qty??1)||1;
+   const rate=Number(it?.unit_price??p?.selling_price??0)||0;
+   return {no:n+1,name:String(it?.product_name||p?.name||"Item"),hsn:String(it?.hsn_code||p?.hsn_code||"—"),qty,rate,amount:Number(it?.line_total??(rate*qty))||0};
+ });
+ const wrap=(value,width)=>pdf.splitTextToSize(String(value??""),width);
+ const moneyText=value=>money(value).replace(/₹/g,"Rs. ");
+ const drawHeader=()=>{
+   pdf.setFillColor(11,31,51);pdf.rect(left,12,usableW,23,"F");
+   pdf.setTextColor(255,255,255);pdf.setFont("helvetica","bold");pdf.setFontSize(16);
+   pdf.text("CleanCore Chemical & Cleaning",left+5,21);
+   pdf.setFontSize(8);pdf.setFont("helvetica","normal");
+   pdf.text("Srinivasa Colony, Manikonda, Hyderabad, Telangana, India",left+5,26);
+   pdf.text("Phone: +91 91827 25773  •  "+BUSINESS_EMAIL,left+5,30);
+   pdf.setFont("helvetica","bold");pdf.setFontSize(13);pdf.text(docTitle.toUpperCase(),right-5,21,{align:"right"});
+   pdf.setFontSize(8);pdf.setFont("helvetica","normal");pdf.text(isQuote?"FOR QUOTATION":"ORIGINAL FOR RECIPIENT",right-5,27,{align:"right"});
+   pdf.setTextColor(23,33,43);
+ };
+ const drawMeta=()=>{
+   const y=43;pdf.setDrawColor(220,229,238);pdf.setFillColor(248,251,253);pdf.rect(left,y,usableW,25,"FD");
+   pdf.setFontSize(8);pdf.setFont("helvetica","bold");
+   pdf.text(isQuote?"Quotation No:":"Invoice No:",left+5,y+7);pdf.text("Date:",left+105,y+7);
+   pdf.setFont("helvetica","normal");pdf.text(String(inv?.invoice_no||"—"),left+5,y+13);
+   pdf.text(new Date(inv?.created_at||Date.now()).toLocaleDateString("en-IN"),left+105,y+13);
+   pdf.setFont("helvetica","bold");pdf.text(isQuote?"Document Type:":"Payment Status:",left+5,y+20);
+   pdf.setFont("helvetica","normal");pdf.text(isQuote?"Quotation":String(inv?.payment_status||"Unpaid"),left+5,y+24);
+   return y+32;
+ };
+ const drawParties=startY=>{
+   let y=startY;const half=(usableW-4)/2;
+   pdf.setDrawColor(220,229,238);pdf.setFont("helvetica","bold");pdf.setFontSize(8);
+   pdf.text(isQuote?"QUOTATION FROM":"BILL FROM",left+4,y+6);pdf.text(isQuote?"QUOTATION TO":"BILL TO",left+half+8,y+6);
+   pdf.line(left+half+2,y,left+half+2,y+29);pdf.setFont("helvetica","normal");pdf.setFontSize(8);
+   const from=["CleanCore Chemical & Cleaning","Srinivasa Colony, Manikonda, Hyderabad, Telangana, India","+91 91827 25773",BUSINESS_EMAIL];
+   const to=[String(inv?.customer_business||"").trim(),String(inv?.customer_name||"").trim(),String(inv?.customer_phone||"").trim(),String(inv?.customer_email||"").trim(),String(inv?.gstin||"").trim()].filter(Boolean);
+   let fy=y+12;from.forEach(line=>wrap(line,half-8).forEach(w=>{pdf.text(w,left+4,fy);fy+=4;}));
+   let ty=y+12;(to.length?to:["—"]).forEach(line=>wrap(line,half-8).forEach(w=>{pdf.text(w,left+half+8,ty);ty+=4;}));
+   const h=Math.max(29,fy-y+2,ty-y+2);pdf.rect(left,y,usableW,h);return y+h+6;
+ };
+ const drawTableHeader=y=>{
+   const xs=[left,left+12,left+78,left+100,left+118,right];
+   pdf.setFillColor(11,31,51);pdf.setDrawColor(11,31,51);pdf.setTextColor(255,255,255);pdf.rect(left,y,usableW,8,"F");
+   pdf.setFont("helvetica","bold");pdf.setFontSize(7);
+   pdf.text("S.No.",xs[0]+2,y+5.5);pdf.text("Product / Service",xs[1]+2,y+5.5);pdf.text("HSN / SAC",xs[2]+2,y+5.5);
+   pdf.text("Qty",xs[3]+2,y+5.5);pdf.text("Rate",xs[4]+2,y+5.5);pdf.text("Amount",xs[5]-2,y+5.5,{align:"right"});
+   pdf.setTextColor(23,33,43);return xs;
+ };
+ drawHeader();let y=drawMeta();y=drawParties(y);let xs=drawTableHeader(y);y+=8;
+ pdf.setFont("helvetica","normal");pdf.setFontSize(7.2);
+ for(const row of safeItems){
+   const nameLines=wrap(row.name,62),h=Math.max(8,4+nameLines.length*3.6);
+   if(y+h>bottom){pdf.addPage();drawHeader();y=43;xs=drawTableHeader(y);y+=8;}
+   const [x0,x1,x2,x3,x4,x5]=xs;pdf.setDrawColor(220,229,238);pdf.rect(left,y,usableW,h);
+   pdf.line(x1,y,x1,y+h);pdf.line(x2,y,x2,y+h);pdf.line(x3,y,x3,y+h);pdf.line(x4,y,x4,y+h);pdf.line(x5,y,x5,y+h);
+   pdf.text(String(row.no),x0+2,y+5);nameLines.forEach((line,i)=>pdf.text(line,x1+2,y+5+i*3.6));
+   pdf.text(row.hsn,x2+2,y+5);pdf.text(String(row.qty),x3+2,y+5);pdf.text(moneyText(row.rate),x4+2,y+5);pdf.text(moneyText(row.amount),x5-2,y+5,{align:"right"});y+=h;
+ }
+ const totalRows=[["Subtotal",inv?.subtotal],...(Number(inv?.discount||0)>0?[["Discount",-Number(inv.discount)]]:[]),["Taxable Value",Number(inv?.subtotal||0)-Number(inv?.discount||0)],...(Number(inv?.gst_amount||0)>0?[["GST",inv.gst_amount]]:[]),["TOTAL",inv?.total]];
+ const totalH=totalRows.length*7;if(y+totalH+30>bottom){pdf.addPage();drawHeader();y=43;}
+ const labelX=left+118,valueX=right-2;pdf.setFontSize(8);
+ for(const [label,value] of totalRows){const isTotal=label==="TOTAL";if(isTotal)pdf.setFillColor(232,245,243),pdf.rect(labelX,y,80,8,"F");pdf.setFont("helvetica",isTotal?"bold":"normal");pdf.text(label,labelX+2,y+5.5);pdf.text(moneyText(value),valueX,y+5.5,{align:"right"});y+=isTotal?8:7;}
+ y+=4;const wordLines=wrap("Total in words: "+numberToWordsIndian(Number(inv?.total||0))+" ONLY",usableW);const wordH=6+wordLines.length*4;
+ if(y+wordH>bottom){pdf.addPage();drawHeader();y=43;}
+ pdf.setFillColor(248,251,253);pdf.setDrawColor(220,229,238);pdf.rect(left,y,usableW,wordH,"FD");pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);wordLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));y+=wordH+6;
+ const terms=isQuote?"Prices are quoted for the listed items and quantities. This quotation is subject to final confirmation before sale.":"Goods once sold will not be taken back. Payment is due as agreed with the customer.";
+ const noteLines=wrap(terms,usableW-8),noteH=6+noteLines.length*4;
+ if(y+noteH+18>bottom){pdf.addPage();drawHeader();y=43;}
+ pdf.setFillColor(248,251,253);pdf.rect(left,y,usableW,noteH,"FD");pdf.setFont("helvetica","normal");pdf.setFontSize(7);noteLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));y+=noteH+12;
+ pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("For CleanCore Chemical & Cleaning",right-2,y,{align:"right"});pdf.setFont("helvetica","normal");pdf.setFontSize(7);pdf.text("Authorised Signature",right-2,y+12,{align:"right"});
+ const blob=pdf.output("blob");await validatePdfBlob(blob,fileName);return new File([blob],fileName,{type:"application/pdf"});
+}
+async function loadInvoiceItemsForPdf(inv){
+ const id=String(inv?.id||"").trim();if(!id)return [];
+ const q=await db.from("invoice_items").select("product_id,product_name,hsn_code,qty,unit_price,line_total").eq("invoice_id",id).order("created_at");
+ if(q.error)throw q.error;return q.data||[];
+}
+async function createInvoicePdfFile(inv,customer,items){
+ const rows=Array.isArray(items)&&items.length?items:await loadInvoiceItemsForPdf(inv);
+ return await createNativeInvoicePdfFile(inv,rows,isQuotationDocument(inv)?"CleanCore Quotation":"CleanCore Invoice","CleanCore-"+String(inv?.invoice_no||"invoice")+".pdf");
+}
+async function createPrintablePdfFile(previewId,title,fileName){
+ const dialogId=previewId==="quotationPreview"?"quotationDialog":"invoiceDialog";
+ const id=$(dialogId)?.getAttribute(previewId==="quotationPreview"?"data-quotation-id":"data-invoice-id");
+ let inv=id?invoices.find(x=>x.id===id):null;
+ if(!inv&&id){const q=await db.from("invoices").select("*").eq("id",id).maybeSingle();if(q.error)throw q.error;inv=q.data;}
+ if(!inv)throw new Error(title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
+ const rows=await loadInvoiceItemsForPdf(inv);return await createNativeInvoicePdfFile(inv,rows,title,fileName);
 }
 async function saveOrPrintDocument(previewId,title,fileName){
  const pdfFile=await createPrintablePdfFile(previewId,title,fileName);
  const isNative=!!window.Capacitor?.isNativePlatform?.();
  if(isNative){
    const Filesystem=window.Capacitor?.Plugins?.Filesystem;
-   const Share=window.Capacitor?.Plugins?.Share;
    if(Filesystem?.writeFile){
-     const base64=await new Promise((resolve,reject)=>{
-       const reader=new FileReader();
-       reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
-       reader.onerror=reject;
-       reader.readAsDataURL(pdfFile);
-     });
-     const path="CleanCore/"+fileName;
+     const base64=await blobToBase64(pdfFile),path="CleanCore/"+fileName;
      await Filesystem.writeFile({path,data:base64,directory:"DOCUMENTS",recursive:true});
-     let savedUri="";
-     if(Filesystem.getUri){
-       const result=await Filesystem.getUri({path,directory:"DOCUMENTS"});
-       savedUri=String(result?.uri||"");
+     if(Filesystem.readFile){
+       const saved=await Filesystem.readFile({path,directory:"DOCUMENTS"});
+       const savedBase64=String(saved?.data||"");
+       if(!savedBase64||savedBase64.length<Math.floor(base64.length*0.9))throw new Error("Saved PDF failed integrity verification.");
+       const savedUri=Filesystem.getUri?String((await Filesystem.getUri({path,directory:"DOCUMENTS"}))?.uri||""):"";
+       if(!savedUri)throw new Error("PDF was created but its local file URI could not be resolved.");
+       await rememberSavedPdf({title,fileName,path,directory:"DOCUMENTS",saved_at:new Date().toISOString()});
+       toast(title+" PDF saved to Documents.");
+       return;
      }
-     if(!savedUri)throw new Error("PDF was created but its local file URI could not be resolved.");
-     await rememberSavedPdf({title,fileName,path,directory:"DOCUMENTS",saved_at:new Date().toISOString()});
-
-     // Android's default Capacitor FileProvider is configured for cache sharing.
-     // Keep the persistent Documents copy as the saved file, then share a temporary
-     // cache copy so the print/share sheet can reliably open it.
-     let shareUri="";
-     if(Share?.share&&Filesystem.writeFile&&Filesystem.getUri){
-       try{
-         const sharePath="CleanCore/"+fileName;
-         await Filesystem.writeFile({path:sharePath,data:base64,directory:"CACHE",recursive:true});
-         const shareResult=await Filesystem.getUri({path:sharePath,directory:"CACHE"});
-         shareUri=String(shareResult?.uri||"");
-         if(shareUri){
-           await Share.share({
-             title:"CleanCore "+title,
-             text:"PDF saved locally: "+fileName,
-             url:shareUri,
-             dialogTitle:"Print / Save PDF"
-           });
-         }
-       }catch(err){
-         // Saving already succeeded. Share cancellation or provider restrictions
-         // must not turn a successful PDF save into a print failure.
-         if(err?.name!=="AbortError")console.warn("PDF share unavailable:",err?.message||err);
-         toast(title+" PDF saved to Documents. Share/print is unavailable right now.");
-         return;
-       }
-     }
-     toast(title+" PDF saved to Documents.");
-     return;
+     throw new Error("PDF storage verification is unavailable.");
    }
  }
- const url=URL.createObjectURL(pdfFile);
- const a=document.createElement("a");
- a.href=url;a.download=fileName;a.rel="noopener";document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),30000);
- toast("PDF downloaded. Open it from Downloads to print or save."); 
+ const url=URL.createObjectURL(pdfFile);const a=document.createElement("a");a.href=url;a.download=fileName;a.rel="noopener";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);toast("PDF downloaded. Open it from Downloads to print or save.");
 }
 async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
  const stamp=String(title==="CleanCore Quotation"?"Quotation":"Invoice");
