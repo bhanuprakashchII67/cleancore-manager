@@ -246,6 +246,12 @@ jobs:
           PY
           echo "stable_signing=true" >> "$GITHUB_OUTPUT"
 
+      - name: Require stable app signing
+        if: steps.signing.outputs.stable_signing != 'true'
+        run: |
+          echo "::error::Stable Android signing is required for published APK updates. Configure the four CLEANCORE_ANDROID_* signing secrets before releasing a new Android version."
+          exit 1
+
       - name: Build Android APK
         run: |
           if [[ "${{ steps.signing.outputs.stable_signing }}" == "true" ]]; then
