@@ -21,7 +21,7 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.83";
+const MANAGER_VERSION="3.8.84";
 const APP_UPDATE_MANIFEST_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/latest.json";
 const APP_UPDATE_APK_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk";
 let latestAppUpdate=null;
