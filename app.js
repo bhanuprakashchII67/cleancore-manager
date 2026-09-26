@@ -2621,7 +2621,7 @@ async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoi
  const no=String($(previewId)?.querySelector?.(".inv-meta")?.textContent||"").replace(/[^A-Za-z0-9-]+/g,"-").slice(0,50)||Date.now();
  await saveOrPrintDocument(previewId,title,"CleanCore-"+stamp+"-"+no+".pdf");
 }
-$("printInvoice").onclick=e=>{
+$("printInvoice").onclick=async e=>{
  e.preventDefault();
  try{await printInvoiceNow();}
  catch(err){console.error("Invoice print error",err);toast(err?.message||"Unable to print invoice.",false);}
@@ -2634,7 +2634,7 @@ $("closeQuotation").onclick=()=>{
  document.body.classList.remove("invoice-open");
  document.documentElement.classList.remove("invoice-open");
 };
-$("printQuotation").onclick=e=>{
+$("printQuotation").onclick=async e=>{
  e.preventDefault();
  try{await printInvoiceNow("quotationPreview","CleanCore Quotation");}
  catch(err){console.error("Quotation print error",err);toast(err?.message||"Unable to print quotation.",false);}
