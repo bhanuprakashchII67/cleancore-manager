@@ -478,6 +478,9 @@ async function enter(){
    if(isAdmin)await loadNotificationPreferences();
  }catch(err){console.error("Manager notification preferences load failed",err);}
  try{
+   await ensureNativeNotificationSetup();
+ }catch(err){console.error("Native notification setup failed",err);}
+ try{
    await loadAll();
  }catch(err){
    console.error("CleanCore Manager data load failed",err);
