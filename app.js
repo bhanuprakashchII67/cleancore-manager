@@ -42,6 +42,61 @@ async function installLatestAppUpdate(){
  const info=latestAppUpdate||await checkForAppUpdate(false);
  if(!info||compareVersions(info.version,MANAGER_VERSION)<=0){if(info)toast("You already have the latest version.");return;}
  const url=String(info.apk_url||APP_UPDATE_APK_URL);
+ const isNative=isNativeManagerApp();
+ if(isNative){
+   const Plugins=window.Capacitor?.Plugins||{};
+   const Filesystem=Plugins.Filesystem;
+   const FileTransfer=Plugins.FileTransfer;
+   const ApkInstaller=Plugins.ApkInstaller;
+   if(Filesystem?.getUri&&FileTransfer?.downloadFile){
+     const cleanVersion=String(info.version).replace(/[^0-9A-Za-z._-]/g,"-");
+     const path="CleanCore/updates/CleanCore-Business-Manager-"+cleanVersion+".apk";
+     try{
+       const target=await Filesystem.getUri({path,directory:"DATA"});
+       if(!target?.uri)throw new Error("Could not resolve the local APK destination.");
+       toast("Downloading update v"+info.version+"…");
+       let progressHandle=null;
+       if(FileTransfer.addListener){
+         try{
+           progressHandle=await FileTransfer.addListener("progress",p=>{
+             const total=Number(p?.contentLength||0),done=Number(p?.bytes||0);
+             if(total>0){
+               const pct=Math.max(0,Math.min(100,Math.round(done/total*100)));
+               updateButtonState("checking","⬇ "+pct+"%");
+             }
+           });
+         }catch(err){console.warn("APK progress listener unavailable:",err);}
+       }
+       try{
+         await FileTransfer.downloadFile({url,path:target.uri,progress:true,readTimeout:120000,connectTimeout:30000});
+       }finally{
+         try{await progressHandle?.remove?.();}catch(_){}
+       }
+       const stat=await Filesystem.stat?.({path,directory:"DATA"});
+       if(!stat?.size||Number(stat.size)<100000)throw new Error("The downloaded APK is missing or incomplete.");
+       updateButtonState("available","Install v"+info.version);
+       if(ApkInstaller?.installApk){
+         await ApkInstaller.installApk({path});
+         toast("Update downloaded. Android installer opened for v"+info.version+".");
+         return;
+       }
+       if(Plugins.Share?.share){
+         const uri=(await Filesystem.getUri({path,directory:"DATA"}))?.uri;
+         if(uri){
+           await Plugins.Share.share({title:"CleanCore Business Manager "+info.version,text:"Update APK downloaded. Open it to install.",url:uri,dialogTitle:"Install CleanCore update"});
+           return;
+         }
+       }
+       toast("Update downloaded. Open the APK from the file manager to install it.");
+       return;
+     }catch(err){
+       console.error("Native APK download failed:",err);
+       toast(err?.message||"The update APK could not be downloaded.",false,{action:"app_update_download"});
+       updateButtonState("available","⬆ Update to v"+info.version);
+       return;
+     }
+   }
+ }
  try{
    const Browser=window.Capacitor?.Plugins?.Browser;
    if(Browser?.open){
