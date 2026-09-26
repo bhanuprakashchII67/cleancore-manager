@@ -1160,3 +1160,5 @@ body{overflow-x:hidden;overflow-y:visible!important}
   font-size:12px;
   letter-spacing:.04em;
 }
+
+.update-app-btn{color:#087f8f;border-color:#a9dfe2;font-weight:900}.update-app-btn.update-available{background:#087f8f;color:#fff;border-color:#087f8f}.update-app-btn:disabled{opacity:.7;cursor:wait}@media(max-width:600px){.top-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.update-app-btn{font-size:11px;padding:8px 9px}}
