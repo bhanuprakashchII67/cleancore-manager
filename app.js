@@ -2436,7 +2436,7 @@ window.viewInvoice=async id=>{
    const dialog=$("invoiceDialog");
    if(dialog){
      try{if(dialog.open)dialog.close();}catch(_){}
-     dialog.showModal();
+     dialog.hidden=false;
      dialog.setAttribute("data-invoice-open","1");
    }
  }catch(err){console.error("Invoice viewer error",err);toast(err?.message||"Unable to open invoice.",false);}
