@@ -2562,23 +2562,45 @@ function getPrintableInvoiceHtml(previewId="invoicePreview",emptyMessage="Open a
  if(!body)throw new Error(emptyMessage);
  return body;
 }
-function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
+async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
  const body=getPrintableInvoiceHtml(previewId,title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
- const w=window.open("about:blank","_blank","width=900,height=1100");
- if(!w)throw new Error("Allow pop-ups for CleanCore Manager to print the invoice.");
  const cssHref=[...document.querySelectorAll('link[rel="stylesheet"]')].find(x=>x.href&&x.href.includes("style.css"))?.href||"style.css";
- w.document.open();
- w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>"+title+"</title><link rel='stylesheet' href='"+String(cssHref).replace(/'/g,"%27")+"'><style>@page{size:A4;margin:10mm}body{margin:0;background:#fff}.invoice-preview{display:block!important;max-width:none!important;width:100%!important}.actions{display:none!important}@media print{html,body{background:#fff!important}.invoice-preview{box-shadow:none!important;border:0!important}}</style></head><body><div id='invoicePrintHost'>"+body+"</div></body></html>");
- w.document.close();
- let printed=false;
- const doPrint=()=>{
-   if(printed||w.closed)return;
-   printed=true;
-   w.focus();
-   setTimeout(()=>w.print(),80);
- };
- w.addEventListener("load",doPrint,{once:true});
- setTimeout(doPrint,400);
+ const markup="<!doctype html><html><head><meta charset='utf-8'><title>"+title+"</title><link rel='stylesheet' href='"+String(cssHref).replace(/'/g,"%27")+"'><style>@page{size:A4;margin:10mm}body{margin:0;background:#fff}.invoice-preview{display:block!important;max-width:none!important;width:100%!important}.actions{display:none!important}@media print{html,body{background:#fff!important}.invoice-preview{box-shadow:none!important;border:0!important}}</style></head><body><div id='invoicePrintHost'>"+body+"</div></body></html>";
+ const isNative=!!window.Capacitor?.isNativePlatform?.();
+
+ if(isNative){
+   try{
+     const Browser=window.Capacitor?.Plugins?.Browser;
+     if(Browser?.open){
+       const dataUrl="data:text/html;charset=utf-8,"+encodeURIComponent(markup);
+       await Browser.open({url:dataUrl});
+       return;
+     }
+   }catch(err){console.warn("Native print surface failed:",err);}
+ }
+
+ let w=null;
+ try{w=window.open("about:blank","_blank","width=900,height=1100");}catch(_){}
+ if(w){
+   w.document.open();
+   w.document.write(markup);
+   w.document.close();
+   const doPrint=()=>{if(!w.closed){try{w.focus();w.print();}catch(err){console.warn("Popup print failed:",err);}}};
+   w.addEventListener("load",doPrint,{once:true});
+   setTimeout(doPrint,500);
+   return;
+ }
+
+ const printRoot=document.createElement("div");
+ printRoot.id="cleanCorePrintRoot";
+ printRoot.innerHTML=markup.slice(markup.indexOf("<body>")+6,markup.lastIndexOf("</body>"));
+ printRoot.style.cssText="position:fixed;inset:0;z-index:999999;background:#fff;overflow:auto;padding:0";
+ document.body.appendChild(printRoot);
+ const style=document.createElement("style");
+ style.textContent="@media print{body>*:not(#cleanCorePrintRoot){display:none!important}#cleanCorePrintRoot{position:static!important;display:block!important;overflow:visible!important}}@media screen{#cleanCorePrintRoot{display:block!important}}";
+ document.head.appendChild(style);
+ await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,100)));
+ try{window.focus();window.print();}finally{setTimeout(()=>{printRoot.remove();style.remove();},1000);}
 }
 $("printInvoice").onclick=e=>{
  e.preventDefault();
