@@ -2647,6 +2647,7 @@ async function createNativeInvoicePdfFile(inv,items,title,fileName){
    return {xs};
  };
 
+ drawHeader();
  let y=drawMeta();
  y=drawParties(y);
  let table=drawTableHeader(y); y+=8;
