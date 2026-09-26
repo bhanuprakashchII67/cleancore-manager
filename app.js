@@ -2556,12 +2556,6 @@ function armManagerExpiryTimer(){
  // Native/installed app sessions do not expire locally.
 }
 async function restoreManagerSession(){
- if(!isStandaloneManagerApp()){
-   try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Web session cleanup:",err)}
-   $("loginView").classList.remove("hidden");
-   $("appView").classList.add("hidden");
-   return;
- }
  const {data,error}=await db.auth.getSession();
  if(error){console.warn("Manager session check:",error.message);return;}
  if(!data?.session)return;
