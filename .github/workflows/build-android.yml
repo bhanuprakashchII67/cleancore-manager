@@ -31,6 +31,12 @@ jobs:
       - name: Sync web app
         run: npx cap sync android
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug
 
