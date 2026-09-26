@@ -5,6 +5,9 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -57,8 +60,37 @@ jobs:
           })().catch(err => { console.error(err); process.exit(1); });
           NODE
 
+      - name: Set Android version
+        run: |
+          VERSION=$(node -e 'const fs=require("fs");const s=fs.readFileSync("app.js","utf8");console.log(s.match(/MANAGER_VERSION="([^"]+)"/)[1])')
+          CODE=$(node -e 'const v=process.argv[1].split(".").map(Number);console.log(v[0]*10000+v[1]*100+v[2])' "$VERSION")
+          python3 - "$VERSION" "$CODE" <<'PY'
+          import sys,re
+          version,code=sys.argv[1],sys.argv[2]
+          p="android/app/build.gradle"
+          s=open(p).read()
+          s=re.sub(r'versionCode\s+\d+',f'versionCode {code}',s,count=1)
+          s=re.sub(r'versionName\s+"[^"]+"',f'versionName "{version}"',s,count=1)
+          open(p,"w").write(s)
+          PY
+
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug
+
+      - name: Publish latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -e 'const fs=require("fs");const s=fs.readFileSync("app.js","utf8");console.log(s.match(/MANAGER_VERSION="([^"]+)"/)[1])')
+          TAG="v$VERSION"
+          cat > latest.json <<EOF
+          {"version":"$VERSION","apk_url":"https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk","released_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" android/app/build/outputs/apk/debug/app-debug.apk#CleanCore-Business-Manager.apk latest.json#latest.json --clobber
+          else
+            gh release create "$TAG" android/app/build/outputs/apk/debug/app-debug.apk#CleanCore-Business-Manager.apk latest.json#latest.json --title "CleanCore Business Manager $VERSION" --notes "CleanCore Manager $VERSION"
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
