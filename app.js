@@ -2657,79 +2657,22 @@ async function createNativeInvoicePdfFile(inv,items,title,fileName){
  const pdfLib=window.jspdf?.jsPDF;
  if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
  const pdf=new pdfLib({orientation:"portrait",unit:"mm",format:"a4",compress:true});
- const pageW=210,pageH=297,left=12,right=198,bottom=280,usableW=186;
- const docTitle=title || (isQuotationDocument(inv)?"CleanCore Quotation":"CleanCore Invoice");
- const isQuote=isQuotationDocument(inv);
- const safeItems=(Array.isArray(items)?items:[]).map((it,n)=>{
-   const p=it?.p||{};
-   const qty=Number(it?.q??it?.qty??1)||1;
-   const rate=Number(it?.unit_price??p?.selling_price??0)||0;
-   return {no:n+1,name:String(it?.product_name||p?.name||"Item"),hsn:String(it?.hsn_code||p?.hsn_code||"—"),qty,rate,amount:Number(it?.line_total??(rate*qty))||0};
- });
- const wrap=(value,width)=>pdf.splitTextToSize(String(value??""),width);
- const moneyText=value=>money(value).replace(/₹/g,"Rs. ");
- const drawHeader=()=>{
-   pdf.setFillColor(11,31,51);pdf.rect(left,12,usableW,23,"F");
-   pdf.setTextColor(255,255,255);pdf.setFont("helvetica","bold");pdf.setFontSize(16);
-   pdf.text("CleanCore Chemical & Cleaning",left+5,21);
-   pdf.setFontSize(8);pdf.setFont("helvetica","normal");
-   pdf.text("Srinivasa Colony, Manikonda, Hyderabad, Telangana, India",left+5,26);
-   pdf.text("Phone: +91 91827 25773  •  "+BUSINESS_EMAIL,left+5,30);
-   pdf.setFont("helvetica","bold");pdf.setFontSize(13);pdf.text(docTitle.toUpperCase(),right-5,21,{align:"right"});
-   pdf.setFontSize(8);pdf.setFont("helvetica","normal");pdf.text(isQuote?"FOR QUOTATION":"ORIGINAL FOR RECIPIENT",right-5,27,{align:"right"});
-   pdf.setTextColor(23,33,43);
- };
- const drawMeta=()=>{
-   const y=43;pdf.setDrawColor(220,229,238);pdf.setFillColor(248,251,253);pdf.rect(left,y,usableW,25,"FD");
-   pdf.setFontSize(8);pdf.setFont("helvetica","bold");
-   pdf.text(isQuote?"Quotation No:":"Invoice No:",left+5,y+7);pdf.text("Date:",left+105,y+7);
-   pdf.setFont("helvetica","normal");pdf.text(String(inv?.invoice_no||"—"),left+5,y+13);
-   pdf.text(new Date(inv?.created_at||Date.now()).toLocaleDateString("en-IN"),left+105,y+13);
-   pdf.setFont("helvetica","bold");pdf.text(isQuote?"Document Type:":"Payment Status:",left+5,y+20);
-   pdf.setFont("helvetica","normal");pdf.text(isQuote?"Quotation":String(inv?.payment_status||"Unpaid"),left+5,y+24);
-   return y+32;
- };
- const drawParties=startY=>{
-   let y=startY;const half=(usableW-4)/2;
-   pdf.setDrawColor(220,229,238);pdf.setFont("helvetica","bold");pdf.setFontSize(8);
-   pdf.text(isQuote?"QUOTATION FROM":"BILL FROM",left+4,y+6);pdf.text(isQuote?"QUOTATION TO":"BILL TO",left+half+8,y+6);
-   pdf.line(left+half+2,y,left+half+2,y+29);pdf.setFont("helvetica","normal");pdf.setFontSize(8);
-   const from=["CleanCore Chemical & Cleaning","Srinivasa Colony, Manikonda, Hyderabad, Telangana, India","+91 91827 25773",BUSINESS_EMAIL];
-   const to=[String(inv?.customer_business||"").trim(),String(inv?.customer_name||"").trim(),String(inv?.customer_phone||"").trim(),String(inv?.customer_email||"").trim(),String(inv?.gstin||"").trim()].filter(Boolean);
-   let fy=y+12;from.forEach(line=>wrap(line,half-8).forEach(w=>{pdf.text(w,left+4,fy);fy+=4;}));
-   let ty=y+12;(to.length?to:["—"]).forEach(line=>wrap(line,half-8).forEach(w=>{pdf.text(w,left+half+8,ty);ty+=4;}));
-   const h=Math.max(29,fy-y+2,ty-y+2);pdf.rect(left,y,usableW,h);return y+h+6;
- };
- const drawTableHeader=y=>{
-   const xs=[left,left+12,left+78,left+100,left+118,right];
-   pdf.setFillColor(11,31,51);pdf.setDrawColor(11,31,51);pdf.setTextColor(255,255,255);pdf.rect(left,y,usableW,8,"F");
-   pdf.setFont("helvetica","bold");pdf.setFontSize(7);
-   pdf.text("S.No.",xs[0]+2,y+5.5);pdf.text("Product / Service",xs[1]+2,y+5.5);pdf.text("HSN / SAC",xs[2]+2,y+5.5);
-   pdf.text("Qty",xs[3]+2,y+5.5);pdf.text("Rate",xs[4]+2,y+5.5);pdf.text("Amount",xs[5]-2,y+5.5,{align:"right"});
-   pdf.setTextColor(23,33,43);return xs;
- };
- drawHeader();let y=drawMeta();y=drawParties(y);let xs=drawTableHeader(y);y+=8;
- pdf.setFont("helvetica","normal");pdf.setFontSize(7.2);
- for(const row of safeItems){
-   const nameLines=wrap(row.name,62),h=Math.max(8,4+nameLines.length*3.6);
-   if(y+h>bottom){pdf.addPage();drawHeader();y=43;xs=drawTableHeader(y);y+=8;}
-   const [x0,x1,x2,x3,x4,x5]=xs;pdf.setDrawColor(220,229,238);pdf.rect(left,y,usableW,h);
-   pdf.line(x1,y,x1,y+h);pdf.line(x2,y,x2,y+h);pdf.line(x3,y,x3,y+h);pdf.line(x4,y,x4,y+h);pdf.line(x5,y,x5,y+h);
-   pdf.text(String(row.no),x0+2,y+5);nameLines.forEach((line,i)=>pdf.text(line,x1+2,y+5+i*3.6));
-   pdf.text(row.hsn,x2+2,y+5);pdf.text(String(row.qty),x3+2,y+5);pdf.text(moneyText(row.rate),x4+2,y+5);pdf.text(moneyText(row.amount),x5-2,y+5,{align:"right"});y+=h;
- }
- const totalRows=[["Subtotal",inv?.subtotal],...(Number(inv?.discount||0)>0?[["Discount",-Number(inv.discount)]]:[]),["Taxable Value",Number(inv?.subtotal||0)-Number(inv?.discount||0)],...(Number(inv?.gst_amount||0)>0?[["GST",inv.gst_amount]]:[]),["TOTAL",inv?.total]];
- const totalH=totalRows.length*7;if(y+totalH+30>bottom){pdf.addPage();drawHeader();y=43;}
- const labelX=left+118,valueX=right-2;pdf.setFontSize(8);
- for(const [label,value] of totalRows){const isTotal=label==="TOTAL";if(isTotal)pdf.setFillColor(232,245,243),pdf.rect(labelX,y,80,8,"F");pdf.setFont("helvetica",isTotal?"bold":"normal");pdf.text(label,labelX+2,y+5.5);pdf.text(moneyText(value),valueX,y+5.5,{align:"right"});y+=isTotal?8:7;}
- y+=4;const wordLines=wrap("Total in words: "+numberToWordsIndian(Number(inv?.total||0))+" ONLY",usableW);const wordH=6+wordLines.length*4;
- if(y+wordH>bottom){pdf.addPage();drawHeader();y=43;}
- pdf.setFillColor(248,251,253);pdf.setDrawColor(220,229,238);pdf.rect(left,y,usableW,wordH,"FD");pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);wordLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));y+=wordH+6;
- const terms=isQuote?"Prices are quoted for the listed items and quantities. This quotation is subject to final confirmation before sale.":"Goods once sold will not be taken back. Payment is due as agreed with the customer.";
- const noteLines=wrap(terms,usableW-8),noteH=6+noteLines.length*4;
- if(y+noteH+18>bottom){pdf.addPage();drawHeader();y=43;}
- pdf.setFillColor(248,251,253);pdf.rect(left,y,usableW,noteH,"FD");pdf.setFont("helvetica","normal");pdf.setFontSize(7);noteLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));y+=noteH+12;
- pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("For CleanCore Chemical & Cleaning",right-2,y,{align:"right"});pdf.setFont("helvetica","normal");pdf.setFontSize(7);pdf.text("Authorised Signature",right-2,y+12,{align:"right"});
+ const pageW=210,left=10,right=200,usableW=190,contentBottom=284;
+ const teal=[0,154,139],navy=[11,43,73],border=[215,225,232],headerFill=[248,252,252],text=[24,38,52];
+ const isQuote=isQuotationDocument(inv),moneyText=v=>money(v).replace(/₹/g,"Rs. "),wrap=(v,w)=>pdf.splitTextToSize(String(v??""),w);
+ const safeItems=(Array.isArray(items)?items:[]).map((it,n)=>{const p=it?.p||{},qty=Number(it?.qty??it?.q??1)||1,rate=Number(it?.unit_price??p?.selling_price??0)||0;return{no:n+1,name:String(it?.product_name||p?.name||"Item"),hsn:String(it?.hsn_code||p?.hsn_code||"—"),qty,rate,amount:Number(it?.line_total??(rate*qty))||0};});
+ const setText=()=>pdf.setTextColor(...text);
+ const drawHeader=()=>{pdf.setFillColor(255,255,255);pdf.rect(0,0,pageW,297,"F");pdf.setDrawColor(...border);pdf.rect(left,8,usableW,27,"S");pdf.setFont("helvetica","bold");pdf.setFontSize(15);pdf.setTextColor(...navy);pdf.text("CleanCore Chemical & Cleaning",left+5,18);pdf.setFontSize(7.5);pdf.setTextColor(...teal);pdf.text(isQuote?"Quotation":"Invoice",left+5,23);pdf.setFont("helvetica","normal");pdf.setFontSize(8);setText();pdf.text("Srinivasa Colony, Manikonda, Hyderabad, Telangana, India",left+5,28);pdf.text("Phone: +91 91827 25773",left+5,32);pdf.text("Email: "+BUSINESS_EMAIL,left+5,35);pdf.setFont("helvetica","bold");pdf.setFontSize(14);pdf.setTextColor(...navy);pdf.text(isQuote?"QUOTATION":"INVOICE",right-5,18,{align:"right"});pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);setText();pdf.text(isQuote?"FOR QUOTATION":"ORIGINAL FOR RECIPIENT",right-5,24,{align:"right"});pdf.setDrawColor(...teal);pdf.setLineWidth(0.7);pdf.line(left,40,right,40);pdf.setLineWidth(0.2);};
+ const drawMeta=()=>{const y=40,h=25;pdf.setFillColor(...headerFill);pdf.setDrawColor(...border);pdf.rect(left,y,usableW,h,"FD");pdf.setFont("helvetica","bold");pdf.setFontSize(8);setText();pdf.text(isQuote?"Quotation No:":"Invoice No:",left+5,y+8);pdf.text("Date:",left+5,y+16);pdf.setFont("helvetica","normal");pdf.text(String(inv?.invoice_no||"—"),left+32,y+8);pdf.text(new Date(inv?.created_at||Date.now()).toLocaleDateString("en-IN"),left+32,y+16);pdf.setFont("helvetica","bold");pdf.text("Document Type:",left+124,y+8);pdf.setFont("helvetica","normal");pdf.text(isQuote?"Quotation":String(inv?.payment_status||"Unpaid"),left+151,y+8);return y+h;};
+ const drawParties=y=>{const half=usableW/2,h=42;pdf.setDrawColor(...border);pdf.rect(left,y,usableW,h,"S");pdf.line(left+half,y,left+half,y+h);pdf.setFont("helvetica","bold");pdf.setFontSize(8);setText();pdf.text(isQuote?"QUOTATION FROM":"BILL FROM",left+4,y+7);pdf.text(isQuote?"QUOTATION TO":"BILL TO",left+half+4,y+7);pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.text("CleanCore Chemical & Cleaning",left+4,y+15);const business=String(inv?.customer_business||"").trim(),name=String(inv?.customer_name||"").trim(),phone=String(inv?.customer_phone||"").trim(),email=String(inv?.customer_email||"").trim(),gstin=String(inv?.gstin||"").trim();const to=["Business: "+(business||"na"),"Name: "+(name||"na"),"Phone: "+(phone||"na")];if(email)to.push("Email: "+email);if(gstin)to.push("GSTIN: "+gstin);let ty=y+15;to.forEach(line=>{const parts=line.split(":");pdf.setFont("helvetica","bold");pdf.text(parts.shift()+":",left+half+4,ty);pdf.setFont("helvetica","normal");pdf.text(parts.join(":").trim(),left+half+23,ty);ty+=4;});return y+h;};
+ const tableHeader=y=>{const widths=[12,68,22,18,18,52],xs=[left];widths.slice(0,-1).forEach(w=>xs.push(xs.at(-1)+w));pdf.setFillColor(...navy);pdf.setDrawColor(...navy);pdf.rect(left,y,usableW,9,"FD");pdf.setTextColor(255,255,255);pdf.setFont("helvetica","bold");pdf.setFontSize(7);["S.NO.","PRODUCT / SERVICE","HSN / SAC","QTY","RATE","AMOUNT"].forEach((label,i)=>i===5?pdf.text(label,xs[i]+widths[i]-3,y+6,{align:"right"}):pdf.text(label,xs[i]+2,y+6));return{xs,widths};};
+ let y=0;drawHeader();y=drawMeta()+1;y=drawParties(y)+4;let table=tableHeader(y);y+=9;pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);setText();
+ for(const row of safeItems){const lines=wrap(row.name,table.widths[1]-4),h=Math.max(9,5+(lines.length-1)*3.8);if(y+h>contentBottom-34){pdf.addPage();drawHeader();y=48;table=tableHeader(y);y+=9;pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);setText();}pdf.setDrawColor(...border);pdf.rect(left,y,usableW,h,"S");for(let i=1;i<table.xs.length;i++)pdf.line(table.xs[i],y,table.xs[i],y+h);pdf.text(String(row.no),table.xs[0]+2,y+6);lines.forEach((line,i)=>pdf.text(line,table.xs[1]+2,y+6+i*3.8));pdf.text(row.hsn,table.xs[2]+2,y+6);pdf.text(String(row.qty),table.xs[3]+2,y+6);pdf.text(moneyText(row.rate),table.xs[4]+2,y+6);pdf.text(moneyText(row.amount),table.xs[5]+table.widths[5]-3,y+6,{align:"right"});y+=h;}
+ const taxable=Number(inv?.subtotal||0)-Number(inv?.discount||0),taxes=Number(inv?.cgst_amount||0)+Number(inv?.sgst_amount||0)+Number(inv?.igst_amount||0),summaryRows=[["Subtotal",Number(inv?.subtotal||0)],...(Number(inv?.discount||0)>0?[["Discount",-Number(inv.discount)]]:[]),["Taxable Value",taxable],...(taxes>0?[["GST",taxes]]:[]),["TOTAL",Number(inv?.total||0)]];
+ if(y+summaryRows.length*7+50>contentBottom){pdf.addPage();drawHeader();y=48;}const labelX=left+122,valueX=right-4;pdf.setFontSize(8);summaryRows.forEach(([label,value])=>{const total=label==="TOTAL";if(total){pdf.setFillColor(232,246,244);pdf.rect(labelX,y,usableW-(labelX-left),8,"F");}pdf.setFont("helvetica",total?"bold":"normal");setText();pdf.text(label,labelX+3,y+5.5);pdf.text(moneyText(value),valueX,y+5.5,{align:"right"});y+=total?8:7;});
+ y+=4;const wordLines=wrap("Total in words: "+numberToWordsIndian(Number(inv?.total||0))+" ONLY",usableW-8),wordH=8+wordLines.length*4;pdf.setFillColor(...headerFill);pdf.setDrawColor(...border);pdf.rect(left,y,usableW,wordH,"FD");pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);setText();wordLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));y+=wordH+5;
+ if(inv?.quotation_notes){const noteLines=wrap(String(inv.quotation_notes),usableW-8),noteH=9+noteLines.length*4;if(y+noteH+25>contentBottom){pdf.addPage();drawHeader();y=48;}pdf.setFillColor(...headerFill);pdf.setDrawColor(...border);pdf.rect(left,y,usableW,noteH,"FD");pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);pdf.text("TERMS & CONDITIONS / NOTES",left+4,y+5);pdf.setFont("helvetica","normal");noteLines.forEach((line,i)=>pdf.text(line,left+4,y+10+i*4));y+=noteH+5;}
+ const quoteNote=isQuote?"QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE.":"This document is generated by CleanCore Chemical & Cleaning.",noteLines=wrap(quoteNote,usableW-8),noteH=8+noteLines.length*4;if(y+noteH+18>contentBottom){pdf.addPage();drawHeader();y=48;}pdf.setFillColor(...headerFill);pdf.setDrawColor(...border);pdf.rect(left,y,usableW,noteH,"FD");pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);setText();noteLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));y+=noteH+10;pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("For CleanCore Chemical & Cleaning",right-4,y,{align:"right"});pdf.setFont("helvetica","normal");pdf.setFontSize(7);pdf.text("Authorised Signature",right-4,y+12,{align:"right"});
  const blob=pdf.output("blob");await validatePdfBlob(blob,fileName);return new File([blob],fileName,{type:"application/pdf"});
 }
 async function loadInvoiceItemsForPdf(inv){
