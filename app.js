@@ -51,6 +51,56 @@ function renderNotificationSettings(){
  const st=$("notificationSettingsStatus");if(st)st.textContent=notificationPreferences.desktop_enabled?"Desktop notifications enabled.":"Desktop notifications off.";
 }
 // In-app notifications only.
+function isNativeManagerApp(){
+ return !!window.Capacitor?.isNativePlatform?.();
+}
+function nativeLocalNotifications(){
+ return window.Capacitor?.Plugins?.LocalNotifications||null;
+}
+async function ensureNativeNotificationSetup(){
+ if(!isNativeManagerApp())return false;
+ const n=nativeLocalNotifications();
+ if(!n)return false;
+ try{
+   const p=await n.requestPermissions();
+   if(p.display!=="granted")return false;
+   await n.createChannel?.({
+     id:"cleancore_manager_alerts",
+     name:"CleanCore Manager Alerts",
+     description:"Orders, enquiries and Manager alerts",
+     importance:5,
+     sound:"default",
+     vibration:true,
+     lights:true
+   }).catch(()=>{});
+   return true;
+ }catch(err){
+   console.warn("Native notification setup failed:",err);
+   return false;
+ }
+}
+function nativeNotificationId(id){
+ let h=0;for(const ch of String(id||Date.now()))h=((h<<5)-h)+ch.charCodeAt(0)|0;
+ return Math.abs(h)||1;
+}
+async function showNativeNotification(n,pref){
+ if(!isNativeManagerApp()||!notificationAllowed(pref))return;
+ const plugin=nativeLocalNotifications();
+ if(!plugin)return;
+ try{
+   const ready=await ensureNativeNotificationSetup();
+   if(!ready)return;
+   await plugin.schedule({notifications:[{
+     id:nativeNotificationId(n?.id||n?.created_at||Date.now()),
+     title:n?.subject||"CleanCore Manager alert",
+     body:n?.body||"New Manager notification",
+     channelId:"cleancore_manager_alerts",
+     sound:"default",
+     smallIcon:"ic_launcher",
+     extra:{notification_id:n?.id||"",type:n?.notification_type||""}
+   }]});
+ }catch(err){console.warn("Native notification failed:",err);}
+}
 async function ensureManagerNotificationPermission(){
  if(!("Notification" in window))return false;
  if(Notification.permission==="granted")return true;
@@ -198,6 +248,7 @@ function announceWebsiteNotification(n){
  const pref=isOrder?"website_orders":"website_enquiries";
  if(!notificationAllowed(pref))return;
  if(notificationPreferences.sound_enabled)playNotificationSound();
+ showNativeNotification(n,pref);
  maybeBrowserNotify(n,pref);
  showInPageNotification(n);
  toast(isOrder?"🔔 New website order received":"🔔 New website enquiry received");
