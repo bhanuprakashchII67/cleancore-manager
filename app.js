@@ -2601,6 +2601,15 @@ async function createPrintablePdfFile(previewId,title,fileName){
    return new File([blob],fileName,{type:"application/pdf"});
  }finally{source.remove();}
 }
+async function rememberSavedPdf(meta){
+ try{
+   const key="cleancore_saved_invoice_files";
+   const current=JSON.parse(localStorage.getItem(key)||"[]");
+   const list=Array.isArray(current)?current:[];
+   const next=[meta,...list.filter(x=>x?.path!==meta.path)].slice(0,50);
+   localStorage.setItem(key,JSON.stringify(next));
+ }catch(_){}
+}
 async function saveOrPrintDocument(previewId,title,fileName){
  const pdfFile=await createPrintablePdfFile(previewId,title,fileName);
  const isNative=!!window.Capacitor?.isNativePlatform?.();
@@ -2615,7 +2624,6 @@ async function saveOrPrintDocument(previewId,title,fileName){
        reader.readAsDataURL(pdfFile);
      });
      const path="CleanCore/"+fileName;
-     // Documents is persistent user-generated storage. Cache is temporary and may be purged.
      await Filesystem.writeFile({path,data:base64,directory:"DOCUMENTS",recursive:true});
      let savedUri="";
      if(Filesystem.getUri){
@@ -2623,10 +2631,33 @@ async function saveOrPrintDocument(previewId,title,fileName){
        savedUri=String(result?.uri||"");
      }
      if(!savedUri)throw new Error("PDF was created but its local file URI could not be resolved.");
-     if(Share?.share){
-       await Share.share({title:"CleanCore "+title,text:"PDF saved locally: "+fileName,url:savedUri,dialogTitle:"Print / Save PDF"});
-       toast(title+" PDF saved to Documents.");
-       return;
+     await rememberSavedPdf({title,fileName,path,directory:"DOCUMENTS",saved_at:new Date().toISOString()});
+
+     // Android's default Capacitor FileProvider is configured for cache sharing.
+     // Keep the persistent Documents copy as the saved file, then share a temporary
+     // cache copy so the print/share sheet can reliably open it.
+     let shareUri="";
+     if(Share?.share&&Filesystem.writeFile&&Filesystem.getUri){
+       try{
+         const sharePath="CleanCore/"+fileName;
+         await Filesystem.writeFile({path:sharePath,data:base64,directory:"CACHE",recursive:true});
+         const shareResult=await Filesystem.getUri({path:sharePath,directory:"CACHE"});
+         shareUri=String(shareResult?.uri||"");
+         if(shareUri){
+           await Share.share({
+             title:"CleanCore "+title,
+             text:"PDF saved locally: "+fileName,
+             url:shareUri,
+             dialogTitle:"Print / Save PDF"
+           });
+         }
+       }catch(err){
+         // Saving already succeeded. Share cancellation or provider restrictions
+         // must not turn a successful PDF save into a print failure.
+         if(err?.name!=="AbortError")console.warn("PDF share unavailable:",err?.message||err);
+         toast(title+" PDF saved to Documents. Share/print is unavailable right now.");
+         return;
+       }
      }
      toast(title+" PDF saved to Documents.");
      return;
@@ -2636,7 +2667,7 @@ async function saveOrPrintDocument(previewId,title,fileName){
  const a=document.createElement("a");
  a.href=url;a.download=fileName;a.rel="noopener";document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),30000);
- toast("PDF downloaded. Open it from Downloads to print or save.");
+ toast("PDF downloaded. Open it from Downloads to print or save."); 
 }
 async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
  const stamp=String(title==="CleanCore Quotation"?"Quotation":"Invoice");
