@@ -53,7 +53,17 @@ async function installLatestAppUpdate(){
  try{window.open(url,"_blank","noopener,noreferrer");return;}catch(_){}
  window.location.href=url;
 }
-function bindAppUpdateControls(){const b=$("updateApp");if(!b||b.dataset.bound==="1")return;b.dataset.bound="1";b.addEventListener("click",async()=>{if(latestAppUpdate&&compareVersions(latestAppUpdate.version,MANAGER_VERSION)>0)await installLatestAppUpdate();else await checkForAppUpdate(true);});}
+function bindAppUpdateControls(){
+ const b=$("updateApp");
+ if(!b||b.dataset.bound==="1")return;
+ b.dataset.bound="1";
+ b.addEventListener("click",async()=>{
+   try{
+     const info=await checkForAppUpdate(true);
+     if(info&&compareVersions(info.version,MANAGER_VERSION)>0)await installLatestAppUpdate();
+   }catch(err){console.error("App update error",err);toast("Unable to start the update.",false);}
+ });
+}
 
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
@@ -2597,7 +2607,7 @@ async function saveOrPrintDocument(previewId,title,fileName){
  if(isNative){
    const Filesystem=window.Capacitor?.Plugins?.Filesystem;
    const Share=window.Capacitor?.Plugins?.Share;
-   if(Filesystem?.writeFile&&Share?.share){
+   if(Filesystem?.writeFile){
      const base64=await new Promise((resolve,reject)=>{
        const reader=new FileReader();
        reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
@@ -2605,8 +2615,20 @@ async function saveOrPrintDocument(previewId,title,fileName){
        reader.readAsDataURL(pdfFile);
      });
      const path="CleanCore/"+fileName;
-     const saved=await Filesystem.writeFile({path,data:base64,directory:"CACHE",recursive:true});
-     await Share.share({title,text:"CleanCore "+title+" — PDF ready to print or save.",url:saved.uri,dialogTitle:"Print / Save PDF"});
+     // Documents is persistent user-generated storage. Cache is temporary and may be purged.
+     await Filesystem.writeFile({path,data:base64,directory:"DOCUMENTS",recursive:true});
+     let savedUri="";
+     if(Filesystem.getUri){
+       const result=await Filesystem.getUri({path,directory:"DOCUMENTS"});
+       savedUri=String(result?.uri||"");
+     }
+     if(!savedUri)throw new Error("PDF was created but its local file URI could not be resolved.");
+     if(Share?.share){
+       await Share.share({title:"CleanCore "+title,text:"PDF saved locally: "+fileName,url:savedUri,dialogTitle:"Print / Save PDF"});
+       toast(title+" PDF saved to Documents.");
+       return;
+     }
+     toast(title+" PDF saved to Documents.");
      return;
    }
  }
