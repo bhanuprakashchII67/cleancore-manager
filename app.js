@@ -2544,22 +2544,8 @@ function buildCustomerBillMessage(inv,customer,items=[]){
  ].join("\n");
 }
 async function createInvoicePdfFile(inv,customer,items){
- const host=$("invoicePreview");
- const previous=host?.innerHTML||"";
- if(!host)throw new Error("Invoice preview is unavailable.");
- await window.viewInvoice(inv.id);
- const preview=host.innerHTML;
- const pdfLib=window.jspdf?.jsPDF;
- if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
- const staging=document.createElement("div");
- staging.style.position="fixed";staging.style.left="-100000px";staging.style.top="0";staging.style.width="794px";staging.style.background="#fff";
- staging.innerHTML=preview;document.body.appendChild(staging);
- try{
-   const pdf=new pdfLib({orientation:"portrait",unit:"pt",format:"a4",compress:true});
-   await pdf.html(staging,{margin:[24,24,24,24],autoPaging:"text",html2canvas:{scale:1,useCORS:true,backgroundColor:"#ffffff"}});
-   const blob=pdf.output("blob");
-   return new File([blob],"CleanCore-"+String(inv.invoice_no||"invoice")+".pdf",{type:"application/pdf"});
- }finally{staging.remove();host.innerHTML=previous;}
+ const rows=Array.isArray(items)&&items.length?items:await loadInvoiceItemsForPdf(inv);
+ return await createNativeInvoicePdfFile(inv,rows,isQuotationDocument(inv)?"CleanCore Quotation":"CleanCore Invoice","CleanCore-"+String(inv?.invoice_no||"invoice")+".pdf");
 }
 async function sendBillToCustomer(inv,customer,items){
  const phone=normalizePhone(inv?.customer_phone||customer?.phone||"");
