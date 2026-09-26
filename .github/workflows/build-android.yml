@@ -16,10 +16,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          package-manager-cache: false
 
       - name: Install dependencies
         run: npm install
+
+      - name: Prepare web assets for Capacitor
+        run: |
+          mkdir -p www
+          cp index.html app.js app-*.js style.css logo.svg icon-*.svg manifest.webmanifest sw.js www/
 
       - name: Add Android platform
         run: npx cap add android
