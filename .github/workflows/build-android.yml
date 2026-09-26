@@ -86,10 +86,11 @@ jobs:
           cat > latest.json <<EOF
           {"version":"$VERSION","apk_url":"https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk","released_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
           EOF
+          cp android/app/build/outputs/apk/debug/app-debug.apk CleanCore-Business-Manager.apk
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" android/app/build/outputs/apk/debug/app-debug.apk#CleanCore-Business-Manager.apk latest.json#latest.json --clobber
+            gh release upload "$TAG" CleanCore-Business-Manager.apk latest.json --clobber
           else
-            gh release create "$TAG" android/app/build/outputs/apk/debug/app-debug.apk#CleanCore-Business-Manager.apk latest.json#latest.json --title "CleanCore Business Manager $VERSION" --notes "CleanCore Manager $VERSION"
+            gh release create "$TAG" CleanCore-Business-Manager.apk latest.json --title "CleanCore Business Manager $VERSION" --notes "CleanCore Manager $VERSION"
           fi
 
       - name: Upload APK
