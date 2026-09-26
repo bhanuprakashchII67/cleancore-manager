@@ -42,7 +42,15 @@ async function installLatestAppUpdate(){
  const info=latestAppUpdate||await checkForAppUpdate(false);
  if(!info||compareVersions(info.version,MANAGER_VERSION)<=0){if(info)toast("You already have the latest version.");return;}
  const url=String(info.apk_url||APP_UPDATE_APK_URL);
- try{const updater=window.Capacitor?.Plugins?.AppUpdater;if(updater?.install){toast("Downloading update…");await updater.install({url});return;}}catch(err){console.warn("Native updater failed:",err);}
+ try{
+   const Browser=window.Capacitor?.Plugins?.Browser;
+   if(Browser?.open){
+     toast("Opening the update download…");
+     await Browser.open({url});
+     return;
+   }
+ }catch(err){console.warn("Native update browser failed:",err);}
+ try{window.open(url,"_blank","noopener,noreferrer");return;}catch(_){}
  window.location.href=url;
 }
 function bindAppUpdateControls(){const b=$("updateApp");if(!b||b.dataset.bound==="1")return;b.dataset.bound="1";b.addEventListener("click",async()=>{if(latestAppUpdate&&compareVersions(latestAppUpdate.version,MANAGER_VERSION)>0)await installLatestAppUpdate();else await checkForAppUpdate(true);});}
@@ -2562,45 +2570,56 @@ function getPrintableInvoiceHtml(previewId="invoicePreview",emptyMessage="Open a
  if(!body)throw new Error(emptyMessage);
  return body;
 }
-async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
+async function createPrintablePdfFile(previewId,title,fileName){
  const body=getPrintableInvoiceHtml(previewId,title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
- const cssHref=[...document.querySelectorAll('link[rel="stylesheet"]')].find(x=>x.href&&x.href.includes("style.css"))?.href||"style.css";
- const markup="<!doctype html><html><head><meta charset='utf-8'><title>"+title+"</title><link rel='stylesheet' href='"+String(cssHref).replace(/'/g,"%27")+"'><style>@page{size:A4;margin:10mm}body{margin:0;background:#fff}.invoice-preview{display:block!important;max-width:none!important;width:100%!important}.actions{display:none!important}@media print{html,body{background:#fff!important}.invoice-preview{box-shadow:none!important;border:0!important}}</style></head><body><div id='invoicePrintHost'>"+body+"</div></body></html>";
+ if(typeof window.html2pdf!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
+ const source=document.createElement("div");
+ source.style.cssText="position:fixed;left:-100000px;top:0;width:794px;background:#fff;padding:0";
+ source.innerHTML=body;
+ document.body.appendChild(source);
+ try{
+   const worker=window.html2pdf().set({
+     margin:[10,10,10,10],
+     filename:fileName,
+     image:{type:"jpeg",quality:0.98},
+     html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
+     jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+     pagebreak:{mode:["css","legacy"]}
+   }).from(source).toPdf();
+   const pdf=await worker.get("pdf");
+   const blob=pdf.output("blob");
+   return new File([blob],fileName,{type:"application/pdf"});
+ }finally{source.remove();}
+}
+async function saveOrPrintDocument(previewId,title,fileName){
+ const pdfFile=await createPrintablePdfFile(previewId,title,fileName);
  const isNative=!!window.Capacitor?.isNativePlatform?.();
-
  if(isNative){
-   try{
-     const Browser=window.Capacitor?.Plugins?.Browser;
-     if(Browser?.open){
-       const dataUrl="data:text/html;charset=utf-8,"+encodeURIComponent(markup);
-       await Browser.open({url:dataUrl});
-       return;
-     }
-   }catch(err){console.warn("Native print surface failed:",err);}
+   const Filesystem=window.Capacitor?.Plugins?.Filesystem;
+   const Share=window.Capacitor?.Plugins?.Share;
+   if(Filesystem?.writeFile&&Share?.share){
+     const base64=await new Promise((resolve,reject)=>{
+       const reader=new FileReader();
+       reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
+       reader.onerror=reject;
+       reader.readAsDataURL(pdfFile);
+     });
+     const path="CleanCore/"+fileName;
+     const saved=await Filesystem.writeFile({path,data:base64,directory:"CACHE",recursive:true});
+     await Share.share({title,text:"CleanCore "+title+" — PDF ready to print or save.",url:saved.uri,dialogTitle:"Print / Save PDF"});
+     return;
+   }
  }
-
- let w=null;
- try{w=window.open("about:blank","_blank","width=900,height=1100");}catch(_){}
- if(w){
-   w.document.open();
-   w.document.write(markup);
-   w.document.close();
-   const doPrint=()=>{if(!w.closed){try{w.focus();w.print();}catch(err){console.warn("Popup print failed:",err);}}};
-   w.addEventListener("load",doPrint,{once:true});
-   setTimeout(doPrint,500);
-   return;
- }
-
- const printRoot=document.createElement("div");
- printRoot.id="cleanCorePrintRoot";
- printRoot.innerHTML=markup.slice(markup.indexOf("<body>")+6,markup.lastIndexOf("</body>"));
- printRoot.style.cssText="position:fixed;inset:0;z-index:999999;background:#fff;overflow:auto;padding:0";
- document.body.appendChild(printRoot);
- const style=document.createElement("style");
- style.textContent="@media print{body>*:not(#cleanCorePrintRoot){display:none!important}#cleanCorePrintRoot{position:static!important;display:block!important;overflow:visible!important}}@media screen{#cleanCorePrintRoot{display:block!important}}";
- document.head.appendChild(style);
- await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,100)));
- try{window.focus();window.print();}finally{setTimeout(()=>{printRoot.remove();style.remove();},1000);}
+ const url=URL.createObjectURL(pdfFile);
+ const a=document.createElement("a");
+ a.href=url;a.download=fileName;a.rel="noopener";document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),30000);
+ toast("PDF downloaded. Open it from Downloads to print or save.");
+}
+async function printInvoiceNow(previewId="invoicePreview",title="CleanCore Invoice"){
+ const stamp=String(title==="CleanCore Quotation"?"Quotation":"Invoice");
+ const no=String($(previewId)?.querySelector?.(".inv-meta")?.textContent||"").replace(/[^A-Za-z0-9-]+/g,"-").slice(0,50)||Date.now();
+ await saveOrPrintDocument(previewId,title,"CleanCore-"+stamp+"-"+no+".pdf");
 }
 $("printInvoice").onclick=e=>{
  e.preventDefault();
