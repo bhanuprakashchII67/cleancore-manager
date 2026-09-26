@@ -297,26 +297,3 @@ jobs:
             android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-
-      - name: Publish latest release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=$(node -e 'const fs=require("fs");const s=fs.readFileSync("app.js","utf8");console.log(s.match(/MANAGER_VERSION="([^"]+)"/)[1])')
-          TAG="v$VERSION"
-          cat > latest.json <<EOF
-          {"version":"$VERSION","apk_url":"https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk","released_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
-          EOF
-          cp android/app/build/outputs/apk/debug/app-debug.apk CleanCore-Business-Manager.apk
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" CleanCore-Business-Manager.apk latest.json --clobber
-          else
-            gh release create "$TAG" CleanCore-Business-Manager.apk latest.json --title "CleanCore Business Manager $VERSION" --notes "CleanCore Manager $VERSION"
-          fi
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: cleancore-business-manager-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
