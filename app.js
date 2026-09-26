@@ -21,7 +21,32 @@ let notificationChannel=null,notificationPollTimer=null,notificationAudioContext
 let errorLogs=[];
 let editingProductId=null, editingCustomerId=null, editingRawId=null, editingExpenseId=null, investments=[]; let billTotal=0;
 
-const MANAGER_VERSION="3.8.79";
+const MANAGER_VERSION="3.8.80";
+const APP_UPDATE_MANIFEST_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/latest.json";
+const APP_UPDATE_APK_URL="https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk";
+let latestAppUpdate=null;
+function compareVersions(a,b){const aa=String(a||"0").replace(/^v/i,"").split(".").map(Number),bb=String(b||"0").replace(/^v/i,"").split(".").map(Number);for(let i=0;i<3;i++){const x=aa[i]||0,y=bb[i]||0;if(x!==y)return x-y;}return 0;}
+function updateButtonState(state,text){const b=$("updateApp");if(!b)return;b.disabled=state==="checking";b.textContent=text;b.classList.toggle("update-available",state==="available");}
+async function checkForAppUpdate(showMessage=false){
+ if(!isNativeManagerApp()){if(showMessage)toast("App updates are available from the Android app only.",false);return null;}
+ updateButtonState("checking","↻ Checking…");
+ try{
+  const r=await fetch(APP_UPDATE_MANIFEST_URL+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("Update server returned "+r.status);
+  const info=await r.json();if(!info?.version)throw new Error("Invalid update information");latestAppUpdate=info;
+  if(compareVersions(info.version,MANAGER_VERSION)>0){updateButtonState("available","⬆ Update to v"+info.version);if(showMessage)toast("Update available: v"+info.version);}
+  else{updateButtonState("current","✓ App is up to date");if(showMessage)toast("You already have the latest version.");setTimeout(()=>updateButtonState("current","↻ Check for Update"),2200);}
+  return info;
+ }catch(err){console.warn("App update check failed:",err);updateButtonState("error","↻ Check for Update");if(showMessage)toast("Could not check for updates. Try again later.",false);return null;}
+}
+async function installLatestAppUpdate(){
+ const info=latestAppUpdate||await checkForAppUpdate(false);
+ if(!info||compareVersions(info.version,MANAGER_VERSION)<=0){if(info)toast("You already have the latest version.");return;}
+ const url=String(info.apk_url||APP_UPDATE_APK_URL);
+ try{const updater=window.Capacitor?.Plugins?.AppUpdater;if(updater?.install){toast("Downloading update…");await updater.install({url});return;}}catch(err){console.warn("Native updater failed:",err);}
+ window.location.href=url;
+}
+function bindAppUpdateControls(){const b=$("updateApp");if(!b||b.dataset.bound==="1")return;b.dataset.bound="1";b.addEventListener("click",async()=>{if(latestAppUpdate&&compareVersions(latestAppUpdate.version,MANAGER_VERSION)>0)await installLatestAppUpdate();else await checkForAppUpdate(true);});}
+
 let lastUserAction=null;
 function captureUserAction(type,target){const el=target?.closest?.("button,input,select,textarea,a,[role='button']")||target;lastUserAction={type,tag:el?.tagName||"",id:el?.id||"",name:el?.getAttribute?.("name")||"",text:String(el?.innerText||el?.value||el?.getAttribute?.("aria-label")||"").trim().slice(0,300),at:new Date().toISOString()};}
 document.addEventListener("click",e=>captureUserAction("click",e.target),true);
@@ -474,6 +499,7 @@ async function enter(){
  if($("profileRole"))$("profileRole").textContent=isAdmin?"Administrator":("Employee • "+employee.team);
  if($("profileChangePassword"))$("profileChangePassword").classList.toggle("hidden",!isAdmin);
  applyAccess();
+ bindAppUpdateControls();
  try{
    if(isAdmin)await loadNotificationPreferences();
  }catch(err){console.error("Manager notification preferences load failed",err);}
@@ -488,6 +514,7 @@ async function enter(){
    toast("Manager opened, but some data could not be loaded. Use Refresh to retry.",false);
  }
  if(isAdmin)startWebsiteNotifications();
+ if(isAdmin)setTimeout(()=>checkForAppUpdate(false),1800);
  const first=isAdmin?"dashboard":ALL_MODULES.find(x=>employeePermissions.has(x))||"dashboard";
  try{await go(first);}catch(err){console.error("CleanCore Manager initial page load failed",err);reportClientError(err,{action:"load_initial_page"});}
 }
