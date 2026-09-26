@@ -2516,7 +2516,7 @@ window.viewInvoice=async id=>{
    if(dialog){
      try{if(dialog.open)dialog.close();}catch(_){}
      dialog.hidden=false;
-     dialog.setAttribute("data-invoice-open","1");
+     dialog.setAttribute("data-invoice-open","1");\n     dialog.setAttribute("data-invoice-id",id);
    }
  }catch(err){console.error("Invoice viewer error",err);toast(err?.message||"Unable to open invoice.",false);}
 };
@@ -2543,202 +2543,212 @@ function buildCustomerBillMessage(inv,customer,items=[]){
   "cleancorehyd@gmail.com"
  ].join("\n");
 }
-async function renderHtmlToPdfFile(html,fileName){
+async function createNativeInvoicePdfFile(inv,items,title,fileName){
  const pdfLib=window.jspdf?.jsPDF;
  if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
- if(typeof window.html2canvas!=="function")throw new Error("HTML canvas renderer did not load. Please refresh the Manager app and try again.");
 
- const source=document.createElement("div");
- source.innerHTML=html;
- source.style.cssText=[
-   "position:absolute",
-   "left:0",
-   "top:0",
-   "width:794px",
-   "min-height:1px",
-   "box-sizing:border-box",
-   "padding:0",
-   "margin:0",
-   "background:#fff",
-   "color:#17212b",
-   "display:block",
-   "visibility:visible",
-   "opacity:1",
-   "pointer-events:none",
-   "z-index:-1000"
- ].join(";");
- document.body.appendChild(source);
+ const pdf=new pdfLib({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+ const pageW=210,pageH=297,left=12,right=198,bottom=280;
+ const usableW=right-left;
+ const docTitle=title|| (isQuotationDocument(inv)?"CleanCore Quotation":"CleanCore Invoice");
+ const isQuote=isQuotationDocument(inv);
+ const safeItems=(Array.isArray(items)?items:[]).map((it,n)=>{
+   const p=it?.p||{};
+   const qty=Number(it?.q??it?.qty??1)||1;
+   const rate=Number(it?.unit_price??p?.selling_price??0)||0;
+   return {
+     no:n+1,
+     name:String(it?.product_name||p?.name||"Item"),
+     hsn:String(it?.hsn_code||p?.hsn_code||"—"),
+     qty,
+     rate,
+     amount:Number(it?.line_total??(rate*qty))||0
+   };
+ });
 
- try{
-   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+ const wrap=(value,width)=>pdf.splitTextToSize(String(value??""),width);
+ const moneyText=value=>money(value).replace(/₹/g,"Rs. ");
+ const drawHeader=()=>{
+   pdf.setFillColor(11,31,51);
+   pdf.rect(left,12,usableW,23,"F");
+   pdf.setTextColor(255,255,255);
+   pdf.setFont("helvetica","bold");
+   pdf.setFontSize(16);
+   pdf.text("CleanCore Chemical & Cleaning",left+5,21);
+   pdf.setFontSize(8);
+   pdf.setFont("helvetica","normal");
+   pdf.text("Srinivasa Colony, Manikonda, Hyderabad, Telangana, India",left+5,26);
+   pdf.text("Phone: +91 91827 25773  •  "+BUSINESS_EMAIL,left+5,30);
+   pdf.setFont("helvetica","bold");
+   pdf.setFontSize(13);
+   pdf.text(docTitle.toUpperCase(),right-5,21,{align:"right"});
+   pdf.setFontSize(8);
+   pdf.setFont("helvetica","normal");
+   pdf.text(isQuote?"FOR QUOTATION":"ORIGINAL FOR RECIPIENT",right-5,27,{align:"right"});
+   pdf.setTextColor(23,33,43);
+ };
 
-   const images=Array.from(source.querySelectorAll("img"));
-   await Promise.all(images.map(img=>{
-     if(img.complete)return Promise.resolve();
-     return new Promise(resolve=>{
-       const done=()=>{img.removeEventListener("load",done);img.removeEventListener("error",done);resolve();};
-       img.addEventListener("load",done,{once:true});
-       img.addEventListener("error",done,{once:true});
-       setTimeout(done,4000);
-     });
-   }));
+ const drawMeta=()=>{
+   let y=43;
+   pdf.setDrawColor(220,229,238);
+   pdf.setFillColor(248,251,253);
+   pdf.rect(left,y,usableW,25,"FD");
+   pdf.setFontSize(8);
+   pdf.setFont("helvetica","bold");
+   pdf.text(isQuote?"Quotation No:":"Invoice No:",left+5,y+7);
+   pdf.text("Date:",left+105,y+7);
+   pdf.setFont("helvetica","normal");
+   pdf.text(String(inv?.invoice_no||"—"),left+5,y+13);
+   pdf.text(new Date(inv?.created_at||Date.now()).toLocaleDateString("en-IN"),left+105,y+13);
+   pdf.setFont("helvetica","bold");
+   pdf.text(isQuote?"Document Type:":"Payment Status:",left+5,y+20);
+   pdf.setFont("helvetica","normal");
+   pdf.text(isQuote?"Quotation":String(inv?.payment_status||"Unpaid"),left+5,y+24);
+   return y+32;
+ };
 
-   if(document.fonts?.ready)await document.fonts.ready;
+ const drawParties=(startY)=>{
+   let y=startY;
+   const half=(usableW-4)/2;
+   pdf.setDrawColor(220,229,238);
+   pdf.setFont("helvetica","bold");pdf.setFontSize(8);
+   pdf.text(isQuote?"QUOTATION FROM":"BILL FROM",left+4,y+6);
+   pdf.text(isQuote?"QUOTATION TO":"BILL TO",left+half+8,y+6);
+   pdf.line(left+half+2,y,left+half+2,y+29);
+   pdf.setFont("helvetica","normal");
+   pdf.setFontSize(8);
+   const from=["CleanCore Chemical & Cleaning","Srinivasa Colony, Manikonda, Hyderabad, Telangana, India","+91 91827 25773",BUSINESS_EMAIL];
+   const to=[
+     String(inv?.customer_business||"").trim(),
+     String(inv?.customer_name||"").trim(),
+     String(inv?.customer_phone||"").trim(),
+     String(inv?.customer_email||"").trim(),
+     isQuote?String(inv?.gstin||"").trim():String(inv?.gstin||"").trim()
+   ].filter(Boolean);
+   let fy=y+12; from.forEach(line=>{wrap(line,half-8).forEach(w=>{pdf.text(w,left+4,fy);fy+=4;});});
+   let ty=y+12; (to.length?to:["—"]).forEach(line=>{wrap(line,half-8).forEach(w=>{pdf.text(w,left+half+8,ty);ty+=4;});});
+   const h=Math.max(29,fy-y+2,ty-y+2);
+   pdf.rect(left,y,usableW,h);
+   return y+h+6;
+ };
 
-   const canvas=await window.html2canvas(source,{
-     scale:2,
-     useCORS:true,
-     allowTaint:false,
-     backgroundColor:"#ffffff",
-     logging:false,
-     width:794,
-     windowWidth:794,
-     scrollX:0,
-     scrollY:0
-   });
+ const drawTableHeader=(y)=>{
+   const xs=[left,left+12,left+78,left+100,left+118,right];
+   pdf.setFillColor(11,31,51);pdf.setDrawColor(11,31,51);pdf.setTextColor(255,255,255);
+   pdf.rect(left,y,usableW,8,"F");
+   pdf.setFont("helvetica","bold");pdf.setFontSize(7);
+   pdf.text("S.No.",xs[0]+2,y+5.5);
+   pdf.text("Product / Service",xs[1]+2,y+5.5);
+   pdf.text("HSN / SAC",xs[2]+2,y+5.5);
+   pdf.text("Qty",xs[3]+2,y+5.5);
+   pdf.text("Rate",xs[4]+2,y+5.5);
+   pdf.text("Amount",xs[5]-2,y+5.5,{align:"right"});
+   pdf.setTextColor(23,33,43);
+   return {xs};
+ };
 
-   if(!canvas.width||!canvas.height)throw new Error("PDF renderer produced an empty canvas.");
-   const pdf=new pdfLib({orientation:"portrait",unit:"mm",format:"a4",compress:true});
-   const pageWidthMm=210;
-   const pageHeightMm=297;
-   const pageHeightPx=Math.max(1,Math.floor(canvas.width*(pageHeightMm/pageWidthMm)));
-   const pageCanvas=document.createElement("canvas");
-   pageCanvas.width=canvas.width;
-   pageCanvas.height=Math.min(pageHeightPx,canvas.height);
-   const ctx=pageCanvas.getContext("2d");
-   if(!ctx)throw new Error("Could not create the PDF page canvas.");
-
-   let offset=0;
-   let page=0;
-   while(offset<canvas.height){
-     const sliceHeight=Math.min(pageHeightPx,canvas.height-offset);
-     if(pageCanvas.height!==sliceHeight)pageCanvas.height=sliceHeight;
-     ctx.fillStyle="#fff";
-     ctx.fillRect(0,0,pageCanvas.width,sliceHeight);
-     ctx.drawImage(canvas,0,offset,canvas.width,sliceHeight,0,0,canvas.width,sliceHeight);
-     if(page>0)pdf.addPage();
-     const imageData=pageCanvas.toDataURL("image/jpeg",0.96);
-     const renderedHeight=pageWidthMm*(sliceHeight/canvas.width);
-     pdf.addImage(imageData,"JPEG",0,0,pageWidthMm,renderedHeight,"","FAST");
-     offset+=sliceHeight;
-     page++;
+ let y=drawMeta();
+ y=drawParties(y);
+ let table=drawTableHeader(y); y+=8;
+ pdf.setFont("helvetica","normal");pdf.setFontSize(7.2);
+ for(const row of safeItems){
+   const nameLines=wrap(row.name,62);
+   const h=Math.max(8,4+nameLines.length*3.6);
+   if(y+h>bottom){
+     pdf.addPage();drawHeader();y=43;table=drawTableHeader(y);y+=8;
    }
-
-   const blob=pdf.output("blob");
-   if(!blob||blob.size<1000)throw new Error("PDF generation produced an empty file.");
-   return new File([blob],fileName,{type:"application/pdf"});
- }finally{
-   source.remove();
+   const [x0,x1,x2,x3,x4,x5]=table.xs;
+   pdf.setDrawColor(220,229,238);
+   pdf.rect(left,y,usableW,h);
+   pdf.line(x1,y,x1,y+h);pdf.line(x2,y,x2,y+h);pdf.line(x3,y,x3,y+h);pdf.line(x4,y,x4,y+h);pdf.line(x5,y,x5,y+h);
+   pdf.text(String(row.no),x0+2,y+5);
+   nameLines.forEach((line,i)=>pdf.text(line,x1+2,y+5+i*3.6));
+   pdf.text(row.hsn,x2+2,y+5);
+   pdf.text(String(row.qty),x3+2,y+5);
+   pdf.text(moneyText(row.rate),x4+2,y+5);
+   pdf.text(moneyText(row.amount),x5-2,y+5,{align:"right"});
+   y+=h;
  }
+
+ const totalRows=[
+   ["Subtotal",inv?.subtotal],
+   ...(Number(inv?.discount||0)>0?[["Discount",-Number(inv.discount)]]:[]),
+   ["Taxable Value",Number(inv?.subtotal||0)-Number(inv?.discount||0)],
+   ...(Number(inv?.gst_amount||0)>0?[["GST",inv.gst_amount]]:[]),
+   ["TOTAL",inv?.total]
+ ];
+ const totalH=totalRows.length*7;
+ if(y+totalH+30>bottom){pdf.addPage();drawHeader();y=43;}
+ const labelX=left+118,valueX=right-2;
+ pdf.setFontSize(8);
+ for(const [label,value] of totalRows){
+   const isTotal=label==="TOTAL";
+   if(isTotal){pdf.setFillColor(232,245,243);pdf.rect(labelX,y,80,8,"F");}
+   pdf.setFont("helvetica",isTotal?"bold":"normal");
+   pdf.text(label,labelX+2,y+5.5);
+   pdf.text(moneyText(value),valueX,y+5.5,{align:"right"});
+   y+=isTotal?8:7;
+ }
+
+ y+=4;
+ const words="Total in words: "+numberToWordsIndian(Number(inv?.total||0))+" ONLY";
+ const wordLines=wrap(words,usableW);
+ const wordH=6+wordLines.length*4;
+ if(y+wordH>bottom){pdf.addPage();drawHeader();y=43;}
+ pdf.setFillColor(248,251,253);pdf.setDrawColor(220,229,238);
+ pdf.rect(left,y,usableW,wordH,"FD");
+ pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);
+ wordLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));
+ y+=wordH+6;
+
+ const terms=isQuote
+   ?"Prices are quoted for the listed items and quantities. This quotation is subject to final confirmation before sale."
+   :"Goods once sold will not be taken back unless agreed in writing. Payment as per agreed business terms. Subject to Hyderabad, Telangana jurisdiction.";
+ const note=(isQuote?"QUOTATION ONLY — NOT A SALE / NOT A TAX INVOICE. ":"Terms & Conditions: ")+terms;
+ const noteLines=wrap(note,usableW-8);
+ const noteH=8+noteLines.length*4;
+ if(y+noteH+22>bottom){pdf.addPage();drawHeader();y=43;}
+ pdf.setDrawColor(220,229,238);pdf.rect(left,y,usableW,noteH);
+ pdf.setFont("helvetica","normal");pdf.setFontSize(7);
+ noteLines.forEach((line,i)=>pdf.text(line,left+4,y+5+i*4));
+ y+=noteH+12;
+ pdf.setFont("helvetica","bold");pdf.setFontSize(8);
+ pdf.text("For CleanCore Chemical & Cleaning",right-2,y,{align:"right"});
+ pdf.setFont("helvetica","normal");pdf.setFontSize(7);
+ pdf.text("Authorised Signature",right-2,y+12,{align:"right"});
+
+ const blob=pdf.output("blob");
+ if(!blob||blob.size<1000)throw new Error("PDF generation produced an empty file.");
+ return new File([blob],fileName,{type:"application/pdf"});
+}
+
+async function loadInvoiceItemsForPdf(inv){
+ const id=String(inv?.id||"").trim();
+ if(!id)return [];
+ const q=await db.from("invoice_items").select("product_id,product_name,hsn_code,qty,unit_price,line_total").eq("invoice_id",id).order("created_at");
+ if(q.error)throw q.error;
+ return q.data||[];
 }
 
 async function createInvoicePdfFile(inv,customer,items){
- const host=$("invoicePreview");
- const previous=host?.innerHTML||"";
- if(!host)throw new Error("Invoice preview is unavailable.");
- await window.viewInvoice(inv.id);
- const preview=host.innerHTML;
- try{
-   return await renderHtmlToPdfFile(
-     preview,
-     "CleanCore-"+String(inv.invoice_no||"invoice")+".pdf"
-   );
- }finally{
-   host.innerHTML=previous;
- }
+ let rows=Array.isArray(items)&&items.length?items:await loadInvoiceItemsForPdf(inv);
+ return await createNativeInvoicePdfFile(inv,rows,isQuotationDocument(inv)?"CleanCore Quotation":"CleanCore Invoice","CleanCore-"+String(inv?.invoice_no||"invoice")+".pdf");
 }
-async function sendBillToCustomer(inv,customer,items){
- const phone=normalizePhone(inv?.customer_phone||customer?.phone||"");
- const msg=buildCustomerBillMessage(inv,customer,items);
- if(!phone){
-   toast("Bill saved, but this customer has no valid WhatsApp phone number.",false);
-   const n=$("billSendNotice");
-   if(n){n.classList.remove("hidden");n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> Add a valid customer phone number to open WhatsApp for this bill.";}
-   const pending=window.__cleancoreBillWhatsAppWindow;window.__cleancoreBillWhatsAppWindow=null;
-   try{if(pending&&!pending.closed)pending.close();}catch(_){}
-   return;
- }
- let pdfFile=null;
- try{toast("Bill generated. Preparing PDF…");pdfFile=await createInvoicePdfFile(inv,customer,items);}
- catch(err){console.error("Invoice PDF creation error",err);toast("Bill saved, but the PDF could not be prepared. You can open the bill and use Print / Save PDF.",false);}
- const encoded=encodeURIComponent(msg),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
- let w=window.__cleancoreBillWhatsAppWindow;window.__cleancoreBillWhatsAppWindow=null;
 
- // Desktop: try the local WhatsApp Web bridge first. It uses the Manager's
- // already-logged-in WhatsApp Web session and can attach the actual PDF file.
- if(pdfFile&&!isMobile){
-   try{
-     const bridgeForm=new FormData();
-     bridgeForm.append("phone",phone);
-     bridgeForm.append("message",msg);
-     bridgeForm.append("pdf",pdfFile,pdfFile.name);
-     const bridgeResponse=await fetch("http://127.0.0.1:8787/send",{method:"POST",body:bridgeForm});
-     const bridgeData=await bridgeResponse.json().catch(()=>({}));
-     if(bridgeResponse.ok&&bridgeData?.sent){
-       if(w&&!w.closed)try{w.close();}catch(_){}
-       const n=$("billSendNotice");
-       if(n){n.classList.remove("hidden");n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" sent.</strong> The generated PDF was attached and sent through your WhatsApp Web session.";}
-       toast("Invoice PDF sent to WhatsApp.");
-       return;
-     }
-     if(bridgeData?.error)console.warn("WhatsApp bridge:",bridgeData.error);
-   }catch(err){console.info("WhatsApp bridge unavailable; using normal WhatsApp Web flow.",err?.message||err);}
- }
- if(pdfFile&&isMobile&&navigator.share&&navigator.canShare){
-   try{
-     if(navigator.canShare({files:[pdfFile]})){
-       if(w&&!w.closed)w.close();
-       await navigator.share({files:[pdfFile],text:msg,title:"CleanCore Invoice "+inv.invoice_no});
-       const n=$("billSendNotice");
-       if(n){n.classList.remove("hidden");n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" PDF is ready to send.</strong> Choose WhatsApp in the share sheet; the PDF is attached.";}
-       return;
-     }
-   }catch(err){if(err?.name==="AbortError")return;console.warn("PDF share failed:",err);}
- }
- const targetUrl=isMobile?"https://wa.me/91"+phone+"?text="+encoded:"https://web.whatsapp.com/send?phone=91"+phone+"&text="+encoded;
- if(!w||w.closed)w=window.open(targetUrl,"_blank","noopener,noreferrer");
- else{try{w.location.href=targetUrl;w.focus?.();}catch(_){}}
- if(pdfFile){
-   const url=URL.createObjectURL(pdfFile),a=document.createElement("a");a.href=url;a.download=pdfFile.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }
- const n=$("billSendNotice");
- if(n){n.classList.remove("hidden");const destination=isMobile?"WhatsApp":"WhatsApp Web";n.innerHTML="<strong>Invoice "+esc(inv.invoice_no)+" saved.</strong> "+destination+" opened for customer <b>+91 "+esc(phone)+"</b>. The PDF was downloaded; attach that PDF in the WhatsApp chat and send it.";}
- if(!w)toast("Bill saved, but your browser blocked WhatsApp. Please allow pop-ups for CleanCore Manager.",false);
-}
-function numberToWordsIndian(n){
- n=Math.round(Number(n)||0); if(n===0)return "ZERO RUPEES";
- const ones=["","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE","TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN"];
- const tens=["","","TWENTY","THIRTY","FORTY","FIFTY","SIXTY","SEVENTY","EIGHTY","NINETY"];
- const two=x=>x<20?ones[x]:tens[Math.floor(x/10)]+(x%10?" "+ones[x%10]:"");
- const part=(x,unit)=>x?two(x)+" "+unit+" ":"";
- let s="";
- if(n>=10000000){s+=part(Math.floor(n/10000000),"CRORE");n%=10000000}
- if(n>=100000){s+=part(Math.floor(n/100000),"LAKH");n%=100000}
- if(n>=1000){s+=part(Math.floor(n/1000),"THOUSAND");n%=1000}
- if(n>=100){s+=part(Math.floor(n/100),"HUNDRED");n%=100}
- if(n)s+=two(n);
- return s.trim()+" RUPEES";
-}
-document.addEventListener("keydown",e=>{
- if(e.key!=="Escape")return;
- if(!$("invoiceDialog")?.hidden)$("closeInvoice")?.click();
- if(!$("quotationDialog")?.hidden)$("closeQuotation")?.click();
-});
-$("closeInvoice").onclick=()=>{
- const d=$("invoiceDialog");
- if(d){d.hidden=true;d.removeAttribute("data-invoice-open");}
- document.body.classList.remove("invoice-open");
- document.documentElement.classList.remove("invoice-open");
-};
-function getPrintableInvoiceHtml(previewId="invoicePreview",emptyMessage="Open a bill before printing."){
- const body=$(previewId)?.innerHTML?.trim();
- if(!body)throw new Error(emptyMessage);
- return body;
-}
 async function createPrintablePdfFile(previewId,title,fileName){
- const body=getPrintableInvoiceHtml(previewId,title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
- return await renderHtmlToPdfFile(body,fileName);
+ const dialogId=previewId==="quotationPreview"?"quotationDialog":"invoiceDialog";
+ const id=$(dialogId)?.getAttribute(previewId==="quotationPreview"?"data-quotation-id":"data-invoice-id");
+ let inv=id?invoices.find(x=>x.id===id):null;
+ if(!inv&&id){
+   const q=await db.from("invoices").select("*").eq("id",id).maybeSingle();
+   if(q.error)throw q.error;
+   inv=q.data;
+ }
+ if(!inv)throw new Error(title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
+ const rows=await loadInvoiceItemsForPdf(inv);
+ return await createNativeInvoicePdfFile(inv,rows,title,fileName);
 }
+
 async function rememberSavedPdf(meta){
  try{
    const key="cleancore_saved_invoice_files";
