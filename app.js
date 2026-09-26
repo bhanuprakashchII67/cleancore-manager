@@ -2749,6 +2749,15 @@ async function createPrintablePdfFile(previewId,title,fileName){
  if(!inv)throw new Error(title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
  const rows=await loadInvoiceItemsForPdf(inv);return await createNativeInvoicePdfFile(inv,rows,title,fileName);
 }
+async function rememberSavedPdf(meta){
+ try{
+   const key="cleancore_saved_invoice_files";
+   const current=JSON.parse(localStorage.getItem(key)||"[]");
+   const list=Array.isArray(current)?current:[];
+   const next=[meta,...list.filter(x=>x?.path!==meta.path)].slice(0,50);
+   localStorage.setItem(key,JSON.stringify(next));
+ }catch(_){}
+}
 async function saveOrPrintDocument(previewId,title,fileName){
  const pdfFile=await createPrintablePdfFile(previewId,title,fileName);
  const isNative=!!window.Capacitor?.isNativePlatform?.();
