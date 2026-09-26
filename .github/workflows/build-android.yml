@@ -39,7 +39,6 @@ jobs:
           if (!version) throw new Error('MANAGER_VERSION is missing.');
           if (asset !== version) throw new Error(`index.html app.js asset version ${asset} does not match Manager version ${version}`);
           if (!js.includes('bindAppUpdateControls();')) throw new Error('Update button binding is not initialized.');
-          if (!js.includes('id="__never__"')) { /* keep this validator syntax-only and deterministic */ }
           const viewerIds = ['invoiceDialog','quotationDialog','printInvoice','printQuotation','closeInvoice','closeQuotation','updateApp'];
           for (const id of viewerIds) {
             if (!html.includes(`id="${id}"`) || !js.includes(id)) throw new Error(`Missing viewer/updater wiring for ${id}`);
