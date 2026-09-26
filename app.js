@@ -2529,16 +2529,15 @@ $("sendReauth").onclick=async()=>{const {error}=await db.auth.reauthenticate();i
 $("updatePw").onclick=async()=>{const current_password=$("currentPw").value,password=$("newPw").value,nonce=$("reauthCode")?.value.trim();if(password.length<12)return toast("Use at least 12 characters",false);if(!nonce)return toast("Enter the reauthentication OTP",false);const {error}=await db.auth.updateUser({password,current_password,nonce});if(error)return toast(error.message,false);toast("Password updated");$("passwordBox").classList.add("hidden")};
 
 // Manager login policy:
-// - Installed Manager app: stay signed in for 7 days.
+// - Installed Manager app: stay signed in indefinitely.
 // - Normal browser/web link: require login again after every page reload.
-// The installed app is launched with ?app=1 via the manifest.
-var MANAGER_LOGIN_TTL_MS=7*24*60*60*1000;
-var MANAGER_LOGIN_EXPIRY_KEY="cleancore_manager_login_expiry";
+// The installed app is detected by ?app=1, standalone display mode, or Capacitor native runtime.
 var managerExpiryTimer=null;
 
 function isStandaloneManagerApp(){
  const params=new URLSearchParams(location.search);
  return params.get("app")==="1" ||
+   !!window.Capacitor?.isNativePlatform?.() ||
    !!(window.matchMedia?.("(display-mode: standalone)")?.matches ||
       window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches ||
       window.navigator.standalone===true);
@@ -2546,37 +2545,18 @@ function isStandaloneManagerApp(){
 function clearManagerLoginWindow(){
  clearTimeout(managerExpiryTimer);
  managerExpiryTimer=null;
- localStorage.removeItem(MANAGER_LOGIN_EXPIRY_KEY);
 }
 function startManagerLoginWindow(){
- if(!isStandaloneManagerApp()){
-   clearManagerLoginWindow();
-   return;
- }
- const expiresAt=Date.now()+MANAGER_LOGIN_TTL_MS;
- localStorage.setItem(MANAGER_LOGIN_EXPIRY_KEY,String(expiresAt));
+ if(!isStandaloneManagerApp())return;
  armManagerExpiryTimer();
 }
 function armManagerExpiryTimer(){
  clearTimeout(managerExpiryTimer);
  managerExpiryTimer=null;
- if(!isStandaloneManagerApp())return;
- const expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
- if(!expiresAt)return;
- const remaining=expiresAt-Date.now();
- if(remaining<=0){forceManagerExpiry();return;}
- managerExpiryTimer=setTimeout(forceManagerExpiry,remaining);
-}
-async function forceManagerExpiry(){
- clearManagerLoginWindow();
- try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Manager sign out:",err)}
- user=null;
- $("loginView").classList.remove("hidden");
- $("appView").classList.add("hidden");
+ // Native/installed app sessions do not expire locally.
 }
 async function restoreManagerSession(){
  if(!isStandaloneManagerApp()){
-   clearManagerLoginWindow();
    try{await db.auth.signOut({scope:"local"})}catch(err){console.warn("Web session cleanup:",err)}
    $("loginView").classList.remove("hidden");
    $("appView").classList.add("hidden");
@@ -2585,12 +2565,6 @@ async function restoreManagerSession(){
  const {data,error}=await db.auth.getSession();
  if(error){console.warn("Manager session check:",error.message);return;}
  if(!data?.session)return;
- let expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
- if(!expiresAt){
-   startManagerLoginWindow();
-   expiresAt=Number(localStorage.getItem(MANAGER_LOGIN_EXPIRY_KEY)||0);
- }
- if(!expiresAt||Date.now()>=expiresAt){await forceManagerExpiry();return;}
  user=data.session.user;
  try{
    await enter();
