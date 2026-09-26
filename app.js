@@ -2543,23 +2543,109 @@ function buildCustomerBillMessage(inv,customer,items=[]){
   "cleancorehyd@gmail.com"
  ].join("\n");
 }
+async function renderHtmlToPdfFile(html,fileName){
+ const pdfLib=window.jspdf?.jsPDF;
+ if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
+ if(typeof window.html2canvas!=="function")throw new Error("HTML canvas renderer did not load. Please refresh the Manager app and try again.");
+
+ const source=document.createElement("div");
+ source.innerHTML=html;
+ source.style.cssText=[
+   "position:absolute",
+   "left:0",
+   "top:0",
+   "width:794px",
+   "min-height:1px",
+   "box-sizing:border-box",
+   "padding:0",
+   "margin:0",
+   "background:#fff",
+   "color:#17212b",
+   "display:block",
+   "visibility:visible",
+   "opacity:1",
+   "pointer-events:none",
+   "z-index:-1000"
+ ].join(";");
+ document.body.appendChild(source);
+
+ try{
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+
+   const images=Array.from(source.querySelectorAll("img"));
+   await Promise.all(images.map(img=>{
+     if(img.complete)return Promise.resolve();
+     return new Promise(resolve=>{
+       const done=()=>{img.removeEventListener("load",done);img.removeEventListener("error",done);resolve();};
+       img.addEventListener("load",done,{once:true});
+       img.addEventListener("error",done,{once:true});
+       setTimeout(done,4000);
+     });
+   }));
+
+   if(document.fonts?.ready)await document.fonts.ready;
+
+   const canvas=await window.html2canvas(source,{
+     scale:2,
+     useCORS:true,
+     allowTaint:false,
+     backgroundColor:"#ffffff",
+     logging:false,
+     width:794,
+     windowWidth:794,
+     scrollX:0,
+     scrollY:0
+   });
+
+   if(!canvas.width||!canvas.height)throw new Error("PDF renderer produced an empty canvas.");
+   const pdf=new pdfLib({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+   const pageWidthMm=210;
+   const pageHeightMm=297;
+   const pageHeightPx=Math.max(1,Math.floor(canvas.width*(pageHeightMm/pageWidthMm)));
+   const pageCanvas=document.createElement("canvas");
+   pageCanvas.width=canvas.width;
+   pageCanvas.height=Math.min(pageHeightPx,canvas.height);
+   const ctx=pageCanvas.getContext("2d");
+   if(!ctx)throw new Error("Could not create the PDF page canvas.");
+
+   let offset=0;
+   let page=0;
+   while(offset<canvas.height){
+     const sliceHeight=Math.min(pageHeightPx,canvas.height-offset);
+     if(pageCanvas.height!==sliceHeight)pageCanvas.height=sliceHeight;
+     ctx.fillStyle="#fff";
+     ctx.fillRect(0,0,pageCanvas.width,sliceHeight);
+     ctx.drawImage(canvas,0,offset,canvas.width,sliceHeight,0,0,canvas.width,sliceHeight);
+     if(page>0)pdf.addPage();
+     const imageData=pageCanvas.toDataURL("image/jpeg",0.96);
+     const renderedHeight=pageWidthMm*(sliceHeight/canvas.width);
+     pdf.addImage(imageData,"JPEG",0,0,pageWidthMm,renderedHeight,"","FAST");
+     offset+=sliceHeight;
+     page++;
+   }
+
+   const blob=pdf.output("blob");
+   if(!blob||blob.size<1000)throw new Error("PDF generation produced an empty file.");
+   return new File([blob],fileName,{type:"application/pdf"});
+ }finally{
+   source.remove();
+ }
+}
+
 async function createInvoicePdfFile(inv,customer,items){
  const host=$("invoicePreview");
  const previous=host?.innerHTML||"";
  if(!host)throw new Error("Invoice preview is unavailable.");
  await window.viewInvoice(inv.id);
  const preview=host.innerHTML;
- const pdfLib=window.jspdf?.jsPDF;
- if(typeof pdfLib!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
- const staging=document.createElement("div");
- staging.style.position="fixed";staging.style.left="-100000px";staging.style.top="0";staging.style.width="794px";staging.style.background="#fff";
- staging.innerHTML=preview;document.body.appendChild(staging);
  try{
-   const pdf=new pdfLib({orientation:"portrait",unit:"pt",format:"a4",compress:true});
-   await pdf.html(staging,{margin:[24,24,24,24],autoPaging:"text",html2canvas:{scale:1,useCORS:true,backgroundColor:"#ffffff"}});
-   const blob=pdf.output("blob");
-   return new File([blob],"CleanCore-"+String(inv.invoice_no||"invoice")+".pdf",{type:"application/pdf"});
- }finally{staging.remove();host.innerHTML=previous;}
+   return await renderHtmlToPdfFile(
+     preview,
+     "CleanCore-"+String(inv.invoice_no||"invoice")+".pdf"
+   );
+ }finally{
+   host.innerHTML=previous;
+ }
 }
 async function sendBillToCustomer(inv,customer,items){
  const phone=normalizePhone(inv?.customer_phone||customer?.phone||"");
@@ -2651,24 +2737,7 @@ function getPrintableInvoiceHtml(previewId="invoicePreview",emptyMessage="Open a
 }
 async function createPrintablePdfFile(previewId,title,fileName){
  const body=getPrintableInvoiceHtml(previewId,title==="CleanCore Quotation"?"Open a quotation before printing.":"Open a bill before printing.");
- if(typeof window.html2pdf!=="function")throw new Error("PDF generator did not load. Please refresh the Manager app and try again.");
- const source=document.createElement("div");
- source.style.cssText="position:fixed;left:-100000px;top:0;width:794px;background:#fff;padding:0";
- source.innerHTML=body;
- document.body.appendChild(source);
- try{
-   const worker=window.html2pdf().set({
-     margin:[10,10,10,10],
-     filename:fileName,
-     image:{type:"jpeg",quality:0.98},
-     html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
-     jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
-     pagebreak:{mode:["css","legacy"]}
-   }).from(source).toPdf();
-   const pdf=await worker.get("pdf");
-   const blob=pdf.output("blob");
-   return new File([blob],fileName,{type:"application/pdf"});
- }finally{source.remove();}
+ return await renderHtmlToPdfFile(body,fileName);
 }
 async function rememberSavedPdf(meta){
  try{
