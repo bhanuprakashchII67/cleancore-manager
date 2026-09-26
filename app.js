@@ -54,6 +54,8 @@ async function installLatestAppUpdate(){
      try{
        const target=await Filesystem.getUri({path,directory:"DATA"});
        if(!target?.uri)throw new Error("Could not resolve the local APK destination.");
+       try{await Filesystem.deleteFile?.({path,directory:"DATA"});}catch(_){}
+       const downloadUrl=url+(url.includes("?")?"&":"?")+"t="+Date.now();
        toast("Downloading update v"+info.version+"…");
        let progressHandle=null;
        if(FileTransfer.addListener){
@@ -68,7 +70,7 @@ async function installLatestAppUpdate(){
          }catch(err){console.warn("APK progress listener unavailable:",err);}
        }
        try{
-         await FileTransfer.downloadFile({url,path:target.uri,progress:true,readTimeout:120000,connectTimeout:30000});
+         await FileTransfer.downloadFile({url:downloadUrl,path:target.uri,progress:true,readTimeout:120000,connectTimeout:30000});
        }finally{
          try{await progressHandle?.remove?.();}catch(_){}
        }
@@ -76,9 +78,17 @@ async function installLatestAppUpdate(){
        if(!stat?.size||Number(stat.size)<100000)throw new Error("The downloaded APK is missing or incomplete.");
        updateButtonState("available","Install v"+info.version);
        if(ApkInstaller?.installApk){
-         await ApkInstaller.installApk({path});
-         toast("Update downloaded. Android installer opened for v"+info.version+".");
-         return;
+         try{
+           await ApkInstaller.installApk({path});
+           toast("Update downloaded. Android installer opened for v"+info.version+".");
+           return;
+         }catch(err){
+           if(String(err?.message||err).includes("INSTALL_PERMISSION_REQUIRED")){
+             toast("Allow CleanCore to install unknown apps, then tap Update again.",false);
+             return;
+           }
+           throw err;
+         }
        }
        if(Plugins.Share?.share){
          const uri=(await Filesystem.getUri({path,directory:"DATA"}))?.uri;
