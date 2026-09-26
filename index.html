@@ -1120,7 +1120,6 @@ html body dialog#productDialog .actions .btn{
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 (function(){
   if(location.search.includes("app_refresh="))history.replaceState(null,"",location.pathname+location.hash);
@@ -1134,7 +1133,6 @@ html body dialog#productDialog .actions .btn{
   }
 })();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function(){
@@ -1159,7 +1157,7 @@ html body dialog#productDialog .actions .btn{
     if(window.__CLEANCORE_APP_LOADING||window.__CLEANCORE_APP_READY)return;
     window.__CLEANCORE_APP_LOADING=true;
     const s=document.createElement("script");
-    s.src="app.js?v=3.8.85";
+    s.src="app.js?v=3.8.86";
     s.onload=function(){
       setTimeout(function(){
         if(!window.__CLEANCORE_APP_READY)bootMessage("The Manager script loaded but did not initialize. Open the browser console and reload once.");
