@@ -77,6 +77,10 @@ async function installLatestAppUpdate(){
        const stat=await Filesystem.stat?.({path,directory:"DATA"});
        if(!stat?.size||Number(stat.size)<100000)throw new Error("The downloaded APK is missing or incomplete.");
        updateButtonState("available","Install v"+info.version);
+       if(info.signed_update===false){
+         toast("Update APK downloaded, but this release is not signed for in-place upgrade. Install the signed release after signing is configured.",false,{action:"app_update_unsigned"});
+         return;
+       }
        if(ApkInstaller?.installApk){
          try{
            await ApkInstaller.installApk({path});
