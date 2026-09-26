@@ -214,8 +214,89 @@ jobs:
           open(p,"w").write(s)
           PY
 
-      - name: Build debug APK
-        run: cd android && ./gradlew assembleDebug
+      - name: Configure stable app signing
+        id: signing
+        shell: bash
+        env:
+          KEYSTORE_B64: '${{ secrets.CLEANCORE_ANDROID_KEYSTORE_BASE64 }}'
+          KEYSTORE_PASSWORD: '${{ secrets.CLEANCORE_ANDROID_KEYSTORE_PASSWORD }}'
+          KEY_ALIAS: '${{ secrets.CLEANCORE_ANDROID_KEY_ALIAS }}'
+          KEY_PASSWORD: '${{ secrets.CLEANCORE_ANDROID_KEY_PASSWORD }}'
+        run: |
+          if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then
+            echo "stable_signing=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Stable Android signing secrets are not configured. This build will remain debug-signed; in-place APK updates are not reliable."
+            exit 0
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/cleancore-release.jks"
+          echo "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          echo "CLEANCORE_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "CLEANCORE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "CLEANCORE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "CLEANCORE_ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/build.gradle")
+          s=p.read_text()
+          if "signingConfigs {" not in s:
+              s=s.replace("buildTypes {", "signingConfigs {\n        release {\n          storeFile file(System.getenv('CLEANCORE_KEYSTORE_PATH'))\n          storePassword System.getenv('CLEANCORE_KEYSTORE_PASSWORD')\n          keyAlias System.getenv('CLEANCORE_KEY_ALIAS')\n          keyPassword System.getenv('CLEANCORE_ANDROID_KEY_PASSWORD')\n        }\n      }\n\n      buildTypes {")
+          s=s.replace("release {\n        minifyEnabled false", "release {\n        signingConfig signingConfigs.release\n        minifyEnabled false", 1)
+          p.write_text(s)
+          PY
+          echo "stable_signing=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android APK
+        run: |
+          if [[ "${{ steps.signing.outputs.stable_signing }}" == "true" ]]; then
+            cd android && ./gradlew assembleRelease
+          else
+            cd android && ./gradlew assembleDebug
+          fi
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          if [[ "${{ steps.signing.outputs.stable_signing }}" == "true" ]]; then
+            APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          else
+            APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          fi
+          test -s "$APK_PATH"
+          echo "APK: $APK_PATH"
+          keytool -printcert -jarfile "$APK_PATH" | grep -E 'Owner:|SHA256:' || true
+
+      - name: Publish latest release
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          VERSION=$(node -e 'const fs=require("fs");const s=fs.readFileSync("app.js","utf8");console.log(s.match(/MANAGER_VERSION="([^"]+)"/)[1])')
+          TAG="v$VERSION"
+          if [[ "${{ steps.signing.outputs.stable_signing }}" == "true" ]]; then
+            APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+            SIGNED_MODE=true
+          else
+            APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+            SIGNED_MODE=false
+          fi
+          cat > latest.json <<EOF
+          {"version":"$VERSION","apk_url":"https://github.com/cleancore01/cleancore-manager/releases/latest/download/CleanCore-Business-Manager.apk","released_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","signed_update":$SIGNED_MODE}
+          EOF
+          cp "$APK_PATH" CleanCore-Business-Manager.apk
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" CleanCore-Business-Manager.apk latest.json --clobber
+          else
+            gh release create "$TAG" CleanCore-Business-Manager.apk latest.json --title "CleanCore Business Manager $VERSION" --notes "CleanCore Manager $VERSION"
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleancore-business-manager-apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
 
       - name: Publish latest release
         env:
