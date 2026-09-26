@@ -89,6 +89,117 @@ jobs:
           })().catch(err => { console.error(err); process.exit(1); });
           NODE
 
+      - name: Configure native APK installer
+        shell: bash
+        run: |
+          PKG_DIR="android/app/src/main/java/com/cleancore/businessmanager"
+          RES_DIR="android/app/src/main/res/xml"
+          mkdir -p "$PKG_DIR" "$RES_DIR"
+          cat > "$PKG_DIR/ApkInstallerPlugin.java" <<'JAVA'
+          package com.cleancore.businessmanager;
+
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.provider.Settings;
+          import androidx.core.content.FileProvider;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.io.File;
+
+          @CapacitorPlugin(name = "ApkInstaller")
+          public class ApkInstallerPlugin extends Plugin {
+            @PluginMethod
+            public void installApk(PluginCall call) {
+              String relativePath = call.getString("path", "");
+              if (relativePath == null || relativePath.trim().isEmpty() || relativePath.contains("..") || relativePath.startsWith("/")) {
+                call.reject("Invalid APK path.");
+                return;
+              }
+
+              File baseDir = getContext().getFilesDir();
+              File apkFile = new File(baseDir, relativePath);
+              try {
+                String base = baseDir.getCanonicalPath() + File.separator;
+                String apk = apkFile.getCanonicalPath();
+                if (!apk.startsWith(base) || !apkFile.isFile() || apkFile.length() < 100000) {
+                  call.reject("Downloaded APK is missing or incomplete.");
+                  return;
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                    !getContext().getPackageManager().canRequestPackageInstalls()) {
+                  Intent settingsIntent = new Intent(
+                      Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                      Uri.parse("package:" + getContext().getPackageName()));
+                  settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                  getActivity().startActivity(settingsIntent);
+                  call.reject("INSTALL_PERMISSION_REQUIRED");
+                  return;
+                }
+
+                Uri apkUri = FileProvider.getUriForFile(
+                    getContext(),
+                    getContext().getPackageName() + ".fileprovider",
+                    apkFile);
+
+                Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+                intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                getActivity().startActivity(intent);
+                call.resolve();
+              } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Unable to open Android package installer." : e.getMessage(), e);
+              }
+            }
+          }
+          JAVA
+
+          cat > "$RES_DIR/file_paths.xml" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+            <files-path name="files" path="." />
+            <cache-path name="cache" path="." />
+          </paths>
+          XML
+
+          MAIN_ACTIVITY=$(find android/app/src/main/java -name 'MainActivity.java' -o -name 'MainActivity.kt' | head -1)
+          if [[ -z "$MAIN_ACTIVITY" ]]; then
+            echo "MainActivity not found" >&2
+            exit 1
+          fi
+          if [[ "$MAIN_ACTIVITY" == *.java ]]; then
+            python3 - "$MAIN_ACTIVITY" <<'PY'
+          import pathlib,re,sys
+          p=pathlib.Path(sys.argv[1]); s=p.read_text()
+          if "ApkInstallerPlugin" not in s:
+              s=s.replace("import com.getcapacitor.BridgeActivity;", "import android.os.Bundle;\nimport com.getcapacitor.BridgeActivity;\nimport com.cleancore.businessmanager.ApkInstallerPlugin;")
+              s=re.sub(r'public class MainActivity extends BridgeActivity\s*\{\s*\}', '''public class MainActivity extends BridgeActivity {
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              registerPlugin(ApkInstallerPlugin.class);
+            }
+          }''', s)
+              p.write_text(s)
+          PY
+          else
+            echo "Unexpected Kotlin MainActivity; native installer registration needs Kotlin support." >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          perm='<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          if perm not in s:
+              s=s.replace('</manifest>',f'  {perm}\n</manifest>')
+              p.write_text(s)
+          PY
+
       - name: Set Android version
         run: |
           VERSION=$(node -e 'const fs=require("fs");const s=fs.readFileSync("app.js","utf8");console.log(s.match(/MANAGER_VERSION="([^"]+)"/)[1])')
