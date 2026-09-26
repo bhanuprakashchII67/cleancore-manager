@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: cleancore-manager-android-release
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,8 +27,31 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Validate JavaScript
-        run: node --check app.js
+      - name: Validate JavaScript and UI wiring
+        run: |
+          node --check app.js
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html','utf8');
+          const js = fs.readFileSync('app.js','utf8');
+          const version = js.match(/MANAGER_VERSION="([^"]+)"/)?.[1];
+          const asset = html.match(/app\.js\?v=([^"' ]+)/)?.[1];
+          if (!version) throw new Error('MANAGER_VERSION is missing.');
+          if (asset !== version) throw new Error(`index.html app.js asset version ${asset} does not match Manager version ${version}`);
+          if (!js.includes('bindAppUpdateControls();')) throw new Error('Update button binding is not initialized.');
+          if (!js.includes('id="__never__"')) { /* keep this validator syntax-only and deterministic */ }
+          const viewerIds = ['invoiceDialog','quotationDialog','printInvoice','printQuotation','closeInvoice','closeQuotation','updateApp'];
+          for (const id of viewerIds) {
+            if (!html.includes(`id="${id}"`) || !js.includes(id)) throw new Error(`Missing viewer/updater wiring for ${id}`);
+          }
+          if (/<div id="invoiceDialog"[^>]*class="[^"]*invoice-viewer-panel/.test(html) && /invoiceDialog\.showModal\(\)/.test(js)) {
+            throw new Error('Invoice viewer must not use showModal().');
+          }
+          if (/<div id="quotationDialog"[^>]*class="[^"]*quotation-viewer-panel/.test(html) && /quotationDialog\.showModal\(\)/.test(js)) {
+            throw new Error('Quotation viewer must not use showModal().');
+          }
+          console.log(`UI wiring check passed for Manager v${version}`);
+          NODE
 
       - name: Prepare web assets for Capacitor
         run: |
